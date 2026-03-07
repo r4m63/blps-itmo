@@ -1,11 +1,11 @@
 package blps.itmo.entity;
 
-import jakarta.persistence.*;
-
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import jakarta.persistence.*;
 
 @Entity
 public class Claim {
@@ -59,7 +59,8 @@ public class Claim {
     public Claim() {
     }
 
-    public Claim(String initiatorId, String respondentId, BigDecimal amount, String currency, String reason, OffsetDateTime createdAt) {
+    public Claim(String initiatorId, String respondentId, BigDecimal amount, String currency, String reason,
+            OffsetDateTime createdAt) {
         this.initiatorId = initiatorId;
         this.respondentId = respondentId;
         this.amount = amount;

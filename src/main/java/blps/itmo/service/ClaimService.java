@@ -1,5 +1,11 @@
 package blps.itmo.service;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import blps.itmo.entity.Attachment;
 import blps.itmo.entity.AttachmentType;
 import blps.itmo.entity.Claim;
@@ -8,11 +14,6 @@ import blps.itmo.exception.DomainException;
 import blps.itmo.repository.AttachmentRepository;
 import blps.itmo.repository.ClaimRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 
 @Service
 public class ClaimService {
@@ -27,10 +28,10 @@ public class ClaimService {
 
     @Transactional
     public Claim createClaim(String initiatorId,
-                             String respondentId,
-                             BigDecimal amount,
-                             String currency,
-                             String reason) {
+            String respondentId,
+            BigDecimal amount,
+            String currency,
+            String reason) {
         Claim claim = new Claim(initiatorId, respondentId, amount, currency, reason, OffsetDateTime.now());
         return claimRepository.save(claim);
     }

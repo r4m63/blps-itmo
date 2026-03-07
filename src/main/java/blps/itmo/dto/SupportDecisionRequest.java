@@ -5,6 +5,5 @@ import jakarta.validation.constraints.NotNull;
 
 public record SupportDecisionRequest(
         @NotNull Boolean approvePenalty,
-        @NotBlank String comment
-) {
+        @NotBlank String comment) {
 }

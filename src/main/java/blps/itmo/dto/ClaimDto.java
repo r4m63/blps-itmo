@@ -1,11 +1,11 @@
 package blps.itmo.dto;
 
-import blps.itmo.entity.Claim;
-import blps.itmo.entity.ClaimStatus;
-
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+
+import blps.itmo.entity.Claim;
+import blps.itmo.entity.ClaimStatus;
 
 public record ClaimDto(
         Long id,
@@ -25,8 +25,7 @@ public record ClaimDto(
         OffsetDateTime responseDueAt,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
-        List<AttachmentDto> attachments
-) {
+        List<AttachmentDto> attachments) {
     public static ClaimDto from(Claim claim) {
         return new ClaimDto(
                 claim.getId(),
@@ -46,7 +45,6 @@ public record ClaimDto(
                 claim.getResponseDueAt(),
                 claim.getCreatedAt(),
                 claim.getUpdatedAt(),
-                claim.getAttachments().stream().map(AttachmentDto::from).toList()
-        );
+                claim.getAttachments().stream().map(AttachmentDto::from).toList());
     }
 }

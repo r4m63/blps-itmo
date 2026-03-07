@@ -7,6 +7,5 @@ import jakarta.validation.constraints.NotNull;
 public record AttachmentRequest(
         @NotNull AttachmentType type,
         @NotBlank String url,
-        @NotBlank String uploaderId
-) {
+        @NotBlank String uploaderId) {
 }

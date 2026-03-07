@@ -1,8 +1,8 @@
 package blps.itmo.dto;
 
-import jakarta.validation.constraints.NotEmpty;
-
 import java.util.List;
+
+import jakarta.validation.constraints.NotEmpty;
 
 public record ProvideDocsRequest(@NotEmpty List<AttachmentRequest> attachments) {
 }

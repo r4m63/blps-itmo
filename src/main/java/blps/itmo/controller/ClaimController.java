@@ -1,13 +1,19 @@
 package blps.itmo.controller;
 
-import blps.itmo.entity.Claim;
-import blps.itmo.service.ClaimService;
-import blps.itmo.dto.*;
-import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import blps.itmo.dto.AttachmentRequest;
+import blps.itmo.dto.ClaimDto;
+import blps.itmo.dto.CreateClaimRequest;
+import blps.itmo.dto.IntakeCheckRequest;
+import blps.itmo.dto.ProvideDocsRequest;
+import blps.itmo.dto.RespondentResponseRequest;
+import blps.itmo.dto.RulesCheckRequest;
+import blps.itmo.dto.SupportDecisionRequest;
+import blps.itmo.entity.Claim;
+import blps.itmo.service.ClaimService;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/claims")
@@ -27,8 +33,7 @@ public class ClaimController {
                 request.respondentId(),
                 request.amount(),
                 request.currency(),
-                request.reason()
-        );
+                request.reason());
 
         if (request.attachments() != null) {
             for (AttachmentRequest a : request.attachments()) {

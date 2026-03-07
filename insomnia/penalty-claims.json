@@ -1,0 +1,153 @@
+{
+    "_type": "export",
+    "__export_format": 4,
+    "__export_date": "2026-03-06T00:00:00.000Z",
+    "__export_source": "codex-generated",
+    "resources": [
+        {
+            "_id": "wrk_penalty",
+            "_type": "workspace",
+            "name": "Penalty Claims",
+            "description": "REST calls for penalty claim process"
+        },
+        {
+            "_id": "env_base",
+            "_type": "environment",
+            "parentId": "wrk_penalty",
+            "name": "Base Environment",
+            "data": {
+                "base_url": "http://localhost:8080/api"
+            }
+        },
+        {
+            "_id": "fld_claims",
+            "_type": "request_group",
+            "parentId": "wrk_penalty",
+            "name": "Claims"
+        },
+        {
+            "_id": "req_create",
+            "_type": "request",
+            "parentId": "fld_claims",
+            "name": "1) Create claim",
+            "method": "POST",
+            "url": "{{ base_url }}/claims",
+            "body": {
+                "mimeType": "application/json",
+                "text": "{\n  \"initiatorId\": \"host-1\",\n  \"respondentId\": \"guest-1\",\n  \"amount\": 150.00,\n  \"currency\": \"USD\",\n  \"reason\": \"Повреждение мебели\",\n  \"attachments\": [\n    {\"type\": \"EVIDENCE\", \"url\": \"https://files/evidence1.jpg\", \"uploaderId\": \"host-1\"}\n  ]\n}"
+            },
+            "headers": [
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                }
+            ]
+        },
+        {
+            "_id": "req_get",
+            "_type": "request",
+            "parentId": "fld_claims",
+            "name": "2) Get claim",
+            "method": "GET",
+            "url": "{{ base_url }}/claims/{{ claimId }}"
+        },
+        {
+            "_id": "req_intake_yes",
+            "_type": "request",
+            "parentId": "fld_claims",
+            "name": "3) Intake check (enoughData=true)",
+            "method": "POST",
+            "url": "{{ base_url }}/claims/{{ claimId }}/intake-check",
+            "body": {
+                "mimeType": "application/json",
+                "text": "{ \"enoughData\": true }"
+            },
+            "headers": [
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                }
+            ]
+        },
+        {
+            "_id": "req_provide_docs",
+            "_type": "request",
+            "parentId": "fld_claims",
+            "name": "3b) Provide extra docs",
+            "method": "POST",
+            "url": "{{ base_url }}/claims/{{ claimId }}/provide-docs",
+            "body": {
+                "mimeType": "application/json",
+                "text": "{\n  \"attachments\": [\n    {\"type\": \"CLARIFICATION\", \"url\": \"https://files/additional.pdf\", \"uploaderId\": \"host-1\"}\n  ]\n}"
+            },
+            "headers": [
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                }
+            ]
+        },
+        {
+            "_id": "req_rules",
+            "_type": "request",
+            "parentId": "fld_claims",
+            "name": "4) Rules check (grounds=true)",
+            "method": "POST",
+            "url": "{{ base_url }}/claims/{{ claimId }}/rules-check",
+            "body": {
+                "mimeType": "application/json",
+                "text": "{ \"groundsForPenalty\": true }"
+            },
+            "headers": [
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                }
+            ]
+        },
+        {
+            "_id": "req_respond",
+            "_type": "request",
+            "parentId": "fld_claims",
+            "name": "5) Respondent comment",
+            "method": "POST",
+            "url": "{{ base_url }}/claims/{{ claimId }}/respondent/response",
+            "body": {
+                "mimeType": "application/json",
+                "text": "{ \"comment\": \"Не согласен, прикладываю фото\" }"
+            },
+            "headers": [
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                }
+            ]
+        },
+        {
+            "_id": "req_timeout",
+            "_type": "request",
+            "parentId": "fld_claims",
+            "name": "5b) Mark timeout (no response)",
+            "method": "POST",
+            "url": "{{ base_url }}/claims/{{ claimId }}/respondent/timeout"
+        },
+        {
+            "_id": "req_support",
+            "_type": "request",
+            "parentId": "fld_claims",
+            "name": "6) Support decision",
+            "method": "POST",
+            "url": "{{ base_url }}/claims/{{ claimId }}/support-decision",
+            "body": {
+                "mimeType": "application/json",
+                "text": "{ \"approvePenalty\": true, \"comment\": \"Подтверждаю удержание\" }"
+            },
+            "headers": [
+                {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                }
+            ]
+        }
+    ]
+}

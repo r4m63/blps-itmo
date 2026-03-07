@@ -1,8 +1,8 @@
 package blps.itmo.entity;
 
-import jakarta.persistence.*;
-
 import java.time.OffsetDateTime;
+
+import jakarta.persistence.*;
 
 @Entity
 public class Attachment {
