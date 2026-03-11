@@ -1,15 +1,15 @@
 package blps.itmo.controller;
 
-import blps.itmo.dto.AttachmentRequest;
 import blps.itmo.dto.ClaimDto;
 import blps.itmo.dto.CreateClaimRequest;
 import blps.itmo.dto.IntakeCheckRequest;
-import blps.itmo.dto.ProvideDocsRequest;
 import blps.itmo.dto.RespondentResponseRequest;
 import blps.itmo.dto.RulesCheckRequest;
 import blps.itmo.dto.SupportDecisionRequest;
+import blps.itmo.entity.AttachmentType;
 import blps.itmo.entity.Claim;
 import blps.itmo.service.ClaimService;
+import blps.itmo.service.MinioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -19,7 +19,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/claims")
@@ -27,9 +31,11 @@ import org.springframework.web.bind.annotation.*;
 public class ClaimController {
 
     private final ClaimService claimService;
+    private final MinioService minioService;
 
-    public ClaimController(ClaimService claimService) {
+    public ClaimController(ClaimService claimService, MinioService minioService) {
         this.claimService = claimService;
+        this.minioService = minioService;
     }
 
     @PostMapping
@@ -53,12 +59,6 @@ public class ClaimController {
                 request.amount(),
                 request.currency(),
                 request.reason());
-
-        if (request.attachments() != null) {
-            for (AttachmentRequest a : request.attachments()) {
-                claimService.addAttachment(claim.getId(), a.uploaderId(), a.type(), a.url());
-            }
-        }
         return ClaimDto.from(claimService.get(claim.getId()));
     }
 
@@ -78,21 +78,34 @@ public class ClaimController {
         return ClaimDto.from(claimService.get(id));
     }
 
-    @PostMapping("/{id}/attachments")
+    @PostMapping(value = "/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
     @Operation(
-            summary = "Добавить вложение",
+            summary = "Загрузить и прикрепить файл к заявке",
             description = """
                     Кто вызывает: инициатор/ответчик/поддержка.
-                    Что делает: добавляет материалы к заявке (доказательства, уточнения и т.п.).
+                    Что делает: загружает файл во внутреннее хранилище и прикрепляет к заявке.
+                    URL хранения скрыт от пользователя.
                     """
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Вложение добавлено", content = @Content(schema = @Schema(implementation = ClaimDto.class))),
-            @ApiResponse(responseCode = "400", description = "Ошибка валидации запроса"),
+            @ApiResponse(responseCode = "201", description = "Файл прикреплён", content = @Content(schema = @Schema(implementation = ClaimDto.class))),
+            @ApiResponse(responseCode = "400", description = "Файл не передан или ошибка валидации"),
             @ApiResponse(responseCode = "404", description = "Заявка не найдена")
     })
-    public ClaimDto addAttachment(@PathVariable Long id, @Valid @RequestBody AttachmentRequest request) {
-        claimService.addAttachment(id, request.uploaderId(), request.type(), request.url());
+    public ClaimDto addAttachment(
+            @PathVariable Long id,
+            @Parameter(description = "Файл (фото, PDF и т.п.)", required = true)
+            @RequestParam("file") MultipartFile file,
+            @Parameter(description = "ID загружающего пользователя", required = true)
+            @RequestParam("uploaderId") String uploaderId,
+            @Parameter(description = "Тип вложения: EVIDENCE, CLARIFICATION, RESPONDENT_COMMENT, PHOTO")
+            @RequestParam(value = "type", defaultValue = "PHOTO") AttachmentType type) {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File must not be empty");
+        }
+        String url = minioService.upload(file);
+        claimService.addAttachment(id, uploaderId, type, url);
         return ClaimDto.from(claimService.get(id));
     }
 
@@ -111,19 +124,29 @@ public class ClaimController {
         return ClaimDto.from(claimService.get(id));
     }
 
-    @PostMapping("/{id}/provide-docs")
+    @PostMapping(value = "/{id}/provide-docs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
             summary = "Предоставить доп. материалы (заявитель)",
-            description = "Отвечает на запрос доп. данных; прикладывает файлы и возвращает в повторную проверку полноты."
+            description = "Отвечает на запрос доп. данных; загружает один или несколько файлов и возвращает в повторную проверку полноты."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Доп материалы приняты", content = @Content(schema = @Schema(implementation = ClaimDto.class))),
             @ApiResponse(responseCode = "400", description = "Неверный статус (ожидался NEED_ADDITIONAL_DATA) или валидация"),
             @ApiResponse(responseCode = "404", description = "Заявка не найдена")
     })
-    public ClaimDto provideDocs(@PathVariable Long id, @Valid @RequestBody ProvideDocsRequest request) {
-        for (AttachmentRequest a : request.attachments()) {
-            claimService.addAttachment(id, a.uploaderId(), a.type(), a.url());
+    public ClaimDto provideDocs(
+            @PathVariable Long id,
+            @Parameter(description = "Файлы (один или несколько)", required = true)
+            @RequestParam("files") List<MultipartFile> files,
+            @Parameter(description = "ID загружающего пользователя", required = true)
+            @RequestParam("uploaderId") String uploaderId,
+            @Parameter(description = "Тип вложения: EVIDENCE, CLARIFICATION, PHOTO")
+            @RequestParam(value = "type", defaultValue = "CLARIFICATION") AttachmentType type) {
+        for (MultipartFile file : files) {
+            if (!file.isEmpty()) {
+                String url = minioService.upload(file);
+                claimService.addAttachment(id, uploaderId, type, url);
+            }
         }
         claimService.provideAdditionalData(id);
         return ClaimDto.from(claimService.get(id));
