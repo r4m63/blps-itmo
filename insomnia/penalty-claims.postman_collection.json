@@ -1,0 +1,220 @@
+{
+  "info": {
+    "_postman_id": "d2c8d3b8-penalty-claims-placeholder",
+    "name": "Penalty Claims",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "REST calls for penalty claim process (converted from Insomnia export, 2026-03-06)"
+  },
+  "item": [
+    {
+      "name": "Claims",
+      "item": [
+        {
+          "name": "1) Create claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"initiatorId\": \"host-1\",\n  \"respondentId\": \"guest-1\",\n  \"amount\": 150.00,\n  \"currency\": \"USD\",\n  \"reason\": \"Повреждение мебели\",\n  \"attachments\": [\n    {\"type\": \"EVIDENCE\", \"url\": \"https://files/evidence1.jpg\", \"uploaderId\": \"host-1\"}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/claims",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "claims"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2) Get claim",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/claims/{{claimId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "claims",
+                "{{claimId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3) Intake check (enoughData=true)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"enoughData\": true }"
+            },
+            "url": {
+              "raw": "{{base_url}}/claims/{{claimId}}/intake-check",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "claims",
+                "{{claimId}}",
+                "intake-check"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3b) Provide extra docs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attachments\": [\n    {\"type\": \"CLARIFICATION\", \"url\": \"https://files/additional.pdf\", \"uploaderId\": \"host-1\"}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/claims/{{claimId}}/provide-docs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "claims",
+                "{{claimId}}",
+                "provide-docs"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4) Rules check (grounds=true)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"groundsForPenalty\": true }"
+            },
+            "url": {
+              "raw": "{{base_url}}/claims/{{claimId}}/rules-check",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "claims",
+                "{{claimId}}",
+                "rules-check"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5) Respondent comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"comment\": \"Не согласен, прикладываю фото\" }"
+            },
+            "url": {
+              "raw": "{{base_url}}/claims/{{claimId}}/respondent/response",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "claims",
+                "{{claimId}}",
+                "respondent",
+                "response"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5b) Mark timeout (no response)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/claims/{{claimId}}/respondent/timeout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "claims",
+                "{{claimId}}",
+                "respondent",
+                "timeout"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6) Support decision",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"approvePenalty\": true, \"comment\": \"Подтверждаю удержание\" }"
+            },
+            "url": {
+              "raw": "{{base_url}}/claims/{{claimId}}/support-decision",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "claims",
+                "{{claimId}}",
+                "support-decision"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080/api"
+    },
+    {
+      "key": "claimId",
+      "value": "<set-after-create>"
+    }
+  ]
+}

@@ -102,7 +102,7 @@
       </bpmn:timerEventDefinition>
     </bpmn:intermediateCatchEvent>
     <bpmn:sequenceFlow id="Flow_0cyfudy" sourceRef="UserTask_RespondComment" targetRef="BoundaryTimer_ResponseTimeout" />
-    <bpmn:userTask id="Activity_0gw4i7b" name="Проверка правил и риск-оценка" camunda:assignee="${initiator}">
+    <bpmn:userTask id="Activity_0gw4i7b" name="Проверка правил и оценка ущерба" camunda:assignee="${initiator}">
       <bpmn:documentation>Если данных недостаточно — запросить уточнение / дополнительные документы.</bpmn:documentation>
       <bpmn:incoming>Flow_04_yes</bpmn:incoming>
       <bpmn:outgoing>Flow_065q47c</bpmn:outgoing>
@@ -162,6 +162,12 @@
           <dc:Bounds x="1838" y="316" width="74" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_ApplyPenalty_di" bpmnElement="ServiceTask_ApplyPenalty">
+        <dc:Bounds x="1960" y="277" width="220" height="86" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_CloseWithoutPenalty_di" bpmnElement="ServiceTask_CloseWithoutPenalty">
+        <dc:Bounds x="1960" y="377" width="220" height="86" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="IntermediateThrowEvent_NotifyDecision_di" bpmnElement="IntermediateThrowEvent_NotifyDecision">
         <dc:Bounds x="2250" y="145" width="36" height="36" />
         <bpmndi:BPMNLabel>
@@ -188,21 +194,9 @@
         <dc:Bounds x="495" y="327" width="190" height="86" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ServiceTask_ApplyPenalty_di" bpmnElement="ServiceTask_ApplyPenalty">
-        <dc:Bounds x="1960" y="277" width="220" height="86" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ServiceTask_CloseWithoutPenalty_di" bpmnElement="ServiceTask_CloseWithoutPenalty">
-        <dc:Bounds x="1960" y="377" width="220" height="86" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_01_di" bpmnElement="Flow_01">
         <di:waypoint x="216" y="163" />
         <di:waypoint x="260" y="163" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_02_di" bpmnElement="Flow_02">
-        <di:waypoint x="430" y="163" />
-        <di:waypoint x="465" y="163" />
-        <di:waypoint x="465" y="370" />
-        <di:waypoint x="490" y="370" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_04_yes_di" bpmnElement="Flow_04_yes">
         <di:waypoint x="785" y="370" />
@@ -212,13 +206,6 @@
         <di:waypoint x="760" y="345" />
         <di:waypoint x="760" y="163" />
         <di:waypoint x="840" y="163" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_05_di" bpmnElement="Flow_05">
-        <di:waypoint x="1030" y="163" />
-        <di:waypoint x="1080" y="163" />
-        <di:waypoint x="1080" y="280" />
-        <di:waypoint x="580" y="280" />
-        <di:waypoint x="580" y="327" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_07_yes_di" bpmnElement="Flow_07_yes">
         <di:waypoint x="1140" y="370" />
@@ -288,6 +275,19 @@
       <bpmndi:BPMNEdge id="Flow_065q47c_di" bpmnElement="Flow_065q47c">
         <di:waypoint x="1030" y="370" />
         <di:waypoint x="1090" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05_di" bpmnElement="Flow_05">
+        <di:waypoint x="1030" y="163" />
+        <di:waypoint x="1080" y="163" />
+        <di:waypoint x="1080" y="280" />
+        <di:waypoint x="580" y="280" />
+        <di:waypoint x="580" y="327" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02_di" bpmnElement="Flow_02">
+        <di:waypoint x="430" y="163" />
+        <di:waypoint x="465" y="163" />
+        <di:waypoint x="465" y="370" />
+        <di:waypoint x="490" y="370" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1mbnhfb_di" bpmnElement="Flow_1mbnhfb">
         <di:waypoint x="685" y="370" />
