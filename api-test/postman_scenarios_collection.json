@@ -1,0 +1,290 @@
+{
+  "info": {
+    "_postman_id": "b7c0d4c1-penalty-scenarios-placeholder",
+    "name": "Penalty Claims - Scenarios",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Полное покрытие бизнес-процесса Penalty Claim. Содержит 4 сценария из bash-скриптов. Запускать через Runner, используя env с base_url."
+  },
+  "item": [
+    {
+      "name": "Scenario 1 - Happy path (grounds, respondent replies, support approves)",
+      "item": [
+        {
+          "name": "S1.1 Create claim",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{base_url}}/claims", "host": ["{{base_url}}"], "path": ["claims"] },
+            "body": { "mode": "raw", "raw": "{\n  \"initiatorId\": \"host-1\",\n  \"respondentId\": \"guest-1\",\n  \"amount\": 150,\n  \"currency\": \"USD\",\n  \"reason\": \"Повреждение мебели\",\n  \"attachments\": [{\n    \"type\": \"EVIDENCE\", \"url\": \"https://files/evidence1.jpg\", \"uploaderId\": \"host-1\"\n  }]\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('Status code 201', () => pm.response.code === 201);",
+                  "pm.test('Status DATA_REVIEW', () => res.status === 'DATA_REVIEW');",
+                  "pm.collectionVariables.set('claimId', res.id);",
+                  "pm.test('claimId stored', () => pm.collectionVariables.get('claimId'));
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "S1.2 Intake enoughData=true",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{base_url}}/claims/{{claimId}}/intake-check", "host": ["{{base_url}}"], "path": ["claims","{{claimId}}","intake-check"] },
+            "body": { "mode": "raw", "raw": "{\"enoughData\":true}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('200 OK', () => pm.response.code === 200);",
+                  "pm.test('status RISK_REVIEW', () => res.status === 'RISK_REVIEW');",
+                  "pm.test('enoughData=true', () => res.enoughData === true);
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "S1.3 Rules groundsForPenalty=true",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{base_url}}/claims/{{claimId}}/rules-check", "host": ["{{base_url}}"], "path": ["claims","{{claimId}}","rules-check"] },
+            "body": { "mode": "raw", "raw": "{\"groundsForPenalty\":true}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {"type": "text/javascript", "exec": [
+                "const res = pm.response.json();",
+                "pm.test('200 OK', () => pm.response.code === 200);",
+                "pm.test('status WAITING_RESPONDENT', () => res.status === 'WAITING_RESPONDENT');",
+                "pm.test('groundsForPenalty=true', () => res.groundsForPenalty === true);",
+                "pm.test('responseDueAt set', () => !!res.responseDueAt);
+              ]}
+            }
+          ]
+        },
+        {
+          "name": "S1.4 Respondent response",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{base_url}}/claims/{{claimId}}/respondent/response", "host": ["{{base_url}}"], "path": ["claims","{{claimId}}","respondent","response"] },
+            "body": { "mode": "raw", "raw": "{\"comment\":\"Не согласен, прикладываю фото\"}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {"type": "text/javascript", "exec": [
+                "const res = pm.response.json();",
+                "pm.test('200 OK', () => pm.response.code === 200);",
+                "pm.test('status SUPPORT_REVIEW', () => res.status === 'SUPPORT_REVIEW');",
+                "pm.test('respondentTimeout=false', () => res.respondentTimeout === false);
+              ]}
+            }
+          ]
+        },
+        {
+          "name": "S1.5 Support approve",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{base_url}}/claims/{{claimId}}/support-decision", "host": ["{{base_url}}"], "path": ["claims","{{claimId}}","support-decision"] },
+            "body": { "mode": "raw", "raw": "{\"approvePenalty\":true,\"comment\":\"Подтверждаю удержание\"}" }
+          },
+          "event": [
+            {"listen": "test", "script": {"type": "text/javascript", "exec": [
+              "const res = pm.response.json();",
+              "pm.test('200 OK', () => pm.response.code === 200);",
+              "pm.test('status CLOSED_PENALTY', () => res.status === 'CLOSED_PENALTY');",
+              "pm.test('penaltyApplied', () => res.penaltyApplied === true);
+            ]}}
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Scenario 2 - Need more docs -> reject",
+      "item": [
+        {
+          "name": "S2.1 Create claim",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{base_url}}/claims", "host": ["{{base_url}}"], "path": ["claims"] },
+            "body": { "mode": "raw", "raw": "{\n  \"initiatorId\": \"host-2\",\n  \"respondentId\": \"guest-2\",\n  \"amount\": 75,\n  \"currency\": \"EUR\",\n  \"reason\": \"Шум ночью\",\n  \"attachments\": [{\"type\":\"EVIDENCE\",\"url\":\"https://files/audio1.mp3\",\"uploaderId\":\"host-2\"}]\n}" }
+          },
+          "event": [{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.collectionVariables.set('claimId', res.id);",
+            "pm.test('201 created', () => pm.response.code === 201);
+          ]}}]
+        },
+        {
+          "name": "S2.2 Intake enoughData=false",
+          "request": {
+            "method": "POST",
+            "header": [ {"key": "Content-Type", "value": "application/json"} ],
+            "url": {"raw": "{{base_url}}/claims/{{claimId}}/intake-check", "host":["{{base_url}}"], "path":["claims","{{claimId}}","intake-check"]},
+            "body": {"mode":"raw","raw":"{\"enoughData\":false}"}
+          },
+          "event": [{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.test('status NEED_ADDITIONAL_DATA', () => res.status === 'NEED_ADDITIONAL_DATA');
+          ]}}]
+        },
+        {
+          "name": "S2.3 Provide docs",
+          "request": {
+            "method": "POST",
+            "header": [ {"key": "Content-Type", "value": "application/json"} ],
+            "url": {"raw": "{{base_url}}/claims/{{claimId}}/provide-docs", "host":["{{base_url}}"], "path":["claims","{{claimId}}","provide-docs"]},
+            "body": {"mode":"raw","raw":"{\"attachments\":[{\"type\":\"CLARIFICATION\",\"url\":\"https://files/additional.pdf\",\"uploaderId\":\"host-2\"}]}"}
+          },
+          "event": [{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.test('status DATA_REVIEW', () => res.status === 'DATA_REVIEW');
+          ]}}]
+        },
+        {
+          "name": "S2.4 Intake again true",
+          "request": {
+            "method": "POST",
+            "header": [ {"key": "Content-Type", "value": "application/json"} ],
+            "url": {"raw": "{{base_url}}/claims/{{claimId}}/intake-check", "host":["{{base_url}}"], "path":["claims","{{claimId}}","intake-check"]},
+            "body": {"mode":"raw","raw":"{\"enoughData\":true}"}
+          },
+          "event": [{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.test('status RISK_REVIEW', () => res.status === 'RISK_REVIEW');
+          ]}}]
+        },
+        {
+          "name": "S2.5 Rules grounds=false -> reject",
+          "request": {
+            "method": "POST",
+            "header": [ {"key": "Content-Type", "value": "application/json"} ],
+            "url": {"raw": "{{base_url}}/claims/{{claimId}}/rules-check", "host":["{{base_url}}"], "path":["claims","{{claimId}}","rules-check"]},
+            "body": {"mode":"raw","raw":"{\"groundsForPenalty\":false}"}
+          },
+          "event": [{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.test('status CLOSED_REJECT', () => res.status === 'CLOSED_REJECT');",
+            "pm.test('penaltyApplied=false', () => res.penaltyApplied === false);
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "Scenario 3 - Timeout -> support approves",
+      "item": [
+        {
+          "name": "S3.1 Create claim",
+          "request": {"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":{"raw":"{{base_url}}/claims","host":["{{base_url}}"],"path":["claims"]},"body":{"mode":"raw","raw":"{\n  \"initiatorId\": \"host-3\",\n  \"respondentId\": \"guest-3\",\n  \"amount\": 200,\n  \"currency\": \"USD\",\n  \"reason\": \"Разбитое окно\",\n  \"attachments\": [{\"type\":\"EVIDENCE\",\"url\":\"https://files/window.jpg\",\"uploaderId\":\"host-3\"}]\n}"}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.collectionVariables.set('claimId', res.id);",
+            "pm.test('201 created', () => pm.response.code === 201);
+          ]}}]
+        },
+        {
+          "name": "S3.2 Intake true",
+          "request": {"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":{"raw":"{{base_url}}/claims/{{claimId}}/intake-check","host":["{{base_url}}"],"path":["claims","{{claimId}}","intake-check"]},"body":{"mode":"raw","raw":"{\"enoughData\":true}"}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "pm.test('RISK_REVIEW', () => pm.response.json().status === 'RISK_REVIEW');
+          ]}}]
+        },
+        {
+          "name": "S3.3 Rules true",
+          "request": {"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":{"raw":"{{base_url}}/claims/{{claimId}}/rules-check","host":["{{base_url}}"],"path":["claims","{{claimId}}","rules-check"]},"body":{"mode":"raw","raw":"{\"groundsForPenalty\":true}"}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.test('WAITING_RESPONDENT', () => res.status === 'WAITING_RESPONDENT');
+          ]}}]
+        },
+        {
+          "name": "S3.4 Timeout",
+          "request": {"method":"POST","url":{"raw":"{{base_url}}/claims/{{claimId}}/respondent/timeout","host":["{{base_url}}"],"path":["claims","{{claimId}}","respondent","timeout"]}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.test('SUPPORT_REVIEW', () => res.status === 'SUPPORT_REVIEW');",
+            "pm.test('respondentTimeout=true', () => res.respondentTimeout === true);
+          ]}}]
+        },
+        {
+          "name": "S3.5 Support approve",
+          "request": {"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":{"raw":"{{base_url}}/claims/{{claimId}}/support-decision","host":["{{base_url}}"],"path":["claims","{{claimId}}","support-decision"]},"body":{"mode":"raw","raw":"{\"approvePenalty\":true,\"comment\":\"Нет ответа арендатора, удержание подтверждено\"}"}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.test('CLOSED_PENALTY', () => res.status === 'CLOSED_PENALTY');
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "Scenario 4 - Respondent disputes -> support rejects",
+      "item": [
+        {
+          "name": "S4.1 Create claim",
+          "request": {"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":{"raw":"{{base_url}}/claims","host":["{{base_url}}"],"path":["claims"]},"body":{"mode":"raw","raw":"{\n  \"initiatorId\": \"host-4\",\n  \"respondentId\": \"guest-4\",\n  \"amount\": 120,\n  \"currency\": \"USD\",\n  \"reason\": \"Задержка выезда\",\n  \"attachments\": [{\"type\":\"EVIDENCE\",\"url\":\"https://files/late-checkout.jpg\",\"uploaderId\":\"host-4\"}]\n}"}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.collectionVariables.set('claimId', res.id);",
+            "pm.test('201 created', () => pm.response.code === 201);
+          ]}}]
+        },
+        {
+          "name": "S4.2 Intake true",
+          "request": {"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":{"raw":"{{base_url}}/claims/{{claimId}}/intake-check","host":["{{base_url}}"],"path":["claims","{{claimId}}","intake-check"]},"body":{"mode":"raw","raw":"{\"enoughData\":true}"}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "pm.test('RISK_REVIEW', () => pm.response.json().status === 'RISK_REVIEW');
+          ]}}]
+        },
+        {
+          "name": "S4.3 Rules true",
+          "request": {"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":{"raw":"{{base_url}}/claims/{{claimId}}/rules-check","host":["{{base_url}}"],"path":["claims","{{claimId}}","rules-check"]},"body":{"mode":"raw","raw":"{\"groundsForPenalty\":true}"}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "pm.test('WAITING_RESPONDENT', () => pm.response.json().status === 'WAITING_RESPONDENT');
+          ]}}]
+        },
+        {
+          "name": "S4.4 Respondent disputes",
+          "request": {"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":{"raw":"{{base_url}}/claims/{{claimId}}/respondent/response","host":["{{base_url}}"],"path":["claims","{{claimId}}","respondent","response"]},"body":{"mode":"raw","raw":"{\"comment\":\"Предоставил доказательства обратного\"}"}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.test('SUPPORT_REVIEW', () => res.status === 'SUPPORT_REVIEW');
+          ]}}]
+        },
+        {
+          "name": "S4.5 Support rejects",
+          "request": {"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":{"raw":"{{base_url}}/claims/{{claimId}}/support-decision","host":["{{base_url}}"],"path":["claims","{{claimId}}","support-decision"]},"body":{"mode":"raw","raw":"{\"approvePenalty\":false,\"comment\":\"Доказательства арендатора убедительны\"}"}},
+          "event":[{"listen":"test","script":{"type":"text/javascript","exec":[
+            "const res = pm.response.json();",
+            "pm.test('CLOSED_REJECT', () => res.status === 'CLOSED_REJECT');",
+            "pm.test('penaltyApplied=false', () => res.penaltyApplied === false);
+          ]}}]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080/api" },
+    { "key": "claimId", "value": "" }
+  ]
+}
