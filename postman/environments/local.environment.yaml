@@ -24,3 +24,6 @@ values:
   - key: claimId
     value: ''
     enabled: true
+  - key: adminId
+    value: ''
+    enabled: true
