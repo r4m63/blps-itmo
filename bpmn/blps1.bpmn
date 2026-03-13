@@ -2,7 +2,7 @@
 <bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="Definitions_PenaltyClaims" targetNamespace="http://example.com/bpmn/penalty-claims" exporter="Camunda Modeler" exporterVersion="5.44.0">
   <bpmn:process id="PenaltyClaimProcess" name="Сервис заявок на штрафные санкции" isExecutable="true">
     <bpmn:laneSet id="LaneSet_1">
-      <bpmn:lane id="Lane_Client" name="Заявитель (гость/хозяин)">
+      <bpmn:lane id="Lane_Client" name="Заявитель (арендодатель)">
         <bpmn:flowNodeRef>StartEvent_RequestCreated</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>UserTask_CreateClaim</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>UserTask_ProvideDocs</bpmn:flowNodeRef>
@@ -10,7 +10,7 @@
         <bpmn:flowNodeRef>EndEvent_PenaltyApplied</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>EndEvent_ClaimRejected</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Lane_Platform" name="Платформа (Airbnb / Support / Risk)">
+      <bpmn:lane id="Lane_Platform" name="Платформа (Airbnb Support)">
         <bpmn:flowNodeRef>ExclusiveGateway_EnoughData</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>ExclusiveGateway_RulesViolated</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>UserTask_SupportReview</bpmn:flowNodeRef>
@@ -20,14 +20,14 @@
         <bpmn:flowNodeRef>ServiceTask_ApplyPenalty</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>ServiceTask_CloseWithoutPenalty</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Lane_Respondent" name="Ответчик (вторая сторона)">
+      <bpmn:lane id="Lane_Respondent" name="Ответчик (арендартор)">
         <bpmn:flowNodeRef>IntermediateThrowEvent_RequestComment</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>UserTask_RespondComment</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>BoundaryTimer_ResponseTimeout</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="StartEvent_RequestCreated" name="Заявка инициирована" />
-    <bpmn:userTask id="UserTask_CreateClaim" name="Создать заявку на штрафные санкции" camunda:assignee="${initiator}">
+    <bpmn:userTask id="UserTask_CreateClaim" name="Создать заявку на возмещение ущерба (санкции)" camunda:assignee="${initiator}">
       <bpmn:documentation>Заявитель заполняет форму, указывает инцидент, сумму/тип штрафа, прикладывает доказательства.</bpmn:documentation>
       <bpmn:outgoing>Flow_02</bpmn:outgoing>
     </bpmn:userTask>
@@ -44,7 +44,7 @@
     <bpmn:intermediateThrowEvent id="IntermediateThrowEvent_RequestComment" name="Запросить комментарий ответчика">
       <bpmn:messageEventDefinition id="MessageEventDefinition_RequestComment" />
     </bpmn:intermediateThrowEvent>
-    <bpmn:userTask id="UserTask_RespondComment" name="Ответчик предоставляет комментарий / возражение" camunda:assignee="${respondent}">
+    <bpmn:userTask id="UserTask_RespondComment" name="Ответчик предоставляет комментарий / возражение / соглашается" camunda:assignee="${respondent}">
       <bpmn:documentation>Ответчик прикладывает объяснение и документы. При отсутствии ответа процесс идет дальше по таймауту.</bpmn:documentation>
       <bpmn:outgoing>Flow_0cyfudy</bpmn:outgoing>
     </bpmn:userTask>
@@ -67,7 +67,7 @@
     <bpmn:sequenceFlow id="Flow_04_yes" sourceRef="ExclusiveGateway_EnoughData" targetRef="Activity_0gw4i7b">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${enoughData == true}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_04_no" sourceRef="ExclusiveGateway_EnoughData" targetRef="UserTask_ProvideDocs">
+    <bpmn:sequenceFlow id="Flow_04_no" name="" sourceRef="ExclusiveGateway_EnoughData" targetRef="UserTask_ProvideDocs">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${enoughData == false}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_07_yes" sourceRef="ExclusiveGateway_RulesViolated" targetRef="IntermediateThrowEvent_RequestComment">
@@ -108,7 +108,7 @@
       <bpmn:outgoing>Flow_065q47c</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:sequenceFlow id="Flow_065q47c" sourceRef="Activity_0gw4i7b" targetRef="ExclusiveGateway_RulesViolated" />
-    <bpmn:userTask id="Activity_1p30r0x" name="Проверить полноту и формат данных" camunda:assignee="${initiator}">
+    <bpmn:userTask id="Activity_1p30r0x" name="Проверить полноту и формат данных (вложение ущерба)" camunda:assignee="${initiator}">
       <bpmn:documentation>Если данных недостаточно — запросить уточнение / дополнительные документы.</bpmn:documentation>
       <bpmn:incoming>Flow_02</bpmn:incoming>
       <bpmn:incoming>Flow_05</bpmn:incoming>
@@ -122,18 +122,22 @@
     <bpmndi:BPMNPlane id="BPMNPlane_PenaltyClaimProcess" bpmnElement="PenaltyClaimProcess">
       <bpmndi:BPMNShape id="Lane_Respondent_di" bpmnElement="Lane_Respondent" isHorizontal="true">
         <dc:Bounds x="120" y="480" width="2310" height="180" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Platform_di" bpmnElement="Lane_Platform" isHorizontal="true">
         <dc:Bounds x="120" y="260" width="2310" height="220" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Client_di" bpmnElement="Lane_Client" isHorizontal="true">
         <dc:Bounds x="120" y="80" width="2310" height="180" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartEvent_RequestCreated_di" bpmnElement="StartEvent_RequestCreated">
         <dc:Bounds x="180" y="145" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_CreateClaim_di" bpmnElement="UserTask_CreateClaim">
         <dc:Bounds x="260" y="120" width="170" height="86" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ExclusiveGateway_EnoughData_di" bpmnElement="ExclusiveGateway_EnoughData" isMarkerVisible="true">
         <dc:Bounds x="735" y="345" width="50" height="50" />
@@ -152,6 +156,7 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_RespondComment_di" bpmnElement="UserTask_RespondComment">
         <dc:Bounds x="1290" y="527" width="220" height="86" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_SupportReview_di" bpmnElement="UserTask_SupportReview">
         <dc:Bounds x="1570" y="327" width="220" height="86" />
@@ -206,6 +211,9 @@
         <di:waypoint x="760" y="345" />
         <di:waypoint x="760" y="163" />
         <di:waypoint x="840" y="163" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="769" y="251" width="13" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_07_yes_di" bpmnElement="Flow_07_yes">
         <di:waypoint x="1140" y="370" />
