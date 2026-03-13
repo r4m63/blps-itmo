@@ -1,0 +1,26 @@
+name: local
+values:
+  - key: base_url
+    value: ''
+    enabled: true
+  - key: uploadContentType
+    value: ''
+    enabled: true
+  - key: landlordId
+    value: ''
+    enabled: true
+  - key: tenantId
+    value: ''
+    enabled: true
+  - key: uploadUrl
+    value: ''
+    enabled: true
+  - key: objectKey
+    value: ''
+    enabled: true
+  - key: attachmentId
+    value: ''
+    enabled: true
+  - key: claimId
+    value: ''
+    enabled: true

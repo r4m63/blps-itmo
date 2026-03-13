@@ -113,7 +113,7 @@ CREATE TYPE attachment_purpose AS ENUM (
 
 CREATE TABLE claim_attachments (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    claim_id BIGINT NOT NULL REFERENCES claims (id) ON DELETE CASCADE,
+    claim_id BIGINT REFERENCES claims (id) ON DELETE CASCADE,
     message_id BIGINT REFERENCES claim_messages (id) ON DELETE SET NULL,
     uploaded_by BIGINT NOT NULL REFERENCES users (id),
     purpose attachment_purpose NOT NULL DEFAULT 'DAMAGE_EVIDENCE',
@@ -121,6 +121,8 @@ CREATE TABLE claim_attachments (
     file_name TEXT NOT NULL,
     content_type TEXT,
     size_bytes BIGINT CHECK (size_bytes >= 0),
+    uploaded BOOLEAN NOT NULL DEFAULT FALSE,
+    confirmed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

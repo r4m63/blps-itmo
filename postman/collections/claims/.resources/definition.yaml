@@ -1,0 +1,14 @@
+$kind: collection
+name: claims
+auth:
+  - id: 891083c5-3d10-4330-9d31-8e5f79dadcd4
+    type: jwt
+    name: JWT Bearer
+    credentials:
+      algorithm: HS256
+      isSecretBase64Encoded: false
+      payload: "{}"
+      addTokenTo: header
+      headerPrefix: Bearer
+      queryParamKey: token
+      header: "{}"

@@ -3,6 +3,7 @@ package blps.itmo.dto;
 import blps.itmo.entity.ClaimStatus;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import lombok.Builder;
 import lombok.Data;
 
@@ -18,4 +19,5 @@ public class ClaimResponse {
     private BigDecimal claimedAmount;
     private String currency;
     private OffsetDateTime createdAt;
+    private List<String> attachmentKeys;
 }

@@ -1,5 +1,11 @@
 package blps.itmo.service;
 
+import java.time.OffsetDateTime;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import blps.itmo.dto.ClaimResponse;
 import blps.itmo.dto.CreateClaimRequest;
 import blps.itmo.entity.Claim;
@@ -9,9 +15,6 @@ import blps.itmo.entity.User;
 import blps.itmo.repository.ClaimRepository;
 import blps.itmo.repository.ClaimStatusHistoryRepository;
 import blps.itmo.repository.UserRepository;
-import java.time.OffsetDateTime;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ClaimService {
@@ -19,13 +22,16 @@ public class ClaimService {
     private final ClaimRepository claimRepository;
     private final UserRepository userRepository;
     private final ClaimStatusHistoryRepository statusHistoryRepository;
+    private final MinioService minioService;
 
     public ClaimService(ClaimRepository claimRepository,
-                        UserRepository userRepository,
-                        ClaimStatusHistoryRepository statusHistoryRepository) {
+            UserRepository userRepository,
+            ClaimStatusHistoryRepository statusHistoryRepository,
+            MinioService minioService) {
         this.claimRepository = claimRepository;
         this.userRepository = userRepository;
         this.statusHistoryRepository = statusHistoryRepository;
+        this.minioService = minioService;
     }
 
     @Transactional
@@ -51,6 +57,11 @@ public class ClaimService {
 
         Claim saved = claimRepository.save(claim);
 
+        List<String> objectKeys = request.getAttachmentKeys();
+        if (objectKeys != null && !objectKeys.isEmpty()) {
+            minioService.attachExistingObjectsToClaim(saved, landlord, objectKeys);
+        }
+
         statusHistoryRepository.save(ClaimStatusHistory.builder()
                 .claim(saved)
                 .fromStatus(null)
@@ -69,6 +80,7 @@ public class ClaimService {
                 .claimedAmount(saved.getClaimedAmount())
                 .currency(saved.getCurrency())
                 .createdAt(saved.getCreatedAt())
+                .attachmentKeys(objectKeys)
                 .build();
     }
 }

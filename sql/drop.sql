@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS claim_attachments CASCADE;
+DROP TABLE IF EXISTS claim_status_history CASCADE;
+DROP TABLE IF EXISTS claim_messages CASCADE;
+DROP TABLE IF EXISTS claims CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+DROP TYPE IF EXISTS attachment_purpose;
+DROP TYPE IF EXISTS comment_type;
+DROP TYPE IF EXISTS claim_status;
+DROP TYPE IF EXISTS user_role;

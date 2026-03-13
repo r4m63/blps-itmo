@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -27,4 +28,9 @@ public class CreateClaimRequest {
 
     @NotBlank
     private String currency = "USD";
+
+    /**
+     * Список object_key уже загруженных в MinIO файлов-доказательств.
+     */
+    private List<String> attachmentKeys;
 }

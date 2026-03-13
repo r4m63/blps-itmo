@@ -1,0 +1,18 @@
+$kind: http-request
+name: Upload to MinIO
+url: "{{uploadUrl}}"
+method: PUT
+headers:
+  - key: Content-Type
+    value: "{{uploadContentType}}"
+body:
+  type: file
+  content:
+    src: /Users/ramil/Projects/blps-itmo/test-resources/image.png
+scripts:
+  - type: afterResponse
+    code: >
+      pm.test("Upload OK",
+      ()=>pm.expect([200,204]).to.include(pm.response.code));
+    language: text/javascript
+order: 239084009689361

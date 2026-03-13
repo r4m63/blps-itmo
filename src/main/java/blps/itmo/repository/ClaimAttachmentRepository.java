@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ClaimAttachmentRepository extends JpaRepository<ClaimAttachment, Long> {
     List<ClaimAttachment> findByClaimId(Long claimId);
     List<ClaimAttachment> findByMessageId(Long messageId);
+    List<ClaimAttachment> findByObjectKeyIn(List<String> keys);
+    java.util.Optional<ClaimAttachment> findByObjectKey(String key);
 }

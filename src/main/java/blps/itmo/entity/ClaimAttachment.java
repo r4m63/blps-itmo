@@ -68,6 +68,13 @@ public class ClaimAttachment {
     @Column(name = "size_bytes")
     private Long sizeBytes;
 
+    @Column(name = "uploaded", nullable = false)
+    @Builder.Default
+    private Boolean uploaded = false;
+
+    @Column(name = "confirmed_at")
+    private OffsetDateTime confirmedAt;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 }
