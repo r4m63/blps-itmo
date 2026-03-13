@@ -1,6 +1,6 @@
 $kind: http-request
-name: POST intake decision NOT OK
-url: "{{base_url}}/api/claims/{claimId}/intake"
+name: (админ) принять решение на доп инфу
+url: "{{base_url}}/api/claims/{{claimId}}/intake"
 method: POST
 body:
   type: json

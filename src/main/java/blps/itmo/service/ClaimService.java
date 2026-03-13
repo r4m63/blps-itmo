@@ -3,6 +3,7 @@ package blps.itmo.service;
 import blps.itmo.dto.ClaimResponse;
 import blps.itmo.dto.CreateClaimRequest;
 import blps.itmo.dto.IntakeDecisionRequest;
+import blps.itmo.dto.AdditionalInfoReplyRequest;
 import blps.itmo.entity.Claim;
 import blps.itmo.entity.ClaimMessage;
 import blps.itmo.entity.ClaimStatus;
@@ -155,6 +156,62 @@ public class ClaimService {
     public ClaimResponse getClaim(Long id) {
         Claim claim = claimRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+        return ClaimResponse.builder()
+                .id(claim.getId())
+                .landlordId(claim.getLandlord().getId())
+                .tenantId(claim.getTenant().getId())
+                .status(claim.getStatus())
+                .title(claim.getTitle())
+                .description(claim.getDescription())
+                .claimedAmount(claim.getClaimedAmount())
+                .currency(claim.getCurrency())
+                .createdAt(claim.getCreatedAt())
+                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .build();
+    }
+
+    @Transactional
+    public ClaimResponse additionalInfoReply(Long claimId, blps.itmo.dto.AdditionalInfoReplyRequest request) {
+        Claim claim = claimRepository.findById(claimId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+        if (claim.getStatus() != ClaimStatus.NEED_ADDITIONAL_INFO) {
+            throw new IllegalStateException("Claim is not waiting for additional info");
+        }
+        User landlord = userRepository.findById(request.getLandlordId())
+                .orElseThrow(() -> new IllegalArgumentException("Landlord not found"));
+        if (!claim.getLandlord().getId().equals(landlord.getId())) {
+            throw new IllegalArgumentException("Landlord does not match claim");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+
+        ClaimMessage msg = ClaimMessage.builder()
+                .claim(claim)
+                .user(landlord)
+                .messageType(CommentType.ADDITIONAL_INFO_REPLY)
+                .body(request.getComment())
+                .createdAt(now)
+                .build();
+        claimMessageRepository.save(msg);
+
+        List<String> keys = request.getAttachmentKeys();
+        if (keys != null && !keys.isEmpty()) {
+            minioService.attachExistingObjectsToClaim(claim, landlord, keys, msg);
+        }
+
+        ClaimStatus from = claim.getStatus();
+        claim.setStatus(ClaimStatus.UNDER_ASSESSMENT);
+        claim.setUpdatedAt(now);
+        claimRepository.save(claim);
+
+        statusHistoryRepository.save(ClaimStatusHistory.builder()
+                .claim(claim)
+                .fromStatus(from)
+                .toStatus(ClaimStatus.UNDER_ASSESSMENT)
+                .actor(landlord)
+                .createdAt(now)
+                .build());
+
         return ClaimResponse.builder()
                 .id(claim.getId())
                 .landlordId(claim.getLandlord().getId())

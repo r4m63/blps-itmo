@@ -1,7 +1,10 @@
 $kind: http-request
-name: GET claim by id
+name: (админ) получить заявку по ид
 url: "{{base_url}}/api/claims/{{claimId}}"
 method: GET
+body:
+  type: json
+  content: ""
 scripts:
   - type: afterResponse
     code: |

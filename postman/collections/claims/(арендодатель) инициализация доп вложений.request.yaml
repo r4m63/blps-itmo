@@ -1,0 +1,14 @@
+$kind: http-request
+name: (арендодатель) инициализация доп вложений
+url: "{{base_url}}/api/storage/attachments/init"
+method: POST
+body:
+  type: json
+  content: |
+    {
+      "fileName": "image.png",
+      "contentType": "{{uploadContentType}}",
+      "uploadedBy": {{landlordId}},
+      "purpose": "DAMAGE_EVIDENCE"
+    }
+order: 4133434038529347

@@ -1,5 +1,5 @@
 $kind: http-request
-name: Attachment init
+name: (арендодатель) инициализация вложений
 url: "{{base_url}}/api/storage/attachments/init"
 method: POST
 body:

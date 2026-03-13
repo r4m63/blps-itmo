@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/api/claims/{{claimId}}/additional-info"
+method: POST
+body:
+  type: json
+  content: |
+    {
+      "landlordId": {{landlordId}},
+      "comment": "Добавил серийник и общий план",
+      "attachmentKeys": ["{{objectKey}}"]
+    }
+order: 4348886828770932

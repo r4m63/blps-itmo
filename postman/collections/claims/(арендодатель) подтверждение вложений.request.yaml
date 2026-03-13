@@ -1,5 +1,5 @@
 $kind: http-request
-name: Confirm Attachment
+name: (арендодатель) подтверждение вложений
 url: "{{base_url}}/api/storage/attachments/confirm"
 method: POST
 body:

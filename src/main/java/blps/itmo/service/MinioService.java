@@ -146,6 +146,13 @@ public class MinioService {
     public void attachExistingObjectsToClaim(Claim claim,
                                              User uploader,
                                              List<String> objectKeys) {
+        attachExistingObjectsToClaim(claim, uploader, objectKeys, null);
+    }
+
+    public void attachExistingObjectsToClaim(Claim claim,
+                                             User uploader,
+                                             List<String> objectKeys,
+                                             blps.itmo.entity.ClaimMessage message) {
         if (objectKeys == null || objectKeys.isEmpty()) {
             return;
         }
@@ -159,6 +166,7 @@ public class MinioService {
             }
             att.setClaim(claim);
             att.setUploadedBy(uploader);
+            att.setMessage(message);
             attachmentRepository.save(att);
         }
     }

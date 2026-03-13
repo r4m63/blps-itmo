@@ -1,5 +1,5 @@
 $kind: http-request
-name: POST intake decision OK
+name: (админ) принять решение ок
 url: "{{base_url}}/api/claims/{{claimId}}/intake"
 method: POST
 body:

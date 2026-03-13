@@ -1,5 +1,5 @@
 $kind: http-request
-name: Create Claim
+name: (арендодатель) создание заявки
 url: "{{base_url}}/api/claims"
 method: POST
 body:
