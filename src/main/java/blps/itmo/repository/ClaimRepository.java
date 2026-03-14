@@ -8,22 +8,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ClaimRepository extends JpaRepository<Claim, Long> {
 
-    @EntityGraph(attributePaths = {
-            "landlord",
-            "tenant",
-            "adminReviewer",
-            "attachments",
-            "messages",
-            "statusHistory"
-    })
+    @EntityGraph(value = "Claim.withAll")
     Optional<Claim> findWithAllById(Long id);
 
-    @EntityGraph(attributePaths = {
-            "landlord",
-            "tenant",
-            "adminReviewer",
-            "attachments"
-    })
+    @EntityGraph(value = "Claim.withAttachments")
     List<Claim> findWithAttachmentsByLandlordId(Long landlordId);
 
     List<Claim> findByTenantId(Long tenantId);

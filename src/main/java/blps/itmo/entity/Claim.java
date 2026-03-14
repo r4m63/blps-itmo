@@ -11,6 +11,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.NamedAttributeNode;
+import jakarta.persistence.NamedEntityGraph;
+import jakarta.persistence.NamedEntityGraphs;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
@@ -29,6 +32,28 @@ import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 
 @Entity
 @Table(name = "claims")
+@NamedEntityGraphs({
+    @NamedEntityGraph(
+            name = "Claim.withAll",
+            attributeNodes = {
+                @NamedAttributeNode("landlord"),
+                @NamedAttributeNode("tenant"),
+                @NamedAttributeNode("adminReviewer"),
+                @NamedAttributeNode("attachments"),
+                @NamedAttributeNode("messages"),
+                @NamedAttributeNode("statusHistory")
+            }
+    ),
+    @NamedEntityGraph(
+            name = "Claim.withAttachments",
+            attributeNodes = {
+                @NamedAttributeNode("landlord"),
+                @NamedAttributeNode("tenant"),
+                @NamedAttributeNode("adminReviewer"),
+                @NamedAttributeNode("attachments")
+            }
+    )
+})
 @Getter
 @Setter
 @NoArgsConstructor

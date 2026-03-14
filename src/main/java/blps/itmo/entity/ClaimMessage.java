@@ -1,5 +1,10 @@
 package blps.itmo.entity;
 
+import java.time.OffsetDateTime;
+
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.PostgreSQLEnumJdbcType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -12,9 +17,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -22,8 +24,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.JdbcType;
-import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 
 @Entity
 @Table(name = "claim_messages")
@@ -32,7 +32,7 @@ import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"claim", "user", "attachments"})
+@ToString(exclude = { "claim", "user", "attachments" })
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ClaimMessage {
 
