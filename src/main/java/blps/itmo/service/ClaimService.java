@@ -1,9 +1,16 @@
 package blps.itmo.service;
 
+import java.time.OffsetDateTime;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import blps.itmo.dto.AdditionalInfoReplyRequest;
+import blps.itmo.dto.AssessmentRequest;
 import blps.itmo.dto.ClaimResponse;
 import blps.itmo.dto.CreateClaimRequest;
 import blps.itmo.dto.IntakeDecisionRequest;
-import blps.itmo.dto.AdditionalInfoReplyRequest;
 import blps.itmo.entity.Claim;
 import blps.itmo.entity.ClaimMessage;
 import blps.itmo.entity.ClaimStatus;
@@ -15,10 +22,6 @@ import blps.itmo.repository.ClaimMessageRepository;
 import blps.itmo.repository.ClaimRepository;
 import blps.itmo.repository.ClaimStatusHistoryRepository;
 import blps.itmo.repository.UserRepository;
-import java.time.OffsetDateTime;
-import java.util.List;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ClaimService {
@@ -117,7 +120,8 @@ public class ClaimService {
             claimMessageRepository.save(ClaimMessage.builder()
                     .claim(claim)
                     .user(admin)
-                    .messageType(request.isNeedMoreInfo() ? CommentType.ADDITIONAL_INFO_REQUEST : CommentType.ADMIN_NOTE)
+                    .messageType(
+                            request.isNeedMoreInfo() ? CommentType.ADDITIONAL_INFO_REQUEST : CommentType.ADMIN_NOTE)
                     .body(request.getComment())
                     .createdAt(OffsetDateTime.now())
                     .build());
@@ -143,6 +147,77 @@ public class ClaimService {
                 .createdAt(claim.getCreatedAt())
                 .attachmentKeys(loadAttachmentKeys(claim.getId()))
                 .build();
+    }
+
+    @Transactional
+    public ClaimResponse assessClaim(Long claimId, AssessmentRequest request) {
+        Claim claim = claimRepository.findById(claimId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+        if (claim.getStatus() != ClaimStatus.UNDER_ASSESSMENT && claim.getStatus() != ClaimStatus.AWAITING_TENANT_RESPONSE) {
+            throw new IllegalStateException("Claim not in assessment stage");
+        }
+        User admin = userRepository.findById(request.getAdminId())
+                .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+        if (claim.getAdminReviewer() == null) {
+            claim.setAdminReviewer(admin);
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        claim.setAssessmentAmount(request.getAssessmentAmount());
+        claim.setAssessmentNotes(request.getAssessmentNotes());
+        claim.setUpdatedAt(now);
+
+        ClaimStatus from = claim.getStatus();
+        ClaimStatus to;
+        if (request.isPenaltyGrounds()) {
+            to = ClaimStatus.AWAITING_TENANT_RESPONSE;
+        } else {
+            to = ClaimStatus.CLOSED_NO_PENALTY;
+            claim.setClosedAt(now);
+            claim.setDecidedAt(now);
+            claim.setPenaltyAmount(null);
+        }
+        claim.setStatus(to);
+        claimRepository.save(claim);
+
+        statusHistoryRepository.save(ClaimStatusHistory.builder()
+                .claim(claim)
+                .fromStatus(from)
+                .toStatus(to)
+                .actor(admin)
+                .createdAt(now)
+                .build());
+
+        claimMessageRepository.save(ClaimMessage.builder()
+                .claim(claim)
+                .user(admin)
+                .messageType(CommentType.ADMIN_NOTE)
+                .body(buildAssessmentNote(request))
+                .createdAt(now)
+                .build());
+
+        return ClaimResponse.builder()
+                .id(claim.getId())
+                .landlordId(claim.getLandlord().getId())
+                .tenantId(claim.getTenant().getId())
+                .status(claim.getStatus())
+                .title(claim.getTitle())
+                .description(claim.getDescription())
+                .claimedAmount(claim.getClaimedAmount())
+                .currency(claim.getCurrency())
+                .createdAt(claim.getCreatedAt())
+                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .build();
+    }
+
+    private String buildAssessmentNote(AssessmentRequest request) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Оценка: ").append(request.getAssessmentAmount());
+        if (request.getAssessmentNotes() != null && !request.getAssessmentNotes().isBlank()) {
+            sb.append(". ").append(request.getAssessmentNotes());
+        }
+        sb.append(". Основания для штрафа: ").append(request.isPenaltyGrounds() ? "да" : "нет");
+        return sb.toString();
     }
 
     private List<String> loadAttachmentKeys(Long claimId) {
@@ -171,7 +246,7 @@ public class ClaimService {
     }
 
     @Transactional
-    public ClaimResponse additionalInfoReply(Long claimId, blps.itmo.dto.AdditionalInfoReplyRequest request) {
+    public ClaimResponse additionalInfoReply(Long claimId, AdditionalInfoReplyRequest request) {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
         if (claim.getStatus() != ClaimStatus.NEED_ADDITIONAL_INFO) {

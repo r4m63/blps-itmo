@@ -1,0 +1,5 @@
+$kind: http-request
+name: (админ) полчить инфу
+url: "{{base_url}}/api/claims/{{claimId}}"
+method: GET
+order: 4447790940634886

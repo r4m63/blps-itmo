@@ -1,6 +1,7 @@
 package blps.itmo.controller;
 
 import blps.itmo.dto.AdditionalInfoReplyRequest;
+import blps.itmo.dto.AssessmentRequest;
 import blps.itmo.dto.ClaimResponse;
 import blps.itmo.dto.CreateClaimRequest;
 import blps.itmo.dto.IntakeDecisionRequest;
@@ -44,6 +45,13 @@ public class ClaimController {
     public ResponseEntity<ClaimResponse> submitAdditionalInfo(@PathVariable Long id,
                                                               @Valid @RequestBody AdditionalInfoReplyRequest request) {
         ClaimResponse response = claimService.additionalInfoReply(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/assessment")
+    public ResponseEntity<ClaimResponse> assessClaim(@PathVariable Long id,
+                                                     @Valid @RequestBody AssessmentRequest request) {
+        ClaimResponse response = claimService.assessClaim(id, request);
         return ResponseEntity.ok(response);
     }
 
