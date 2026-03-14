@@ -88,6 +88,21 @@ public class MinioService {
         }
     }
 
+    public String presignGetUrl(String objectKey) {
+        try {
+            return minioClient.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(io.minio.http.Method.GET)
+                            .bucket(bucket)
+                            .object(objectKey)
+                            .expiry((int) presignTtl.getSeconds())
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to presign download url", e);
+        }
+    }
+
     public void attachObjectsToClaim(blps.itmo.entity.Claim claim,
                                      User uploader,
                                      List<String> objectKeys) {
@@ -156,18 +171,57 @@ public class MinioService {
         if (objectKeys == null || objectKeys.isEmpty()) {
             return;
         }
-        List<ClaimAttachment> attachments = attachmentRepository.findByObjectKeyIn(objectKeys);
-        if (attachments.size() != objectKeys.size()) {
+        List<String> normalizedKeys = normalizeObjectKeys(objectKeys);
+        List<ClaimAttachment> attachments = attachmentRepository.findByObjectKeyIn(normalizedKeys);
+        if (attachments.size() != normalizedKeys.size()) {
             throw new IllegalArgumentException("Some attachments not found or not initialized");
         }
         for (ClaimAttachment att : attachments) {
-            if (!Boolean.TRUE.equals(att.getUploaded())) {
-                throw new IllegalStateException("Attachment " + att.getObjectKey() + " not confirmed/uploaded");
+            if (!Boolean.TRUE.equals(att.getUploaded()) || att.getSizeBytes() == null) {
+                // attempt late confirmation/stat in case confirm step было пропущено
+                StatObjectResponse stat = stat(att.getObjectKey());
+                att.setSizeBytes(stat.size());
+                att.setContentType(stat.contentType());
+                att.setUploaded(true);
+                att.setConfirmedAt(OffsetDateTime.now());
             }
             att.setClaim(claim);
             att.setUploadedBy(uploader);
             att.setMessage(message);
             attachmentRepository.save(att);
+        }
+    }
+
+    public List<String> normalizeObjectKeys(List<String> keysOrUrls) {
+        if (keysOrUrls == null || keysOrUrls.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return keysOrUrls.stream()
+                .map(this::normalizeObjectKey)
+                .toList();
+    }
+
+    public String normalizeObjectKey(String keyOrUrl) {
+        if (keyOrUrl == null || keyOrUrl.isBlank()) {
+            return keyOrUrl;
+        }
+        String trimmed = keyOrUrl.trim();
+        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+            return trimmed;
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(trimmed);
+            String path = uri.getPath();
+            if (path == null) {
+                return trimmed;
+            }
+            String normalized = path.startsWith("/") ? path.substring(1) : path;
+            if (normalized.startsWith(bucket + "/")) {
+                normalized = normalized.substring(bucket.length() + 1);
+            }
+            return normalized;
+        } catch (Exception e) {
+            return trimmed;
         }
     }
 

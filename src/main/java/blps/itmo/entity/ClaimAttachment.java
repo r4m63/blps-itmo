@@ -38,7 +38,7 @@ public class ClaimAttachment {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "claim_id")
     private Claim claim;
 

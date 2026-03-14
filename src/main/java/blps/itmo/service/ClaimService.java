@@ -11,8 +11,8 @@ import blps.itmo.dto.AssessmentRequest;
 import blps.itmo.dto.ClaimResponse;
 import blps.itmo.dto.CreateClaimRequest;
 import blps.itmo.dto.IntakeDecisionRequest;
-import blps.itmo.dto.TenantResponseRequest;
 import blps.itmo.dto.SupportDecisionRequest;
+import blps.itmo.dto.TenantResponseRequest;
 import blps.itmo.entity.Claim;
 import blps.itmo.entity.ClaimMessage;
 import blps.itmo.entity.ClaimStatus;
@@ -95,7 +95,7 @@ public class ClaimService {
                 .claimedAmount(saved.getClaimedAmount())
                 .currency(saved.getCurrency())
                 .createdAt(saved.getCreatedAt())
-                .attachmentKeys(objectKeys)
+                .attachments(toDownloadUrls(objectKeys))
                 .build();
     }
 
@@ -147,7 +147,7 @@ public class ClaimService {
                 .claimedAmount(claim.getClaimedAmount())
                 .currency(claim.getCurrency())
                 .createdAt(claim.getCreatedAt())
-                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .attachments(loadAttachmentUrls(claim.getId()))
                 .build();
     }
 
@@ -155,7 +155,8 @@ public class ClaimService {
     public ClaimResponse assessClaim(Long claimId, AssessmentRequest request) {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
-        if (claim.getStatus() != ClaimStatus.UNDER_ASSESSMENT && claim.getStatus() != ClaimStatus.AWAITING_TENANT_RESPONSE) {
+        if (claim.getStatus() != ClaimStatus.UNDER_ASSESSMENT
+                && claim.getStatus() != ClaimStatus.AWAITING_TENANT_RESPONSE) {
             throw new IllegalStateException("Claim not in assessment stage");
         }
         User admin = userRepository.findById(request.getAdminId())
@@ -208,7 +209,7 @@ public class ClaimService {
                 .claimedAmount(claim.getClaimedAmount())
                 .currency(claim.getCurrency())
                 .createdAt(claim.getCreatedAt())
-                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .attachments(loadAttachmentUrls(claim.getId()))
                 .build();
     }
 
@@ -245,8 +246,8 @@ public class ClaimService {
                 .build();
         claimMessageRepository.save(msg);
 
-        List<String> keys = request.getAttachmentKeys();
-        if (keys != null && !keys.isEmpty()) {
+        List<String> keys = mergeAttachmentKeys(request.getAttachmentKeys(), request.getAttachmentIds());
+        if (!keys.isEmpty()) {
             minioService.attachExistingObjectsToClaim(claim, tenant, keys, msg);
         }
 
@@ -273,7 +274,7 @@ public class ClaimService {
                 .claimedAmount(claim.getClaimedAmount())
                 .currency(claim.getCurrency())
                 .createdAt(claim.getCreatedAt())
-                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .attachments(loadAttachmentUrls(claim.getId()))
                 .build();
     }
 
@@ -337,20 +338,41 @@ public class ClaimService {
                 .claimedAmount(claim.getClaimedAmount())
                 .currency(claim.getCurrency())
                 .createdAt(claim.getCreatedAt())
-                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .attachments(loadAttachmentUrls(claim.getId()))
                 .build();
     }
 
-    private List<String> loadAttachmentKeys(Long claimId) {
+    private List<String> loadAttachmentUrls(Long claimId) {
         return claimAttachmentRepository.findByClaimId(claimId)
                 .stream()
-                .map(att -> att.getObjectKey())
+                .map(att -> minioService.presignGetUrl(att.getObjectKey()))
                 .toList();
+    }
+
+    private List<String> toDownloadUrls(List<String> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return minioService.normalizeObjectKeys(keys).stream()
+                .map(minioService::presignGetUrl)
+                .toList();
+    }
+
+    private List<String> mergeAttachmentKeys(List<String> keys, List<Long> ids) {
+        java.util.LinkedHashSet<String> result = new java.util.LinkedHashSet<>();
+        if (keys != null && !keys.isEmpty()) {
+            result.addAll(minioService.normalizeObjectKeys(keys));
+        }
+        if (ids != null && !ids.isEmpty()) {
+            claimAttachmentRepository.findAllById(ids)
+                    .forEach(att -> result.add(att.getObjectKey()));
+        }
+        return new java.util.ArrayList<>(result);
     }
 
     @Transactional(readOnly = true)
     public ClaimResponse getClaim(Long id) {
-        Claim claim = claimRepository.findById(id)
+        Claim claim = claimRepository.findWithAllById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
         return ClaimResponse.builder()
                 .id(claim.getId())
@@ -362,7 +384,70 @@ public class ClaimService {
                 .claimedAmount(claim.getClaimedAmount())
                 .currency(claim.getCurrency())
                 .createdAt(claim.getCreatedAt())
-                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .attachments(loadAttachmentUrls(claim.getId()))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ClaimResponse> getClaimsForLandlord(Long landlordId, boolean openOnly) {
+        List<Claim> claims = claimRepository.findWithAttachmentsByLandlordId(landlordId);
+        java.util.Map<Long, List<String>> attachmentsMap = preloadAttachmentUrls(claims);
+        return claims.stream()
+                .filter(c -> !openOnly || isOpenStatus(c.getStatus()))
+                .map(c -> buildResponse(c, attachmentsMap.getOrDefault(c.getId(), java.util.Collections.emptyList())))
+                .toList();
+    }
+
+    private boolean isOpenStatus(ClaimStatus status) {
+        return status != ClaimStatus.CLOSED_NO_PENALTY && status != ClaimStatus.PENALTY_APPLIED;
+    }
+
+    private java.util.Map<Long, List<String>> preloadAttachmentUrls(List<Claim> claims) {
+        if (claims.isEmpty())
+            return java.util.Collections.emptyMap();
+        List<Long> ids = claims.stream().map(Claim::getId).toList();
+        return claimAttachmentRepository.findByClaimIdIn(ids).stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        att -> att.getClaim().getId(),
+                        java.util.stream.Collectors.mapping(att -> minioService.presignGetUrl(att.getObjectKey()),
+                                java.util.stream.Collectors.toList())));
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getAdditionalInfoAttachmentKeys(Long claimId) {
+        Claim claim = claimRepository.findById(claimId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+        // все сообщения типа ADDITIONAL_INFO_REPLY по этой заявке
+        List<Long> messageIds = claimMessageRepository
+                .findByClaimIdAndMessageTypeOrderByCreatedAtAsc(claim.getId(), CommentType.ADDITIONAL_INFO_REPLY)
+                .stream()
+                .map(ClaimMessage::getId)
+                .toList();
+        if (messageIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return claimAttachmentRepository.findByMessageIdIn(messageIds)
+                .stream()
+                .map(att -> minioService.presignGetUrl(att.getObjectKey()))
+                .toList();
+    }
+
+    private ClaimResponse buildResponse(Claim claim) {
+        return buildResponse(claim, loadAttachmentUrls(claim.getId()));
+    }
+
+    private ClaimResponse buildResponse(Claim claim, List<String> attachments) {
+        return ClaimResponse.builder()
+                .id(claim.getId())
+                .landlordId(claim.getLandlord().getId())
+                .tenantId(claim.getTenant().getId())
+                .status(claim.getStatus())
+                .title(claim.getTitle())
+                .description(claim.getDescription())
+                .claimedAmount(claim.getClaimedAmount())
+                .currency(claim.getCurrency())
+                .createdAt(claim.getCreatedAt())
+                .attachments(attachments)
                 .build();
     }
 
@@ -390,8 +475,8 @@ public class ClaimService {
                 .build();
         claimMessageRepository.save(msg);
 
-        List<String> keys = request.getAttachmentKeys();
-        if (keys != null && !keys.isEmpty()) {
+        List<String> keys = mergeAttachmentKeys(request.getAttachmentKeys(), request.getAttachmentIds());
+        if (!keys.isEmpty()) {
             minioService.attachExistingObjectsToClaim(claim, landlord, keys, msg);
         }
 
@@ -418,7 +503,7 @@ public class ClaimService {
                 .claimedAmount(claim.getClaimedAmount())
                 .currency(claim.getCurrency())
                 .createdAt(claim.getCreatedAt())
-                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .attachments(loadAttachmentUrls(claim.getId()))
                 .build();
     }
 }

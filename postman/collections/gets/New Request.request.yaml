@@ -1,0 +1,5 @@
+$kind: http-request
+name: New Request
+url: "{{base_url}}/api/claims/{{claimId}}/attachments/additional"
+method: GET
+order: 3053635301246052

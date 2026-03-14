@@ -11,4 +11,13 @@ body:
       "uploadedBy": {{landlordId}},
       "purpose": "DAMAGE_EVIDENCE"
     }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("200", ()=>pm.response.to.have.status(200));
+      const j = pm.response.json();
+      pm.environment.set("uploadUrl", j.uploadUrl);
+      pm.environment.set("objectKey", j.objectKey);
+      pm.environment.set("attachmentId", j.attachmentId);
+    language: text/javascript
 order: 4133434038529347

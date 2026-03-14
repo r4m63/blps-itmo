@@ -62,5 +62,5 @@ public class ClaimMessage {
 
     @OneToMany(mappedBy = "message")
     @Builder.Default
-    private List<ClaimAttachment> attachments = new ArrayList<>();
+    private java.util.Set<ClaimAttachment> attachments = new java.util.HashSet<>();
 }

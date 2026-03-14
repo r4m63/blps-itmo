@@ -1,5 +1,6 @@
 package blps.itmo.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,5 +33,6 @@ public class CreateClaimRequest {
     /**
      * Список object_key уже загруженных в MinIO файлов-доказательств.
      */
+    @JsonAlias({"attachments", "attachmentUrls"})
     private List<String> attachmentKeys;
 }

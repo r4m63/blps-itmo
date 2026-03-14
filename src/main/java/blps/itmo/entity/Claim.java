@@ -15,8 +15,8 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -105,13 +105,13 @@ public class Claim {
 
     @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<ClaimMessage> messages = new ArrayList<>();
+    private Set<ClaimMessage> messages = new HashSet<>();
 
     @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<ClaimAttachment> attachments = new ArrayList<>();
+    private Set<ClaimAttachment> attachments = new HashSet<>();
 
     @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<ClaimStatusHistory> statusHistory = new ArrayList<>();
+    private Set<ClaimStatusHistory> statusHistory = new HashSet<>();
 }

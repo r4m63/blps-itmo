@@ -19,5 +19,5 @@ public class ClaimResponse {
     private BigDecimal claimedAmount;
     private String currency;
     private OffsetDateTime createdAt;
-    private List<String> attachmentKeys;
+    private List<String> attachments; // presigned download urls
 }

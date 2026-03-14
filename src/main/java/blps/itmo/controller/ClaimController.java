@@ -15,6 +15,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -75,5 +76,16 @@ public class ClaimController {
     public ResponseEntity<ClaimResponse> getClaim(@PathVariable Long id) {
         ClaimResponse response = claimService.getClaim(id);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/landlord/{landlordId}")
+    public ResponseEntity<java.util.List<ClaimResponse>> getClaimsForLandlord(@PathVariable Long landlordId,
+                                                                              @RequestParam(name = "openOnly", defaultValue = "true") boolean openOnly) {
+        return ResponseEntity.ok(claimService.getClaimsForLandlord(landlordId, openOnly));
+    }
+
+    @GetMapping("/{id}/attachments/additional")
+    public ResponseEntity<java.util.List<String>> getAdditionalInfoAttachments(@PathVariable Long id) {
+        return ResponseEntity.ok(claimService.getAdditionalInfoAttachmentKeys(id));
     }
 }
