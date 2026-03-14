@@ -1,0 +1,22 @@
+$kind: http-request
+name: (арендатор) ответ на штраф
+url: "{{base_url}}/api/claims/{{claimId}}/tenant-response"
+method: POST
+body:
+  type: json
+  content: |
+    {
+      "tenantId": {{tenantId}},
+      "agree": false,
+      "comment": "Стул был уже шатающийся, прикладываю фото до заселения",
+      "attachmentKeys": ["{{objectKey}}"]
+    }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("200", ()=>pm.response.to.have.status(200));
+      pm.test("Support review stage", ()=>{
+        pm.expect(pm.response.json().status).to.eql("SUPPORT_REVIEW");
+      });
+    language: text/javascript
+order: 4502261570010186

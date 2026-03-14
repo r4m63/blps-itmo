@@ -1,5 +1,5 @@
 $kind: http-request
-name: (админ) оценка ущерба - нет
+name: (админ) ИЛИ оценка ущерба - нет
 url: "{{base_url}}/api/claims/{{claimId}}/assessment"
 method: POST
 body:

@@ -5,11 +5,4 @@ method: GET
 body:
   type: json
   content: ""
-scripts:
-  - type: afterResponse
-    code: |
-      pm.test("200", ()=>pm.response.to.have.status(200));
-      const j = pm.response.json();
-      pm.environment.set("claimId", j.id);
-    language: text/javascript
 order: 3233543354181021

@@ -11,6 +11,8 @@ import blps.itmo.dto.AssessmentRequest;
 import blps.itmo.dto.ClaimResponse;
 import blps.itmo.dto.CreateClaimRequest;
 import blps.itmo.dto.IntakeDecisionRequest;
+import blps.itmo.dto.TenantResponseRequest;
+import blps.itmo.dto.SupportDecisionRequest;
 import blps.itmo.entity.Claim;
 import blps.itmo.entity.ClaimMessage;
 import blps.itmo.entity.ClaimStatus;
@@ -218,6 +220,125 @@ public class ClaimService {
         }
         sb.append(". Основания для штрафа: ").append(request.isPenaltyGrounds() ? "да" : "нет");
         return sb.toString();
+    }
+
+    @Transactional
+    public ClaimResponse tenantResponse(Long claimId, TenantResponseRequest request) {
+        Claim claim = claimRepository.findById(claimId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+        if (claim.getStatus() != ClaimStatus.AWAITING_TENANT_RESPONSE) {
+            throw new IllegalStateException("Claim is not waiting for tenant response");
+        }
+        User tenant = userRepository.findById(request.getTenantId())
+                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
+        if (!claim.getTenant().getId().equals(tenant.getId())) {
+            throw new IllegalArgumentException("Tenant does not match claim");
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+
+        ClaimMessage msg = ClaimMessage.builder()
+                .claim(claim)
+                .user(tenant)
+                .messageType(CommentType.TENANT_RESPONSE)
+                .body(request.getComment())
+                .createdAt(now)
+                .build();
+        claimMessageRepository.save(msg);
+
+        List<String> keys = request.getAttachmentKeys();
+        if (keys != null && !keys.isEmpty()) {
+            minioService.attachExistingObjectsToClaim(claim, tenant, keys, msg);
+        }
+
+        ClaimStatus from = claim.getStatus();
+        claim.setStatus(ClaimStatus.SUPPORT_REVIEW);
+        claim.setUpdatedAt(now);
+        claimRepository.save(claim);
+
+        statusHistoryRepository.save(ClaimStatusHistory.builder()
+                .claim(claim)
+                .fromStatus(from)
+                .toStatus(ClaimStatus.SUPPORT_REVIEW)
+                .actor(tenant)
+                .createdAt(now)
+                .build());
+
+        return ClaimResponse.builder()
+                .id(claim.getId())
+                .landlordId(claim.getLandlord().getId())
+                .tenantId(claim.getTenant().getId())
+                .status(claim.getStatus())
+                .title(claim.getTitle())
+                .description(claim.getDescription())
+                .claimedAmount(claim.getClaimedAmount())
+                .currency(claim.getCurrency())
+                .createdAt(claim.getCreatedAt())
+                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .build();
+    }
+
+    @Transactional
+    public ClaimResponse supportDecision(Long claimId, SupportDecisionRequest request) {
+        Claim claim = claimRepository.findById(claimId)
+                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+        if (claim.getStatus() != ClaimStatus.SUPPORT_REVIEW) {
+            throw new IllegalStateException("Claim not in support review stage");
+        }
+        User admin = userRepository.findById(request.getAdminId())
+                .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+        if (claim.getAdminReviewer() == null) {
+            claim.setAdminReviewer(admin);
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        ClaimStatus from = claim.getStatus();
+        ClaimStatus to;
+        if (request.isApplyPenalty()) {
+            to = ClaimStatus.PENALTY_APPLIED;
+            if (request.getPenaltyAmount() == null) {
+                throw new IllegalArgumentException("penaltyAmount required when applyPenalty=true");
+            }
+            claim.setPenaltyAmount(request.getPenaltyAmount());
+            claim.setPenaltyCurrency(request.getPenaltyCurrency());
+        } else {
+            to = ClaimStatus.CLOSED_NO_PENALTY;
+            claim.setPenaltyAmount(null);
+        }
+        claim.setStatus(to);
+        claim.setDecidedAt(now);
+        claim.setClosedAt(now);
+        claim.setUpdatedAt(now);
+        claimRepository.save(claim);
+
+        statusHistoryRepository.save(ClaimStatusHistory.builder()
+                .claim(claim)
+                .fromStatus(from)
+                .toStatus(to)
+                .actor(admin)
+                .createdAt(now)
+                .build());
+
+        if (request.getNote() != null && !request.getNote().isBlank()) {
+            claimMessageRepository.save(ClaimMessage.builder()
+                    .claim(claim)
+                    .user(admin)
+                    .messageType(CommentType.ADMIN_NOTE)
+                    .body(request.getNote())
+                    .createdAt(now)
+                    .build());
+        }
+
+        return ClaimResponse.builder()
+                .id(claim.getId())
+                .landlordId(claim.getLandlord().getId())
+                .tenantId(claim.getTenant().getId())
+                .status(claim.getStatus())
+                .title(claim.getTitle())
+                .description(claim.getDescription())
+                .claimedAmount(claim.getClaimedAmount())
+                .currency(claim.getCurrency())
+                .createdAt(claim.getCreatedAt())
+                .attachmentKeys(loadAttachmentKeys(claim.getId()))
+                .build();
     }
 
     private List<String> loadAttachmentKeys(Long claimId) {

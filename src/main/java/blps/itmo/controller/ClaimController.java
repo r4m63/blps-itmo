@@ -5,6 +5,8 @@ import blps.itmo.dto.AssessmentRequest;
 import blps.itmo.dto.ClaimResponse;
 import blps.itmo.dto.CreateClaimRequest;
 import blps.itmo.dto.IntakeDecisionRequest;
+import blps.itmo.dto.TenantResponseRequest;
+import blps.itmo.dto.SupportDecisionRequest;
 import blps.itmo.service.ClaimService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -52,6 +54,20 @@ public class ClaimController {
     public ResponseEntity<ClaimResponse> assessClaim(@PathVariable Long id,
                                                      @Valid @RequestBody AssessmentRequest request) {
         ClaimResponse response = claimService.assessClaim(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/tenant-response")
+    public ResponseEntity<ClaimResponse> tenantResponse(@PathVariable Long id,
+                                                        @Valid @RequestBody TenantResponseRequest request) {
+        ClaimResponse response = claimService.tenantResponse(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/support-decision")
+    public ResponseEntity<ClaimResponse> supportDecision(@PathVariable Long id,
+                                                         @Valid @RequestBody SupportDecisionRequest request) {
+        ClaimResponse response = claimService.supportDecision(id, request);
         return ResponseEntity.ok(response);
     }
 

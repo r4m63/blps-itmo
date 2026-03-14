@@ -1,5 +1,5 @@
 $kind: http-request
-name: (админ) принять решение ок
+name: (админ) ИЛИ принять решение на доп инфу
 url: "{{base_url}}/api/claims/{{claimId}}/intake"
 method: POST
 body:
@@ -7,8 +7,8 @@ body:
   content: |
     {
       "adminId": {{adminId}},
-      "needMoreInfo": false,
-      "comment": "Данных достаточно, переходим к оценке"
+      "needMoreInfo": true,
+      "comment": "Нужны фото серийного номера и общий вид комнаты"
     }
 scripts:
   - type: afterResponse
@@ -18,4 +18,4 @@ scripts:
       pm.environment.set("claimId", j.id);
       pm.test("Status updated", ()=>pm.expect(j.status).to.be.oneOf(["NEED_ADDITIONAL_INFO","UNDER_ASSESSMENT"]));
     language: text/javascript
-order: 3876567980904507
+order: 3610744840512098
