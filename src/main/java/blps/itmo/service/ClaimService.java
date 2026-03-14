@@ -19,6 +19,9 @@ import blps.itmo.entity.ClaimStatus;
 import blps.itmo.entity.ClaimStatusHistory;
 import blps.itmo.entity.CommentType;
 import blps.itmo.entity.User;
+import blps.itmo.exception.BadRequestException;
+import blps.itmo.exception.ConflictException;
+import blps.itmo.exception.ResourceNotFoundException;
 import blps.itmo.repository.ClaimAttachmentRepository;
 import blps.itmo.repository.ClaimMessageRepository;
 import blps.itmo.repository.ClaimRepository;
@@ -52,9 +55,9 @@ public class ClaimService {
     @Transactional
     public ClaimResponse createClaim(CreateClaimRequest request) {
         User landlord = userRepository.findById(request.getLandlordId())
-                .orElseThrow(() -> new IllegalArgumentException("Landlord not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getLandlordId()));
         User tenant = userRepository.findById(request.getTenantId())
-                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getTenantId()));
 
         OffsetDateTime now = OffsetDateTime.now();
 
@@ -102,15 +105,15 @@ public class ClaimService {
     @Transactional
     public ClaimResponse intakeDecision(Long claimId, IntakeDecisionRequest request) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
         User admin = userRepository.findById(request.getAdminId())
-                .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getAdminId()));
 
         ClaimStatus from = claim.getStatus();
         ClaimStatus to = request.isNeedMoreInfo() ? ClaimStatus.NEED_ADDITIONAL_INFO : ClaimStatus.UNDER_ASSESSMENT;
 
         if (request.isNeedMoreInfo() && (request.getComment() == null || request.getComment().isBlank())) {
-            throw new IllegalArgumentException("Comment is required when requesting additional info");
+            throw new BadRequestException("Comment is required when requesting additional info");
         }
 
         claim.setAdminReviewer(admin);
@@ -154,13 +157,13 @@ public class ClaimService {
     @Transactional
     public ClaimResponse assessClaim(Long claimId, AssessmentRequest request) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
         if (claim.getStatus() != ClaimStatus.UNDER_ASSESSMENT
                 && claim.getStatus() != ClaimStatus.AWAITING_TENANT_RESPONSE) {
-            throw new IllegalStateException("Claim not in assessment stage");
+            throw new ConflictException("Claim not in assessment stage");
         }
         User admin = userRepository.findById(request.getAdminId())
-                .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getAdminId()));
         if (claim.getAdminReviewer() == null) {
             claim.setAdminReviewer(admin);
         }
@@ -226,14 +229,14 @@ public class ClaimService {
     @Transactional
     public ClaimResponse tenantResponse(Long claimId, TenantResponseRequest request) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
         if (claim.getStatus() != ClaimStatus.AWAITING_TENANT_RESPONSE) {
-            throw new IllegalStateException("Claim is not waiting for tenant response");
+            throw new ConflictException("Claim is not waiting for tenant response");
         }
         User tenant = userRepository.findById(request.getTenantId())
-                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getTenantId()));
         if (!claim.getTenant().getId().equals(tenant.getId())) {
-            throw new IllegalArgumentException("Tenant does not match claim");
+            throw new BadRequestException("Tenant does not match claim");
         }
         OffsetDateTime now = OffsetDateTime.now();
 
@@ -281,12 +284,12 @@ public class ClaimService {
     @Transactional
     public ClaimResponse supportDecision(Long claimId, SupportDecisionRequest request) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
         if (claim.getStatus() != ClaimStatus.SUPPORT_REVIEW) {
-            throw new IllegalStateException("Claim not in support review stage");
+            throw new ConflictException("Claim not in support review stage");
         }
         User admin = userRepository.findById(request.getAdminId())
-                .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getAdminId()));
         if (claim.getAdminReviewer() == null) {
             claim.setAdminReviewer(admin);
         }
@@ -296,7 +299,7 @@ public class ClaimService {
         if (request.isApplyPenalty()) {
             to = ClaimStatus.PENALTY_APPLIED;
             if (request.getPenaltyAmount() == null) {
-                throw new IllegalArgumentException("penaltyAmount required when applyPenalty=true");
+                throw new BadRequestException("penaltyAmount required when applyPenalty=true");
             }
             claim.setPenaltyAmount(request.getPenaltyAmount());
             claim.setPenaltyCurrency(request.getPenaltyCurrency());
@@ -373,7 +376,7 @@ public class ClaimService {
     @Transactional(readOnly = true)
     public ClaimResponse getClaim(Long id) {
         Claim claim = claimRepository.findWithAllById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", id));
         return ClaimResponse.builder()
                 .id(claim.getId())
                 .landlordId(claim.getLandlord().getId())
@@ -416,7 +419,7 @@ public class ClaimService {
     @Transactional(readOnly = true)
     public List<String> getAdditionalInfoAttachmentKeys(Long claimId) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
         // все сообщения типа ADDITIONAL_INFO_REPLY по этой заявке
         List<Long> messageIds = claimMessageRepository
                 .findByClaimIdAndMessageTypeOrderByCreatedAtAsc(claim.getId(), CommentType.ADDITIONAL_INFO_REPLY)
@@ -430,10 +433,6 @@ public class ClaimService {
                 .stream()
                 .map(att -> minioService.presignGetUrl(att.getObjectKey()))
                 .toList();
-    }
-
-    private ClaimResponse buildResponse(Claim claim) {
-        return buildResponse(claim, loadAttachmentUrls(claim.getId()));
     }
 
     private ClaimResponse buildResponse(Claim claim, List<String> attachments) {
@@ -454,14 +453,14 @@ public class ClaimService {
     @Transactional
     public ClaimResponse additionalInfoReply(Long claimId, AdditionalInfoReplyRequest request) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new IllegalArgumentException("Claim not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
         if (claim.getStatus() != ClaimStatus.NEED_ADDITIONAL_INFO) {
-            throw new IllegalStateException("Claim is not waiting for additional info");
+            throw new ConflictException("Claim is not waiting for additional info");
         }
         User landlord = userRepository.findById(request.getLandlordId())
-                .orElseThrow(() -> new IllegalArgumentException("Landlord not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getLandlordId()));
         if (!claim.getLandlord().getId().equals(landlord.getId())) {
-            throw new IllegalArgumentException("Landlord does not match claim");
+            throw new BadRequestException("Landlord does not match claim");
         }
 
         OffsetDateTime now = OffsetDateTime.now();

@@ -4,6 +4,8 @@ import blps.itmo.entity.AttachmentPurpose;
 import blps.itmo.entity.Claim;
 import blps.itmo.entity.ClaimAttachment;
 import blps.itmo.entity.User;
+import blps.itmo.exception.BadRequestException;
+import blps.itmo.exception.ResourceNotFoundException;
 import blps.itmo.repository.ClaimAttachmentRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.GetPresignedObjectUrlArgs;
@@ -148,7 +150,7 @@ public class MinioService {
 
     public ClaimAttachment confirmUpload(String objectKey) {
         ClaimAttachment attachment = attachmentRepository.findByObjectKey(objectKey)
-                .orElseThrow(() -> new IllegalArgumentException("Attachment not found for objectKey " + objectKey));
+                .orElseThrow(() -> ResourceNotFoundException.of(ClaimAttachment.class, "objectKey", objectKey));
         StatObjectResponse stat = stat(objectKey);
         attachment.setSizeBytes(stat.size());
         attachment.setContentType(stat.contentType());
@@ -174,7 +176,7 @@ public class MinioService {
         List<String> normalizedKeys = normalizeObjectKeys(objectKeys);
         List<ClaimAttachment> attachments = attachmentRepository.findByObjectKeyIn(normalizedKeys);
         if (attachments.size() != normalizedKeys.size()) {
-            throw new IllegalArgumentException("Some attachments not found or not initialized");
+            throw new BadRequestException("Some attachments not found or not initialized");
         }
         for (ClaimAttachment att : attachments) {
             if (!Boolean.TRUE.equals(att.getUploaded()) || att.getSizeBytes() == null) {

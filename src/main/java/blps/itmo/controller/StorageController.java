@@ -7,6 +7,7 @@ import blps.itmo.dto.AttachmentInitResponse;
 import blps.itmo.dto.PresignRequest;
 import blps.itmo.dto.PresignResponse;
 import blps.itmo.entity.User;
+import blps.itmo.exception.ResourceNotFoundException;
 import blps.itmo.repository.UserRepository;
 import blps.itmo.service.MinioService;
 import jakarta.validation.Valid;
@@ -45,7 +46,7 @@ public class StorageController {
     @PostMapping("/attachments/init")
     public ResponseEntity<AttachmentInitResponse> initAttachment(@Valid @RequestBody AttachmentInitRequest request) {
         User uploader = userRepository.findById(request.getUploadedBy())
-                .orElseThrow(() -> new IllegalArgumentException("Uploader not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getUploadedBy()));
         var result = minioService.initAttachment(
                 request.getFileName(),
                 request.getContentType(),
