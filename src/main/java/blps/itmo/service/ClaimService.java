@@ -420,7 +420,6 @@ public class ClaimService {
     public List<String> getAdditionalInfoAttachmentKeys(Long claimId) {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
-        // все сообщения типа ADDITIONAL_INFO_REPLY по этой заявке
         List<Long> messageIds = claimMessageRepository
                 .findByClaimIdAndMessageTypeOrderByCreatedAtAsc(claim.getId(), CommentType.ADDITIONAL_INFO_REPLY)
                 .stream()

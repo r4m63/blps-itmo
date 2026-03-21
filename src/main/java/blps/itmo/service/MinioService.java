@@ -1,5 +1,16 @@
 package blps.itmo.service;
 
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import blps.itmo.entity.AttachmentPurpose;
 import blps.itmo.entity.Claim;
 import blps.itmo.entity.ClaimAttachment;
@@ -9,20 +20,11 @@ import blps.itmo.exception.ResourceNotFoundException;
 import blps.itmo.repository.ClaimAttachmentRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MinioClient;
 import io.minio.MakeBucketArgs;
+import io.minio.MinioClient;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
 import io.minio.errors.MinioException;
-import java.io.IOException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 
 @Service
 public class MinioService {
@@ -32,10 +34,8 @@ public class MinioService {
     private final String bucket;
     private final Duration presignTtl;
 
-    public MinioService(MinioClient minioClient,
-                        ClaimAttachmentRepository attachmentRepository,
-                        @Value("${minio.bucket}") String bucket,
-                        @Value("${minio.presign-ttl-seconds:900}") long ttlSeconds) {
+    public MinioService(MinioClient minioClient, ClaimAttachmentRepository attachmentRepository,
+            @Value("${minio.bucket}") String bucket, @Value("${minio.presign-ttl-seconds:900}") long ttlSeconds) {
         this.minioClient = minioClient;
         this.attachmentRepository = attachmentRepository;
         this.bucket = bucket;
@@ -72,8 +72,7 @@ public class MinioService {
                             .bucket(bucket)
                             .object(objectKey)
                             .expiry((int) presignTtl.getSeconds())
-                            .build()
-            );
+                            .build());
         } catch (MinioException | InvalidKeyException | NoSuchAlgorithmException | IOException e) {
             throw new RuntimeException("Failed to presign url", e);
         }
@@ -98,16 +97,15 @@ public class MinioService {
                             .bucket(bucket)
                             .object(objectKey)
                             .expiry((int) presignTtl.getSeconds())
-                            .build()
-            );
+                            .build());
         } catch (Exception e) {
             throw new RuntimeException("Failed to presign download url", e);
         }
     }
 
     public void attachObjectsToClaim(blps.itmo.entity.Claim claim,
-                                     User uploader,
-                                     List<String> objectKeys) {
+            User uploader,
+            List<String> objectKeys) {
         if (objectKeys == null || objectKeys.isEmpty()) {
             return;
         }
@@ -129,9 +127,9 @@ public class MinioService {
     }
 
     public AttachmentInitResult initAttachment(String fileName,
-                                               String contentType,
-                                               AttachmentPurpose purpose,
-                                               User uploader) {
+            String contentType,
+            AttachmentPurpose purpose,
+            User uploader) {
         String objectKey = generateObjectKey(fileName);
         OffsetDateTime now = OffsetDateTime.now();
         ClaimAttachment attachment = ClaimAttachment.builder()
@@ -160,16 +158,12 @@ public class MinioService {
         return attachment;
     }
 
-    public void attachExistingObjectsToClaim(Claim claim,
-                                             User uploader,
-                                             List<String> objectKeys) {
+    public void attachExistingObjectsToClaim(Claim claim, User uploader, List<String> objectKeys) {
         attachExistingObjectsToClaim(claim, uploader, objectKeys, null);
     }
 
-    public void attachExistingObjectsToClaim(Claim claim,
-                                             User uploader,
-                                             List<String> objectKeys,
-                                             blps.itmo.entity.ClaimMessage message) {
+    public void attachExistingObjectsToClaim(Claim claim, User uploader, List<String> objectKeys,
+            blps.itmo.entity.ClaimMessage message) {
         if (objectKeys == null || objectKeys.isEmpty()) {
             return;
         }
@@ -227,5 +221,7 @@ public class MinioService {
         }
     }
 
-    public record AttachmentInitResult(Long attachmentId, String objectKey, String uploadUrl, OffsetDateTime expiresAt) {}
+    public record AttachmentInitResult(Long attachmentId, String objectKey, String uploadUrl,
+            OffsetDateTime expiresAt) {
+    }
 }
