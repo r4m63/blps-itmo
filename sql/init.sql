@@ -1,17 +1,34 @@
 BEGIN;
 
-CREATE TYPE user_role AS ENUM ('TENANT', 'LANDLORD', 'ADMIN');
+-- Reset schema for lab environment: drop old tables and types if they exist
+DROP TABLE IF EXISTS claim_attachments CASCADE;
+DROP TABLE IF EXISTS claim_status_history CASCADE;
+DROP TABLE IF EXISTS claim_messages CASCADE;
+DROP TABLE IF EXISTS claims CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+DROP TYPE IF EXISTS attachment_purpose CASCADE;
+DROP TYPE IF EXISTS attachmentpurpose CASCADE;
+DROP TYPE IF EXISTS comment_type CASCADE;
+DROP TYPE IF EXISTS commenttype CASCADE;
+DROP TYPE IF EXISTS claim_status CASCADE;
+DROP TYPE IF EXISTS claimstatus CASCADE;
+DROP TYPE IF EXISTS user_role CASCADE;
+DROP TYPE IF EXISTS userrole CASCADE;
+
+-- Enum type names are aligned with Hibernate's PostgreSQLEnumJdbcType defaults
+CREATE TYPE userrole AS ENUM ('TENANT', 'LANDLORD', 'ADMIN');
 
 CREATE TABLE users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT,
-    role user_role NOT NULL DEFAULT 'TENANT',
+    role userrole NOT NULL DEFAULT 'TENANT',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TYPE claim_status AS ENUM (
+CREATE TYPE claimstatus AS ENUM (
     'SUBMITTED', -- заявка создана арендодателем
     'INTAKE_REVIEW', -- админ проверяет полноту/формат данных
     'NEED_ADDITIONAL_INFO', -- админ запросил дополнительные материалы
@@ -26,7 +43,7 @@ CREATE TABLE claims (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     landlord_id BIGINT NOT NULL REFERENCES users (id),
     tenant_id BIGINT NOT NULL REFERENCES users (id),
-    status claim_status NOT NULL DEFAULT 'SUBMITTED',
+    status claimstatus NOT NULL DEFAULT 'SUBMITTED',
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     claimed_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (claimed_amount >= 0),
@@ -77,7 +94,7 @@ CREATE TABLE claims (
     )
 );
 
-CREATE TYPE comment_type AS ENUM (
+CREATE TYPE commenttype AS ENUM (
     'LANDLORD_STATEMENT', -- первичное заявление/описание от арендодателя
     'ADMIN_NOTE', -- служебная или публичная заметка администратора
     'TENANT_RESPONSE', -- ответ/комментарий/возражение арендатора
@@ -90,7 +107,7 @@ CREATE TABLE claim_messages (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     claim_id BIGINT NOT NULL REFERENCES claims (id) ON DELETE CASCADE,
     user_id BIGINT NOT NULL REFERENCES users (id),
-    message_type comment_type NOT NULL,
+    message_type commenttype NOT NULL,
     body TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -98,14 +115,14 @@ CREATE TABLE claim_messages (
 CREATE TABLE claim_status_history (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     claim_id BIGINT NOT NULL REFERENCES claims (id) ON DELETE CASCADE,
-    from_status claim_status,
-    to_status claim_status NOT NULL,
+    from_status claimstatus,
+    to_status claimstatus NOT NULL,
     actor_id BIGINT REFERENCES users (id),
     note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TYPE attachment_purpose AS ENUM (
+CREATE TYPE attachmentpurpose AS ENUM (
     'DAMAGE_EVIDENCE', -- доказательства ущерба (фото/видео/акты)
     'ADDITIONAL_MATERIAL', -- материалы, загруженные по запросу или для уточнений
     'SYSTEM' -- служебные вложения
@@ -116,7 +133,7 @@ CREATE TABLE claim_attachments (
     claim_id BIGINT REFERENCES claims (id) ON DELETE CASCADE,
     message_id BIGINT REFERENCES claim_messages (id) ON DELETE SET NULL,
     uploaded_by BIGINT NOT NULL REFERENCES users (id),
-    purpose attachment_purpose NOT NULL DEFAULT 'DAMAGE_EVIDENCE',
+    purpose attachmentpurpose NOT NULL DEFAULT 'DAMAGE_EVIDENCE',
     object_key TEXT NOT NULL UNIQUE,
     file_name TEXT NOT NULL,
     content_type TEXT,

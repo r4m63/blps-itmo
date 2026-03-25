@@ -1,46 +1,62 @@
 BEGIN;
 
 INSERT INTO
-    users (email, password_hash, role)
+    users (email, password_hash, role, created_at, updated_at)
 VALUES (
         'landlord1@example.com',
         'pwd-landlord1',
-        'LANDLORD'
+        'LANDLORD',
+        now(),
+        now()
     ),
     (
         'landlord2@example.com',
         'pwd-landlord2',
-        'LANDLORD'
+        'LANDLORD',
+        now(),
+        now()
     ),
     (
         'landlord3@example.com',
         'pwd-landlord3',
-        'LANDLORD'
+        'LANDLORD',
+        now(),
+        now()
     ),
     (
         'tenant1@example.com',
         'pwd-tenant1',
-        'TENANT'
+        'TENANT',
+        now(),
+        now()
     ),
     (
         'tenant2@example.com',
         'pwd-tenant2',
-        'TENANT'
+        'TENANT',
+        now(),
+        now()
     ),
     (
         'tenant3@example.com',
         'pwd-tenant3',
-        'TENANT'
+        'TENANT',
+        now(),
+        now()
     ),
     (
         'admin1@example.com',
         'pwd-admin1',
-        'ADMIN'
+        'ADMIN',
+        now(),
+        now()
     ),
     (
         'admin2@example.com',
         'pwd-admin2',
-        'ADMIN'
+        'ADMIN',
+        now(),
+        now()
     );
 
 COMMIT;
