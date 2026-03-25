@@ -1,0 +1,29 @@
+$kind: http-request
+name: (арендодатель) создание заявки
+url: "{{base_url}}/api/claims"
+method: POST
+body:
+  type: json
+  content: |
+    {
+      "landlordId": {{landlordId}},
+      "tenantId": {{tenantId}},
+      "title": "Повреждена мебель",
+      "description": "Гость сломал стул и испачкал обивку дивана",
+      "claimedAmount": 250.00,
+      "currency": "USD",
+      "attachmentKeys": ["{{objectKey}}"]
+    }
+scripts:
+  - type: afterResponse
+    code: >
+      pm.test("201", ()=>pm.response.to.have.status(201));
+
+      const j = pm.response.json();
+
+      pm.environment.set("claimId", j.id);
+
+      pm.test("has attachment",
+      ()=>pm.expect(j.attachmentKeys).to.be.an('array'));
+    language: text/javascript
+order: 3208046545813464

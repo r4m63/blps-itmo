@@ -1,0 +1,7 @@
+$kind: http-request
+name: (арендодатель) полчить все заявки
+url: "{{base_url}}/api/claims/landlord/{{landlordId}}?openOnly=false"
+method: GET
+queryParams:
+  openOnly: "false"
+order: 1773484241589

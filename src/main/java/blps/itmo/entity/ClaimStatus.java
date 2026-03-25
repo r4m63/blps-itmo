@@ -1,0 +1,12 @@
+package blps.itmo.entity;
+
+public enum ClaimStatus {
+    SUBMITTED,
+    INTAKE_REVIEW,
+    NEED_ADDITIONAL_INFO,
+    UNDER_ASSESSMENT,
+    AWAITING_TENANT_RESPONSE,
+    SUPPORT_REVIEW,
+    PENALTY_APPLIED,
+    CLOSED_NO_PENALTY
+}

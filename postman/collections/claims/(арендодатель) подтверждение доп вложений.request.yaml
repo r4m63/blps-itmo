@@ -1,0 +1,18 @@
+$kind: http-request
+name: (арендодатель) подтверждение доп вложений
+url: "{{base_url}}/api/storage/attachments/confirm"
+method: POST
+body:
+  type: json
+  content: |
+    { 
+        "objectKey": "{{objectKey}}" 
+    }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("200", ()=>pm.response.to.have.status(200));
+      const j = pm.response.json();
+      pm.environment.set("attachmentId", j.attachmentId);
+    language: text/javascript
+order: 4269367608313125

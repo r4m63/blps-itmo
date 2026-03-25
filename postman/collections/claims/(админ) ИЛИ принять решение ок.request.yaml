@@ -1,0 +1,21 @@
+$kind: http-request
+name: (админ) ИЛИ принять решение ок
+url: "{{base_url}}/api/claims/{{claimId}}/intake"
+method: POST
+body:
+  type: json
+  content: |
+    {
+      "adminId": {{adminId}},
+      "needMoreInfo": false,
+      "comment": "Данных достаточно, переходим к оценке"
+    }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("200", ()=>pm.response.to.have.status(200));
+      const j = pm.response.json();
+      pm.environment.set("claimId", j.id);
+      pm.test("Status updated", ()=>pm.expect(j.status).to.be.oneOf(["NEED_ADDITIONAL_INFO","UNDER_ASSESSMENT"]));
+    language: text/javascript
+order: 3876567980904507

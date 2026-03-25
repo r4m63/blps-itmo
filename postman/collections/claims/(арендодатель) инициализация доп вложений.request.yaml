@@ -1,0 +1,23 @@
+$kind: http-request
+name: (арендодатель) инициализация доп вложений
+url: "{{base_url}}/api/storage/attachments/init"
+method: POST
+body:
+  type: json
+  content: |
+    {
+      "fileName": "image.png",
+      "contentType": "{{uploadContentType}}",
+      "uploadedBy": {{landlordId}},
+      "purpose": "DAMAGE_EVIDENCE"
+    }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("200", ()=>pm.response.to.have.status(200));
+      const j = pm.response.json();
+      pm.environment.set("uploadUrl", j.uploadUrl);
+      pm.environment.set("objectKey", j.objectKey);
+      pm.environment.set("attachmentId", j.attachmentId);
+    language: text/javascript
+order: 4133434038529347
