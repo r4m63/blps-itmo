@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import blps.itmo.dto.AdditionalInfoReplyRequest;
@@ -52,7 +53,7 @@ public class ClaimService {
         this.claimAttachmentRepository = claimAttachmentRepository;
     }
 
-    @Transactional
+        @Transactional(isolation = Isolation.REPEATABLE_READ)
     public ClaimResponse createClaim(CreateClaimRequest request) {
         User landlord = userRepository.findById(request.getLandlordId())
                 .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getLandlordId()));
@@ -102,12 +103,16 @@ public class ClaimService {
                 .build();
     }
 
-    @Transactional
+        @Transactional(isolation = Isolation.REPEATABLE_READ)
     public ClaimResponse intakeDecision(Long claimId, IntakeDecisionRequest request) {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
         User admin = userRepository.findById(request.getAdminId())
                 .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getAdminId()));
+
+            if (claim.getStatus() != ClaimStatus.SUBMITTED && claim.getStatus() != ClaimStatus.INTAKE_REVIEW) {
+                throw new ConflictException("Claim is not in intake review stage");
+            }
 
         ClaimStatus from = claim.getStatus();
         ClaimStatus to = request.isNeedMoreInfo() ? ClaimStatus.NEED_ADDITIONAL_INFO : ClaimStatus.UNDER_ASSESSMENT;
@@ -154,7 +159,7 @@ public class ClaimService {
                 .build();
     }
 
-    @Transactional
+        @Transactional(isolation = Isolation.REPEATABLE_READ)
     public ClaimResponse assessClaim(Long claimId, AssessmentRequest request) {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
@@ -226,7 +231,7 @@ public class ClaimService {
         return sb.toString();
     }
 
-    @Transactional
+        @Transactional(isolation = Isolation.REPEATABLE_READ)
     public ClaimResponse tenantResponse(Long claimId, TenantResponseRequest request) {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
@@ -281,7 +286,7 @@ public class ClaimService {
                 .build();
     }
 
-    @Transactional
+        @Transactional(isolation = Isolation.REPEATABLE_READ)
     public ClaimResponse supportDecision(Long claimId, SupportDecisionRequest request) {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
@@ -373,7 +378,7 @@ public class ClaimService {
         return new java.util.ArrayList<>(result);
     }
 
-    @Transactional(readOnly = true)
+        @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ClaimResponse getClaim(Long id) {
         Claim claim = claimRepository.findWithAllById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", id));
@@ -391,7 +396,7 @@ public class ClaimService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
+        @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<ClaimResponse> getClaimsForLandlord(Long landlordId, boolean openOnly) {
         List<Claim> claims = claimRepository.findWithAttachmentsByLandlordId(landlordId);
         java.util.Map<Long, List<String>> attachmentsMap = preloadAttachmentUrls(claims);
@@ -416,7 +421,7 @@ public class ClaimService {
                                 java.util.stream.Collectors.toList())));
     }
 
-    @Transactional(readOnly = true)
+        @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<String> getAdditionalInfoAttachmentKeys(Long claimId) {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
@@ -449,7 +454,7 @@ public class ClaimService {
                 .build();
     }
 
-    @Transactional
+        @Transactional(isolation = Isolation.REPEATABLE_READ)
     public ClaimResponse additionalInfoReply(Long claimId, AdditionalInfoReplyRequest request) {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));

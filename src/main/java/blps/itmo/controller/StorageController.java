@@ -12,7 +12,6 @@ import blps.itmo.repository.UserRepository;
 import blps.itmo.service.MinioService;
 import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
-import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,18 +32,18 @@ public class StorageController {
     }
 
     @PostMapping("/presign")
-    public ResponseEntity<PresignResponse> presign(@Valid @RequestBody PresignRequest request) {
+    public PresignResponse presign(@Valid @RequestBody PresignRequest request) {
         String objectKey = minioService.generateObjectKey(request.getFileName());
         String url = minioService.presignPutUrl(objectKey, request.getContentType());
-        return ResponseEntity.ok(PresignResponse.builder()
+        return PresignResponse.builder()
                 .objectKey(objectKey)
                 .uploadUrl(url)
                 .expiresAt(OffsetDateTime.now().plus(minioService.getPresignTtl()))
-                .build());
+                .build();
     }
 
     @PostMapping("/attachments/init")
-    public ResponseEntity<AttachmentInitResponse> initAttachment(@Valid @RequestBody AttachmentInitRequest request) {
+    public AttachmentInitResponse initAttachment(@Valid @RequestBody AttachmentInitRequest request) {
         User uploader = userRepository.findById(request.getUploadedBy())
                 .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getUploadedBy()));
         var result = minioService.initAttachment(
@@ -53,24 +52,24 @@ public class StorageController {
                 request.getPurpose(),
                 uploader
         );
-        return ResponseEntity.ok(AttachmentInitResponse.builder()
+        return AttachmentInitResponse.builder()
                 .attachmentId(result.attachmentId())
                 .objectKey(result.objectKey())
                 .uploadUrl(result.uploadUrl())
                 .expiresAt(result.expiresAt())
-                .build());
+                .build();
     }
 
     @PostMapping("/attachments/confirm")
-    public ResponseEntity<AttachmentConfirmResponse> confirmAttachment(@Valid @RequestBody AttachmentConfirmRequest request) {
+    public AttachmentConfirmResponse confirmAttachment(@Valid @RequestBody AttachmentConfirmRequest request) {
         var attachment = minioService.confirmUpload(request.getObjectKey());
-        return ResponseEntity.ok(AttachmentConfirmResponse.builder()
+        return AttachmentConfirmResponse.builder()
                 .attachmentId(attachment.getId())
                 .objectKey(attachment.getObjectKey())
                 .sizeBytes(attachment.getSizeBytes())
                 .contentType(attachment.getContentType())
                 .confirmedAt(attachment.getConfirmedAt())
                 .uploaded(Boolean.TRUE.equals(attachment.getUploaded()))
-                .build());
+                .build();
     }
 }

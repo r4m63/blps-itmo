@@ -5,6 +5,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -109,6 +110,7 @@ public class MinioService {
         if (objectKeys == null || objectKeys.isEmpty()) {
             return;
         }
+        List<ClaimAttachment> attachmentsToSave = new ArrayList<>(objectKeys.size());
         for (String key : objectKeys) {
             StatObjectResponse stat = stat(key);
             ClaimAttachment attachment = ClaimAttachment.builder()
@@ -122,8 +124,9 @@ public class MinioService {
                     .sizeBytes(stat.size())
                     .createdAt(OffsetDateTime.now())
                     .build();
-            attachmentRepository.save(attachment);
+            attachmentsToSave.add(attachment);
         }
+        attachmentRepository.saveAll(attachmentsToSave);
     }
 
     public AttachmentInitResult initAttachment(String fileName,
@@ -184,8 +187,8 @@ public class MinioService {
             att.setClaim(claim);
             att.setUploadedBy(uploader);
             att.setMessage(message);
-            attachmentRepository.save(att);
         }
+        attachmentRepository.saveAll(attachments);
     }
 
     public List<String> normalizeObjectKeys(List<String> keysOrUrls) {

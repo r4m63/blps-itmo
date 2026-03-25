@@ -1,7 +1,5 @@
 package blps.itmo.controller;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,60 +31,53 @@ public class ClaimController {
     }
 
     @PostMapping
-    public ResponseEntity<ClaimResponse> createClaim(@Valid @RequestBody CreateClaimRequest request) {
-        ClaimResponse response = claimService.createClaim(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    public ClaimResponse createClaim(@Valid @RequestBody CreateClaimRequest request) {
+        return claimService.createClaim(request);
     }
 
     @PostMapping("/{id}/intake")
-    public ResponseEntity<ClaimResponse> intakeDecision(@PathVariable Long id,
+    public ClaimResponse intakeDecision(@PathVariable Long id,
             @Valid @RequestBody IntakeDecisionRequest request) {
-        ClaimResponse response = claimService.intakeDecision(id, request);
-        return ResponseEntity.ok(response);
+        return claimService.intakeDecision(id, request);
     }
 
     @PostMapping("/{id}/additional-info")
-    public ResponseEntity<ClaimResponse> submitAdditionalInfo(@PathVariable Long id,
+    public ClaimResponse submitAdditionalInfo(@PathVariable Long id,
             @Valid @RequestBody AdditionalInfoReplyRequest request) {
-        ClaimResponse response = claimService.additionalInfoReply(id, request);
-        return ResponseEntity.ok(response);
+        return claimService.additionalInfoReply(id, request);
     }
 
     @PostMapping("/{id}/assessment")
-    public ResponseEntity<ClaimResponse> assessClaim(@PathVariable Long id,
+    public ClaimResponse assessClaim(@PathVariable Long id,
             @Valid @RequestBody AssessmentRequest request) {
-        ClaimResponse response = claimService.assessClaim(id, request);
-        return ResponseEntity.ok(response);
+        return claimService.assessClaim(id, request);
     }
 
     @PostMapping("/{id}/tenant-response")
-    public ResponseEntity<ClaimResponse> tenantResponse(@PathVariable Long id,
+    public ClaimResponse tenantResponse(@PathVariable Long id,
             @Valid @RequestBody TenantResponseRequest request) {
-        ClaimResponse response = claimService.tenantResponse(id, request);
-        return ResponseEntity.ok(response);
+        return claimService.tenantResponse(id, request);
     }
 
     @PostMapping("/{id}/support-decision")
-    public ResponseEntity<ClaimResponse> supportDecision(@PathVariable Long id,
+    public ClaimResponse supportDecision(@PathVariable Long id,
             @Valid @RequestBody SupportDecisionRequest request) {
-        ClaimResponse response = claimService.supportDecision(id, request);
-        return ResponseEntity.ok(response);
+        return claimService.supportDecision(id, request);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ClaimResponse> getClaim(@PathVariable Long id) {
-        ClaimResponse response = claimService.getClaim(id);
-        return ResponseEntity.ok(response);
+    public ClaimResponse getClaim(@PathVariable Long id) {
+        return claimService.getClaim(id);
     }
 
     @GetMapping("/landlord/{landlordId}")
-    public ResponseEntity<java.util.List<ClaimResponse>> getClaimsForLandlord(@PathVariable Long landlordId,
+    public java.util.List<ClaimResponse> getClaimsForLandlord(@PathVariable Long landlordId,
             @RequestParam(name = "openOnly", defaultValue = "true") boolean openOnly) {
-        return ResponseEntity.ok(claimService.getClaimsForLandlord(landlordId, openOnly));
+        return claimService.getClaimsForLandlord(landlordId, openOnly);
     }
 
     @GetMapping("/{id}/attachments/additional")
-    public ResponseEntity<java.util.List<String>> getAdditionalInfoAttachments(@PathVariable Long id) {
-        return ResponseEntity.ok(claimService.getAdditionalInfoAttachmentKeys(id));
+    public java.util.List<String> getAdditionalInfoAttachments(@PathVariable Long id) {
+        return claimService.getAdditionalInfoAttachmentKeys(id);
     }
 }
