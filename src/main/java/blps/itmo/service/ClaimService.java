@@ -3,6 +3,7 @@ package blps.itmo.service;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import blps.itmo.entity.ClaimStatus;
 import blps.itmo.entity.ClaimStatusHistory;
 import blps.itmo.entity.CommentType;
 import blps.itmo.entity.User;
+import blps.itmo.entity.UserRole;
 import blps.itmo.exception.BadRequestException;
 import blps.itmo.exception.ConflictException;
 import blps.itmo.exception.ResourceNotFoundException;
@@ -29,6 +31,16 @@ import blps.itmo.repository.ClaimRepository;
 import blps.itmo.repository.ClaimStatusHistoryRepository;
 import blps.itmo.repository.UserRepository;
 
+/**
+ * Бизнес-логика обработки заявок на штрафные санкции.
+ * <p>
+ * Все методы, модифицирующие состояние, принимают {@code actorUserId} —
+ * идентификатор аутентифицированного пользователя, извлечённый контроллером
+ * из {@code SecurityContext}. Клиент не может подделать актора.
+ * <p>
+ * Для read-операций используется дополнительная проверка владения:
+ * арендодатель/арендатор видит только свои заявки, администратор — любые.
+ */
 @Service
 public class ClaimService {
 
@@ -53,12 +65,21 @@ public class ClaimService {
         this.claimAttachmentRepository = claimAttachmentRepository;
     }
 
-        @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public ClaimResponse createClaim(CreateClaimRequest request) {
-        User landlord = userRepository.findById(request.getLandlordId())
-                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getLandlordId()));
-        User tenant = userRepository.findById(request.getTenantId())
-                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getTenantId()));
+    // =================================================================
+    // Commands (write operations)
+    // =================================================================
+
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public ClaimResponse createClaim(Long landlordUserId, CreateClaimRequest request) {
+        User landlord = requireUser(landlordUserId);
+        User tenant = requireUser(request.getTenantId());
+
+        if (landlord.getId().equals(tenant.getId())) {
+            throw new BadRequestException("Landlord and tenant must be different users");
+        }
+        if (tenant.getRole() != UserRole.TENANT) {
+            throw new BadRequestException("Target user must have TENANT role");
+        }
 
         OffsetDateTime now = OffsetDateTime.now();
 
@@ -89,30 +110,17 @@ public class ClaimService {
                 .createdAt(now)
                 .build());
 
-        return ClaimResponse.builder()
-                .id(saved.getId())
-                .landlordId(saved.getLandlord().getId())
-                .tenantId(saved.getTenant().getId())
-                .status(saved.getStatus())
-                .title(saved.getTitle())
-                .description(saved.getDescription())
-                .claimedAmount(saved.getClaimedAmount())
-                .currency(saved.getCurrency())
-                .createdAt(saved.getCreatedAt())
-                .attachments(toDownloadUrls(objectKeys))
-                .build();
+        return buildResponse(saved, toDownloadUrls(objectKeys));
     }
 
-        @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public ClaimResponse intakeDecision(Long claimId, IntakeDecisionRequest request) {
-        Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
-        User admin = userRepository.findById(request.getAdminId())
-                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getAdminId()));
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public ClaimResponse intakeDecision(Long claimId, Long adminUserId, IntakeDecisionRequest request) {
+        Claim claim = requireClaim(claimId);
+        User admin = requireUser(adminUserId);
 
-            if (claim.getStatus() != ClaimStatus.SUBMITTED && claim.getStatus() != ClaimStatus.INTAKE_REVIEW) {
-                throw new ConflictException("Claim is not in intake review stage");
-            }
+        if (claim.getStatus() != ClaimStatus.SUBMITTED && claim.getStatus() != ClaimStatus.INTAKE_REVIEW) {
+            throw new ConflictException("Claim is not in intake review stage");
+        }
 
         ClaimStatus from = claim.getStatus();
         ClaimStatus to = request.isNeedMoreInfo() ? ClaimStatus.NEED_ADDITIONAL_INFO : ClaimStatus.UNDER_ASSESSMENT;
@@ -145,30 +153,17 @@ public class ClaimService {
                 .createdAt(OffsetDateTime.now())
                 .build());
 
-        return ClaimResponse.builder()
-                .id(claim.getId())
-                .landlordId(claim.getLandlord().getId())
-                .tenantId(claim.getTenant().getId())
-                .status(claim.getStatus())
-                .title(claim.getTitle())
-                .description(claim.getDescription())
-                .claimedAmount(claim.getClaimedAmount())
-                .currency(claim.getCurrency())
-                .createdAt(claim.getCreatedAt())
-                .attachments(loadAttachmentUrls(claim.getId()))
-                .build();
+        return buildResponse(claim, loadAttachmentUrls(claim.getId()));
     }
 
-        @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public ClaimResponse assessClaim(Long claimId, AssessmentRequest request) {
-        Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public ClaimResponse assessClaim(Long claimId, Long adminUserId, AssessmentRequest request) {
+        Claim claim = requireClaim(claimId);
         if (claim.getStatus() != ClaimStatus.UNDER_ASSESSMENT
                 && claim.getStatus() != ClaimStatus.AWAITING_TENANT_RESPONSE) {
             throw new ConflictException("Claim not in assessment stage");
         }
-        User admin = userRepository.findById(request.getAdminId())
-                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getAdminId()));
+        User admin = requireUser(adminUserId);
         if (claim.getAdminReviewer() == null) {
             claim.setAdminReviewer(admin);
         }
@@ -207,18 +202,7 @@ public class ClaimService {
                 .createdAt(now)
                 .build());
 
-        return ClaimResponse.builder()
-                .id(claim.getId())
-                .landlordId(claim.getLandlord().getId())
-                .tenantId(claim.getTenant().getId())
-                .status(claim.getStatus())
-                .title(claim.getTitle())
-                .description(claim.getDescription())
-                .claimedAmount(claim.getClaimedAmount())
-                .currency(claim.getCurrency())
-                .createdAt(claim.getCreatedAt())
-                .attachments(loadAttachmentUrls(claim.getId()))
-                .build();
+        return buildResponse(claim, loadAttachmentUrls(claim.getId()));
     }
 
     private String buildAssessmentNote(AssessmentRequest request) {
@@ -231,17 +215,15 @@ public class ClaimService {
         return sb.toString();
     }
 
-        @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public ClaimResponse tenantResponse(Long claimId, TenantResponseRequest request) {
-        Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public ClaimResponse tenantResponse(Long claimId, Long tenantUserId, TenantResponseRequest request) {
+        Claim claim = requireClaim(claimId);
         if (claim.getStatus() != ClaimStatus.AWAITING_TENANT_RESPONSE) {
             throw new ConflictException("Claim is not waiting for tenant response");
         }
-        User tenant = userRepository.findById(request.getTenantId())
-                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getTenantId()));
+        User tenant = requireUser(tenantUserId);
         if (!claim.getTenant().getId().equals(tenant.getId())) {
-            throw new BadRequestException("Tenant does not match claim");
+            throw new AccessDeniedException("Current tenant is not the respondent of this claim");
         }
         OffsetDateTime now = OffsetDateTime.now();
 
@@ -272,29 +254,16 @@ public class ClaimService {
                 .createdAt(now)
                 .build());
 
-        return ClaimResponse.builder()
-                .id(claim.getId())
-                .landlordId(claim.getLandlord().getId())
-                .tenantId(claim.getTenant().getId())
-                .status(claim.getStatus())
-                .title(claim.getTitle())
-                .description(claim.getDescription())
-                .claimedAmount(claim.getClaimedAmount())
-                .currency(claim.getCurrency())
-                .createdAt(claim.getCreatedAt())
-                .attachments(loadAttachmentUrls(claim.getId()))
-                .build();
+        return buildResponse(claim, loadAttachmentUrls(claim.getId()));
     }
 
-        @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public ClaimResponse supportDecision(Long claimId, SupportDecisionRequest request) {
-        Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public ClaimResponse supportDecision(Long claimId, Long adminUserId, SupportDecisionRequest request) {
+        Claim claim = requireClaim(claimId);
         if (claim.getStatus() != ClaimStatus.SUPPORT_REVIEW) {
             throw new ConflictException("Claim not in support review stage");
         }
-        User admin = userRepository.findById(request.getAdminId())
-                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getAdminId()));
+        User admin = requireUser(adminUserId);
         if (claim.getAdminReviewer() == null) {
             claim.setAdminReviewer(admin);
         }
@@ -336,135 +305,18 @@ public class ClaimService {
                     .build());
         }
 
-        return ClaimResponse.builder()
-                .id(claim.getId())
-                .landlordId(claim.getLandlord().getId())
-                .tenantId(claim.getTenant().getId())
-                .status(claim.getStatus())
-                .title(claim.getTitle())
-                .description(claim.getDescription())
-                .claimedAmount(claim.getClaimedAmount())
-                .currency(claim.getCurrency())
-                .createdAt(claim.getCreatedAt())
-                .attachments(loadAttachmentUrls(claim.getId()))
-                .build();
+        return buildResponse(claim, loadAttachmentUrls(claim.getId()));
     }
 
-    private List<String> loadAttachmentUrls(Long claimId) {
-        return claimAttachmentRepository.findByClaimId(claimId)
-                .stream()
-                .map(att -> minioService.presignGetUrl(att.getObjectKey()))
-                .toList();
-    }
-
-    private List<String> toDownloadUrls(List<String> keys) {
-        if (keys == null || keys.isEmpty()) {
-            return java.util.Collections.emptyList();
-        }
-        return minioService.normalizeObjectKeys(keys).stream()
-                .map(minioService::presignGetUrl)
-                .toList();
-    }
-
-    private List<String> mergeAttachmentKeys(List<String> keys, List<Long> ids) {
-        java.util.LinkedHashSet<String> result = new java.util.LinkedHashSet<>();
-        if (keys != null && !keys.isEmpty()) {
-            result.addAll(minioService.normalizeObjectKeys(keys));
-        }
-        if (ids != null && !ids.isEmpty()) {
-            claimAttachmentRepository.findAllById(ids)
-                    .forEach(att -> result.add(att.getObjectKey()));
-        }
-        return new java.util.ArrayList<>(result);
-    }
-
-        @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public ClaimResponse getClaim(Long id) {
-        Claim claim = claimRepository.findWithAllById(id)
-                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", id));
-        return ClaimResponse.builder()
-                .id(claim.getId())
-                .landlordId(claim.getLandlord().getId())
-                .tenantId(claim.getTenant().getId())
-                .status(claim.getStatus())
-                .title(claim.getTitle())
-                .description(claim.getDescription())
-                .claimedAmount(claim.getClaimedAmount())
-                .currency(claim.getCurrency())
-                .createdAt(claim.getCreatedAt())
-                .attachments(loadAttachmentUrls(claim.getId()))
-                .build();
-    }
-
-        @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public List<ClaimResponse> getClaimsForLandlord(Long landlordId, boolean openOnly) {
-        List<Claim> claims = claimRepository.findWithAttachmentsByLandlordId(landlordId);
-        java.util.Map<Long, List<String>> attachmentsMap = preloadAttachmentUrls(claims);
-        return claims.stream()
-                .filter(c -> !openOnly || isOpenStatus(c.getStatus()))
-                .map(c -> buildResponse(c, attachmentsMap.getOrDefault(c.getId(), java.util.Collections.emptyList())))
-                .toList();
-    }
-
-    private boolean isOpenStatus(ClaimStatus status) {
-        return status != ClaimStatus.CLOSED_NO_PENALTY && status != ClaimStatus.PENALTY_APPLIED;
-    }
-
-    private java.util.Map<Long, List<String>> preloadAttachmentUrls(List<Claim> claims) {
-        if (claims.isEmpty())
-            return java.util.Collections.emptyMap();
-        List<Long> ids = claims.stream().map(Claim::getId).toList();
-        return claimAttachmentRepository.findByClaimIdIn(ids).stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                        att -> att.getClaim().getId(),
-                        java.util.stream.Collectors.mapping(att -> minioService.presignGetUrl(att.getObjectKey()),
-                                java.util.stream.Collectors.toList())));
-    }
-
-        @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public List<String> getAdditionalInfoAttachmentKeys(Long claimId) {
-        Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
-        List<Long> messageIds = claimMessageRepository
-                .findByClaimIdAndMessageTypeOrderByCreatedAtAsc(claim.getId(), CommentType.ADDITIONAL_INFO_REPLY)
-                .stream()
-                .map(ClaimMessage::getId)
-                .toList();
-        if (messageIds.isEmpty()) {
-            return java.util.Collections.emptyList();
-        }
-        return claimAttachmentRepository.findByMessageIdIn(messageIds)
-                .stream()
-                .map(att -> minioService.presignGetUrl(att.getObjectKey()))
-                .toList();
-    }
-
-    private ClaimResponse buildResponse(Claim claim, List<String> attachments) {
-        return ClaimResponse.builder()
-                .id(claim.getId())
-                .landlordId(claim.getLandlord().getId())
-                .tenantId(claim.getTenant().getId())
-                .status(claim.getStatus())
-                .title(claim.getTitle())
-                .description(claim.getDescription())
-                .claimedAmount(claim.getClaimedAmount())
-                .currency(claim.getCurrency())
-                .createdAt(claim.getCreatedAt())
-                .attachments(attachments)
-                .build();
-    }
-
-        @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public ClaimResponse additionalInfoReply(Long claimId, AdditionalInfoReplyRequest request) {
-        Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public ClaimResponse additionalInfoReply(Long claimId, Long landlordUserId, AdditionalInfoReplyRequest request) {
+        Claim claim = requireClaim(claimId);
         if (claim.getStatus() != ClaimStatus.NEED_ADDITIONAL_INFO) {
             throw new ConflictException("Claim is not waiting for additional info");
         }
-        User landlord = userRepository.findById(request.getLandlordId())
-                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", request.getLandlordId()));
+        User landlord = requireUser(landlordUserId);
         if (!claim.getLandlord().getId().equals(landlord.getId())) {
-            throw new BadRequestException("Landlord does not match claim");
+            throw new AccessDeniedException("Current landlord is not the owner of this claim");
         }
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -496,6 +348,133 @@ public class ClaimService {
                 .createdAt(now)
                 .build());
 
+        return buildResponse(claim, loadAttachmentUrls(claim.getId()));
+    }
+
+    // =================================================================
+    // Queries (read operations)
+    // =================================================================
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public ClaimResponse getClaim(Long id, Long actorUserId, UserRole actorRole) {
+        Claim claim = claimRepository.findWithAllById(id)
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", id));
+
+        ensureCanView(claim, actorUserId, actorRole);
+
+        return buildResponse(claim, loadAttachmentUrls(claim.getId()));
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<ClaimResponse> getClaimsForLandlord(Long landlordId, boolean openOnly,
+            Long actorUserId, UserRole actorRole) {
+        // LANDLORD может запрашивать только свои заявки. ADMIN — любые.
+        if (actorRole != UserRole.ADMIN && !landlordId.equals(actorUserId)) {
+            throw new AccessDeniedException("Cannot list claims of another landlord");
+        }
+
+        List<Claim> claims = claimRepository.findWithAttachmentsByLandlordId(landlordId);
+        java.util.Map<Long, List<String>> attachmentsMap = preloadAttachmentUrls(claims);
+        return claims.stream()
+                .filter(c -> !openOnly || isOpenStatus(c.getStatus()))
+                .map(c -> buildResponse(c, attachmentsMap.getOrDefault(c.getId(), java.util.Collections.emptyList())))
+                .toList();
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<String> getAdditionalInfoAttachmentKeys(Long claimId, Long actorUserId, UserRole actorRole) {
+        Claim claim = claimRepository.findById(claimId)
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", claimId));
+
+        ensureCanView(claim, actorUserId, actorRole);
+
+        List<Long> messageIds = claimMessageRepository
+                .findByClaimIdAndMessageTypeOrderByCreatedAtAsc(claim.getId(), CommentType.ADDITIONAL_INFO_REPLY)
+                .stream()
+                .map(ClaimMessage::getId)
+                .toList();
+        if (messageIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return claimAttachmentRepository.findByMessageIdIn(messageIds)
+                .stream()
+                .map(att -> minioService.presignGetUrl(att.getObjectKey()))
+                .toList();
+    }
+
+    // =================================================================
+    // Helpers
+    // =================================================================
+
+    private User requireUser(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", id));
+    }
+
+    private Claim requireClaim(Long id) {
+        return claimRepository.findById(id)
+                .orElseThrow(() -> ResourceNotFoundException.of(Claim.class, "id", id));
+    }
+
+    /**
+     * Ownership-проверка: ADMIN видит всё, LANDLORD/TENANT — только заявки,
+     * где он является стороной.
+     */
+    private void ensureCanView(Claim claim, Long actorUserId, UserRole actorRole) {
+        if (actorRole == UserRole.ADMIN) {
+            return;
+        }
+        Long landlordId = claim.getLandlord().getId();
+        Long tenantId = claim.getTenant().getId();
+        if (!landlordId.equals(actorUserId) && !tenantId.equals(actorUserId)) {
+            throw new AccessDeniedException("Access to this claim is denied");
+        }
+    }
+
+    private boolean isOpenStatus(ClaimStatus status) {
+        return status != ClaimStatus.CLOSED_NO_PENALTY && status != ClaimStatus.PENALTY_APPLIED;
+    }
+
+    private List<String> loadAttachmentUrls(Long claimId) {
+        return claimAttachmentRepository.findByClaimId(claimId)
+                .stream()
+                .map(att -> minioService.presignGetUrl(att.getObjectKey()))
+                .toList();
+    }
+
+    private List<String> toDownloadUrls(List<String> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return minioService.normalizeObjectKeys(keys).stream()
+                .map(minioService::presignGetUrl)
+                .toList();
+    }
+
+    private List<String> mergeAttachmentKeys(List<String> keys, List<Long> ids) {
+        java.util.LinkedHashSet<String> result = new java.util.LinkedHashSet<>();
+        if (keys != null && !keys.isEmpty()) {
+            result.addAll(minioService.normalizeObjectKeys(keys));
+        }
+        if (ids != null && !ids.isEmpty()) {
+            claimAttachmentRepository.findAllById(ids)
+                    .forEach(att -> result.add(att.getObjectKey()));
+        }
+        return new java.util.ArrayList<>(result);
+    }
+
+    private java.util.Map<Long, List<String>> preloadAttachmentUrls(List<Claim> claims) {
+        if (claims.isEmpty())
+            return java.util.Collections.emptyMap();
+        List<Long> ids = claims.stream().map(Claim::getId).toList();
+        return claimAttachmentRepository.findByClaimIdIn(ids).stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        att -> att.getClaim().getId(),
+                        java.util.stream.Collectors.mapping(att -> minioService.presignGetUrl(att.getObjectKey()),
+                                java.util.stream.Collectors.toList())));
+    }
+
+    private ClaimResponse buildResponse(Claim claim, List<String> attachments) {
         return ClaimResponse.builder()
                 .id(claim.getId())
                 .landlordId(claim.getLandlord().getId())
@@ -506,7 +485,7 @@ public class ClaimService {
                 .claimedAmount(claim.getClaimedAmount())
                 .currency(claim.getCurrency())
                 .createdAt(claim.getCreatedAt())
-                .attachments(loadAttachmentUrls(claim.getId()))
+                .attachments(attachments)
                 .build();
     }
 }

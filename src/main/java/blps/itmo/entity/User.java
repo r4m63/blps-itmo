@@ -47,6 +47,10 @@ public class User {
     @Builder.Default
     private UserRole role = UserRole.TENANT;
 
+    @Column(name = "enabled", nullable = false)
+    @Builder.Default
+    private Boolean enabled = Boolean.TRUE;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 

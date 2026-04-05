@@ -4,11 +4,12 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import lombok.Data;
 
+/**
+ * Оценка ущерба администратором.
+ * Идентификатор администратора берётся из контекста аутентификации.
+ */
 @Data
 public class AssessmentRequest {
-    @NotNull
-    private Long adminId;
-
     @NotNull
     private BigDecimal assessmentAmount;
 

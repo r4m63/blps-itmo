@@ -1,10 +1,14 @@
 BEGIN;
 
--- Reset schema for lab environment: drop old tables and types if they exist
+-- =====================================================================
+-- Reset schema for lab environment: drop old tables and types if exist
+-- =====================================================================
 DROP TABLE IF EXISTS claim_attachments CASCADE;
 DROP TABLE IF EXISTS claim_status_history CASCADE;
 DROP TABLE IF EXISTS claim_messages CASCADE;
 DROP TABLE IF EXISTS claims CASCADE;
+DROP TABLE IF EXISTS role_privileges CASCADE;
+DROP TABLE IF EXISTS privileges CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 DROP TYPE IF EXISTS attachment_purpose CASCADE;
@@ -16,18 +20,129 @@ DROP TYPE IF EXISTS claimstatus CASCADE;
 DROP TYPE IF EXISTS user_role CASCADE;
 DROP TYPE IF EXISTS userrole CASCADE;
 
--- Enum type names are aligned with Hibernate's PostgreSQLEnumJdbcType defaults
+-- =====================================================================
+-- USERS & ACCESS CONTROL (lab 2: RBAC + privileges)
+-- =====================================================================
+-- Три роли участников бизнес-процесса сервиса заявок на штрафные санкции:
+--   TENANT   — арендатор (ответчик по заявке)
+--   LANDLORD — арендодатель (инициатор заявки о штрафе)
+--   ADMIN    — администратор сервиса (модератор/поддержка Airbnb)
 CREATE TYPE userrole AS ENUM ('TENANT', 'LANDLORD', 'ADMIN');
 
 CREATE TABLE users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
-    password_hash TEXT,
+    password_hash TEXT NOT NULL,
     role userrole NOT NULL DEFAULT 'TENANT',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Справочник привилегий (атомарные права на операции бизнес-логики).
+-- Код привилегии используется как GrantedAuthority в Spring Security
+-- и проверяется в @PreAuthorize("hasAuthority('...')").
+CREATE TABLE privileges (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL
+);
+
+-- Маппинг роль -> множество привилегий (many-to-many на уровне роли).
+-- Позволяет менять матрицу доступа без перекомпиляции приложения.
+CREATE TABLE role_privileges (
+    role userrole NOT NULL,
+    privilege_id BIGINT NOT NULL REFERENCES privileges (id) ON DELETE CASCADE,
+    PRIMARY KEY (role, privilege_id)
+);
+
+-- ---------------------------------------------------------------------
+-- Набор привилегий (специфицированная политика доступа)
+-- ---------------------------------------------------------------------
+INSERT INTO
+    privileges (code, description)
+VALUES (
+        'CLAIM_CREATE',
+        'Создание заявки на штрафные санкции'
+    ),
+    (
+        'CLAIM_READ_OWN',
+        'Просмотр заявок, в которых пользователь является стороной (арендодатель/арендатор)'
+    ),
+    (
+        'CLAIM_READ_ANY',
+        'Просмотр любой заявки в системе (административный доступ)'
+    ),
+    (
+        'CLAIM_INTAKE_DECISION',
+        'Первичная проверка заявки администратором: полнота данных, запрос доп. материалов'
+    ),
+    (
+        'CLAIM_PROVIDE_ADDITIONAL_INFO',
+        'Предоставление арендодателем дополнительных материалов по запросу администратора'
+    ),
+    (
+        'CLAIM_ASSESS',
+        'Оценка ущерба и определение оснований для штрафа администратором'
+    ),
+    (
+        'CLAIM_TENANT_RESPOND',
+        'Ответ/возражение арендатора на претензию в рамках заявки'
+    ),
+    (
+        'CLAIM_SUPPORT_DECISION',
+        'Финальное решение поддержки: применить штраф либо закрыть без штрафа'
+    ),
+    (
+        'STORAGE_UPLOAD',
+        'Инициация и подтверждение загрузки файлов-доказательств в объектное хранилище'
+    );
+
+-- ---------------------------------------------------------------------
+-- Матрица ролей и привилегий
+-- ---------------------------------------------------------------------
+-- LANDLORD: создаёт заявки, видит свои, дополняет по запросу, загружает файлы
+INSERT INTO
+    role_privileges (role, privilege_id)
+SELECT 'LANDLORD'::userrole, id
+FROM privileges
+WHERE
+    code IN (
+        'CLAIM_CREATE',
+        'CLAIM_READ_OWN',
+        'CLAIM_PROVIDE_ADDITIONAL_INFO',
+        'STORAGE_UPLOAD'
+    );
+
+-- TENANT: видит свои заявки, отвечает на претензии, загружает файлы-возражения
+INSERT INTO
+    role_privileges (role, privilege_id)
+SELECT 'TENANT'::userrole, id
+FROM privileges
+WHERE
+    code IN (
+        'CLAIM_READ_OWN',
+        'CLAIM_TENANT_RESPOND',
+        'STORAGE_UPLOAD'
+    );
+
+-- ADMIN: полный модерационный контроль над заявками
+INSERT INTO
+    role_privileges (role, privilege_id)
+SELECT 'ADMIN'::userrole, id
+FROM privileges
+WHERE
+    code IN (
+        'CLAIM_READ_ANY',
+        'CLAIM_INTAKE_DECISION',
+        'CLAIM_ASSESS',
+        'CLAIM_SUPPORT_DECISION',
+        'STORAGE_UPLOAD'
+    );
+
+-- =====================================================================
+-- CLAIMS (бизнес-процесс)
+-- =====================================================================
 CREATE TYPE claimstatus AS ENUM (
     'SUBMITTED', -- заявка создана арендодателем
     'INTAKE_REVIEW', -- админ проверяет полноту/формат данных
@@ -101,8 +216,7 @@ CREATE TYPE commenttype AS ENUM (
     'ADDITIONAL_INFO_REQUEST', -- запрос доп. материалов от админа
     'ADDITIONAL_INFO_REPLY' -- ответ на запрос с доп. информацией
 );
--- арендодатель (первичное заявление, ответы на запросы), администратор (запросы доп. данных, служебные заметки)
--- арендатор (комментарии/возражения/согласие).
+
 CREATE TABLE claim_messages (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     claim_id BIGINT NOT NULL REFERENCES claims (id) ON DELETE CASCADE,

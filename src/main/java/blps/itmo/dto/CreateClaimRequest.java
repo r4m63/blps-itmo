@@ -8,12 +8,17 @@ import java.math.BigDecimal;
 import java.util.List;
 import lombok.Data;
 
+/**
+ * Запрос на создание заявки о штрафных санкциях.
+ * <p>
+ * Идентификатор арендодателя (автор заявки) НЕ принимается от клиента —
+ * он извлекается из контекста аутентификации Spring Security.
+ * Это защищает от спуфинга актора.
+ */
 @Data
 public class CreateClaimRequest {
 
-    @NotNull
-    private Long landlordId;
-
+    /** Идентификатор арендатора, против которого подаётся заявка. */
     @NotNull
     private Long tenantId;
 

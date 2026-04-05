@@ -1,14 +1,16 @@
 package blps.itmo.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
-import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import lombok.Data;
 
+/**
+ * Ответ арендодателя на запрос дополнительных материалов.
+ * Идентификатор арендодателя берётся из контекста аутентификации,
+ * принадлежность заявки проверяется на сервисном слое.
+ */
 @Data
 public class AdditionalInfoReplyRequest {
-    @NotNull
-    private Long landlordId;
     private String comment;
 
     @JsonAlias({"attachments", "attachmentUrls"})

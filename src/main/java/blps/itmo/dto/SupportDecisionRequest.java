@@ -1,13 +1,14 @@
 package blps.itmo.dto;
 
-import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import lombok.Data;
 
+/**
+ * Финальное решение поддержки по заявке.
+ * Идентификатор администратора берётся из контекста аутентификации.
+ */
 @Data
 public class SupportDecisionRequest {
-    @NotNull
-    private Long adminId;
     private boolean applyPenalty;
     private BigDecimal penaltyAmount;
     private String penaltyCurrency = "USD";
