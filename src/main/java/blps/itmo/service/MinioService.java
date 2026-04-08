@@ -12,13 +12,13 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import blps.itmo.entity.AttachmentPurpose;
-import blps.itmo.entity.Claim;
-import blps.itmo.entity.ClaimAttachment;
-import blps.itmo.entity.User;
+import blps.itmo.entity.business.AttachmentPurpose;
+import blps.itmo.entity.business.Claim;
+import blps.itmo.entity.business.ClaimAttachment;
+import blps.itmo.entity.business.ClaimMessage;
 import blps.itmo.exception.BadRequestException;
 import blps.itmo.exception.ResourceNotFoundException;
-import blps.itmo.repository.ClaimAttachmentRepository;
+import blps.itmo.repository.business.ClaimAttachmentRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
@@ -104,35 +104,10 @@ public class MinioService {
         }
     }
 
-    public void attachObjectsToClaim(blps.itmo.entity.Claim claim,
-            User uploader,
-            List<String> objectKeys) {
-        if (objectKeys == null || objectKeys.isEmpty()) {
-            return;
-        }
-        List<ClaimAttachment> attachmentsToSave = new ArrayList<>(objectKeys.size());
-        for (String key : objectKeys) {
-            StatObjectResponse stat = stat(key);
-            ClaimAttachment attachment = ClaimAttachment.builder()
-                    .claim(claim)
-                    .message(null)
-                    .uploadedBy(uploader)
-                    .purpose(AttachmentPurpose.DAMAGE_EVIDENCE)
-                    .objectKey(key)
-                    .fileName(stat.object())
-                    .contentType(stat.contentType())
-                    .sizeBytes(stat.size())
-                    .createdAt(OffsetDateTime.now())
-                    .build();
-            attachmentsToSave.add(attachment);
-        }
-        attachmentRepository.saveAll(attachmentsToSave);
-    }
-
     public AttachmentInitResult initAttachment(String fileName,
             String contentType,
             AttachmentPurpose purpose,
-            User uploader) {
+            Long uploadedById) {
         String objectKey = generateObjectKey(fileName);
         OffsetDateTime now = OffsetDateTime.now();
         ClaimAttachment attachment = ClaimAttachment.builder()
@@ -140,7 +115,7 @@ public class MinioService {
                 .fileName(fileName)
                 .contentType(contentType)
                 .purpose(purpose == null ? AttachmentPurpose.DAMAGE_EVIDENCE : purpose)
-                .uploadedBy(uploader)
+                .uploadedById(uploadedById)
                 .uploaded(false)
                 .createdAt(now)
                 .build();
@@ -161,12 +136,12 @@ public class MinioService {
         return attachment;
     }
 
-    public void attachExistingObjectsToClaim(Claim claim, User uploader, List<String> objectKeys) {
-        attachExistingObjectsToClaim(claim, uploader, objectKeys, null);
+    public void attachExistingObjectsToClaim(Claim claim, Long uploadedById, List<String> objectKeys) {
+        attachExistingObjectsToClaim(claim, uploadedById, objectKeys, null);
     }
 
-    public void attachExistingObjectsToClaim(Claim claim, User uploader, List<String> objectKeys,
-            blps.itmo.entity.ClaimMessage message) {
+    public void attachExistingObjectsToClaim(Claim claim, Long uploadedById, List<String> objectKeys,
+            ClaimMessage message) {
         if (objectKeys == null || objectKeys.isEmpty()) {
             return;
         }
@@ -177,7 +152,6 @@ public class MinioService {
         }
         for (ClaimAttachment att : attachments) {
             if (!Boolean.TRUE.equals(att.getUploaded()) || att.getSizeBytes() == null) {
-                // attempt late confirmation/stat in case confirm step было пропущено
                 StatObjectResponse stat = stat(att.getObjectKey());
                 att.setSizeBytes(stat.size());
                 att.setContentType(stat.contentType());
@@ -185,7 +159,7 @@ public class MinioService {
                 att.setConfirmedAt(OffsetDateTime.now());
             }
             att.setClaim(claim);
-            att.setUploadedBy(uploader);
+            att.setUploadedById(uploadedById);
             att.setMessage(message);
         }
         attachmentRepository.saveAll(attachments);

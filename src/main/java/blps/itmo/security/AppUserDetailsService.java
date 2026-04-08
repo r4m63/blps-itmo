@@ -11,9 +11,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import blps.itmo.entity.User;
-import blps.itmo.repository.PrivilegeRepository;
-import blps.itmo.repository.UserRepository;
+import blps.itmo.entity.auth.User;
+import blps.itmo.repository.auth.PrivilegeRepository;
+import blps.itmo.repository.auth.UserRepository;
 
 /**
  * Загружает учётную запись пользователя из реляционной БД и собирает
@@ -40,7 +40,7 @@ public class AppUserDetailsService implements UserDetailsService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, transactionManager = "authTransactionManager")
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));

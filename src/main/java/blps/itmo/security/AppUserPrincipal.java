@@ -6,8 +6,8 @@ import java.util.Collections;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import blps.itmo.entity.User;
-import blps.itmo.entity.UserRole;
+import blps.itmo.entity.auth.User;
+import blps.itmo.entity.auth.UserRole;
 
 /**
  * Кастомная обёртка {@link UserDetails}, которая помимо стандартных полей

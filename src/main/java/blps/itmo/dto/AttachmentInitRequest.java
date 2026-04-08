@@ -1,6 +1,6 @@
 package blps.itmo.dto;
 
-import blps.itmo.entity.AttachmentPurpose;
+import blps.itmo.entity.business.AttachmentPurpose;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 

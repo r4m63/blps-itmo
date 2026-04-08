@@ -1,6 +1,6 @@
 package blps.itmo.dto;
 
-import blps.itmo.entity.ClaimStatus;
+import blps.itmo.entity.business.ClaimStatus;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;

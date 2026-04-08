@@ -16,19 +16,12 @@ import blps.itmo.dto.AttachmentInitRequest;
 import blps.itmo.dto.AttachmentInitResponse;
 import blps.itmo.dto.PresignRequest;
 import blps.itmo.dto.PresignResponse;
-import blps.itmo.entity.User;
-import blps.itmo.exception.ResourceNotFoundException;
-import blps.itmo.repository.UserRepository;
 import blps.itmo.security.AppUserPrincipal;
 import blps.itmo.service.MinioService;
 import jakarta.validation.Valid;
 
 /**
  * Операции с объектным хранилищем (MinIO).
- * <p>
- * Все операции требуют привилегию {@code STORAGE_UPLOAD} — она выдана
- * всем трём ролям (LANDLORD, TENANT, ADMIN), поскольку любая сторона
- * может загружать файлы в рамках своего участия в заявке.
  */
 @RestController
 @RequestMapping("/api/storage")
@@ -37,11 +30,9 @@ import jakarta.validation.Valid;
 public class StorageController {
 
     private final MinioService minioService;
-    private final UserRepository userRepository;
 
-    public StorageController(MinioService minioService, UserRepository userRepository) {
+    public StorageController(MinioService minioService) {
         this.minioService = minioService;
-        this.userRepository = userRepository;
     }
 
     @PostMapping("/presign")
@@ -58,13 +49,11 @@ public class StorageController {
     @PostMapping("/attachments/init")
     public AttachmentInitResponse initAttachment(@AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @RequestBody AttachmentInitRequest request) {
-        User uploader = userRepository.findById(principal.getUserId())
-                .orElseThrow(() -> ResourceNotFoundException.of(User.class, "id", principal.getUserId()));
         var result = minioService.initAttachment(
                 request.getFileName(),
                 request.getContentType(),
                 request.getPurpose(),
-                uploader);
+                principal.getUserId());
         return AttachmentInitResponse.builder()
                 .attachmentId(result.attachmentId())
                 .objectKey(result.objectKey())

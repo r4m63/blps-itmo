@@ -1,4 +1,4 @@
-package blps.itmo.repository;
+package blps.itmo.repository.auth;
 
 import java.util.List;
 
@@ -6,18 +6,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import blps.itmo.entity.Privilege;
-import blps.itmo.entity.UserRole;
+import blps.itmo.entity.auth.Privilege;
+import blps.itmo.entity.auth.UserRole;
 
 public interface PrivilegeRepository extends JpaRepository<Privilege, Long> {
 
-    /**
-     * Возвращает коды привилегий, которые должны быть выданы пользователю
-     * с указанной ролью. Источник — таблица {@code role_privileges}.
-     */
     @Query(value = """
-            SELECT p.code
-            FROM privileges p
+            SELECT p.code FROM privileges p
             JOIN role_privileges rp ON rp.privilege_id = p.id
             WHERE rp.role = CAST(:role AS userrole)
             """, nativeQuery = true)

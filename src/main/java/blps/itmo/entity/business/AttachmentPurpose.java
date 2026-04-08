@@ -1,4 +1,4 @@
-package blps.itmo.entity;
+package blps.itmo.entity.business;
 
 public enum AttachmentPurpose {
     DAMAGE_EVIDENCE,

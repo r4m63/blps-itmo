@@ -1,4 +1,4 @@
-package blps.itmo.entity;
+package blps.itmo.entity.business;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,7 +29,7 @@ import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"claim", "message", "uploadedBy"})
+@ToString(exclude = {"claim", "message"})
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ClaimAttachment {
 
@@ -38,7 +38,7 @@ public class ClaimAttachment {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "claim_id")
     private Claim claim;
 
@@ -46,9 +46,8 @@ public class ClaimAttachment {
     @JoinColumn(name = "message_id")
     private ClaimMessage message;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "uploaded_by")
-    private User uploadedBy;
+    @Column(name = "uploaded_by", nullable = false)
+    private Long uploadedById;
 
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)

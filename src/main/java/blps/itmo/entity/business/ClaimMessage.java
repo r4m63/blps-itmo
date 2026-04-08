@@ -1,6 +1,8 @@
-package blps.itmo.entity;
+package blps.itmo.entity.business;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.hibernate.annotations.JdbcType;
 import org.hibernate.dialect.PostgreSQLEnumJdbcType;
@@ -32,7 +34,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = { "claim", "user", "attachments" })
+@ToString(exclude = {"claim", "attachments"})
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ClaimMessage {
 
@@ -45,9 +47,8 @@ public class ClaimMessage {
     @JoinColumn(name = "claim_id")
     private Claim claim;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id")
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
@@ -62,5 +63,5 @@ public class ClaimMessage {
 
     @OneToMany(mappedBy = "message")
     @Builder.Default
-    private java.util.Set<ClaimAttachment> attachments = new java.util.HashSet<>();
+    private Set<ClaimAttachment> attachments = new HashSet<>();
 }

@@ -30,21 +30,22 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * <h3>Политика разграничения доступа</h3>
  * <ul>
- *   <li>Аутентификация — HTTP Basic. Учётные записи хранятся в БД
- *       (таблица {@code users}), пароли — BCrypt.</li>
- *   <li>Авторизация — RBAC + набор привилегий (см. {@code privileges},
- *       {@code role_privileges}). Разграничение выполняется на уровне
- *       методов контроллеров через {@link org.springframework.security.access.prepost.PreAuthorize}.</li>
- *   <li>Сессии — stateless: каждый запрос несёт заголовок Basic.</li>
- *   <li>CSRF выключен: это чистое REST API без cookie-based auth.</li>
+ * <li>Аутентификация — HTTP Basic. Учётные записи хранятся в БД
+ * (таблица {@code users}), пароли — BCrypt.</li>
+ * <li>Авторизация — RBAC + набор привилегий (см. {@code privileges},
+ * {@code role_privileges}). Разграничение выполняется на уровне
+ * методов контроллеров через
+ * {@link org.springframework.security.access.prepost.PreAuthorize}.</li>
+ * <li>Сессии — stateless: каждый запрос несёт заголовок Basic.</li>
+ * <li>CSRF выключен: это чистое REST API без cookie-based auth.</li>
  * </ul>
  *
  * <h3>Публичные endpoints</h3>
  * <ul>
- *   <li>{@code /swagger-ui/**}, {@code /api-docs/**}, {@code /v3/api-docs/**} —
- *       документация API;</li>
- *   <li>{@code /error} — стандартный error endpoint Spring;</li>
- *   <li>{@code /actuator/health} — health check.</li>
+ * <li>{@code /swagger-ui/**}, {@code /api-docs/**}, {@code /v3/api-docs/**} —
+ * документация API;</li>
+ * <li>{@code /error} — стандартный error endpoint Spring;</li>
+ * <li>{@code /actuator/health} — health check.</li>
  * </ul>
  */
 @Configuration

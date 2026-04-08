@@ -1,4 +1,4 @@
-package blps.itmo.entity;
+package blps.itmo.entity.auth;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -16,10 +16,6 @@ import lombok.ToString;
 
 /**
  * Справочник атомарных привилегий доступа к операциям бизнес-логики.
- * <p>
- * Код привилегии используется как {@code GrantedAuthority} в Spring Security
- * и проверяется в аннотациях {@code @PreAuthorize("hasAuthority('...')")}.
- * Привилегии связываются с ролями через таблицу {@code role_privileges}.
  */
 @Entity
 @Table(name = "privileges")
