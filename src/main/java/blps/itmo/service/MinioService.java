@@ -5,12 +5,13 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import blps.itmo.entity.business.AttachmentPurpose;
 import blps.itmo.entity.business.Claim;
@@ -34,13 +35,18 @@ public class MinioService {
     private final ClaimAttachmentRepository attachmentRepository;
     private final String bucket;
     private final Duration presignTtl;
+    private final TransactionTemplate txTemplate;
 
-    public MinioService(MinioClient minioClient, ClaimAttachmentRepository attachmentRepository,
-            @Value("${minio.bucket}") String bucket, @Value("${minio.presign-ttl-seconds:900}") long ttlSeconds) {
+    public MinioService(MinioClient minioClient,
+            ClaimAttachmentRepository attachmentRepository,
+            @Qualifier("jtaTransactionTemplate") TransactionTemplate txTemplate,
+            @Value("${minio.bucket}") String bucket,
+            @Value("${minio.presign-ttl-seconds:900}") long ttlSeconds) {
         this.minioClient = minioClient;
         this.attachmentRepository = attachmentRepository;
         this.bucket = bucket;
         this.presignTtl = Duration.ofSeconds(ttlSeconds);
+        this.txTemplate = txTemplate;
         ensureBucket();
     }
 
@@ -108,32 +114,36 @@ public class MinioService {
             String contentType,
             AttachmentPurpose purpose,
             Long uploadedById) {
-        String objectKey = generateObjectKey(fileName);
-        OffsetDateTime now = OffsetDateTime.now();
-        ClaimAttachment attachment = ClaimAttachment.builder()
-                .objectKey(objectKey)
-                .fileName(fileName)
-                .contentType(contentType)
-                .purpose(purpose == null ? AttachmentPurpose.DAMAGE_EVIDENCE : purpose)
-                .uploadedById(uploadedById)
-                .uploaded(false)
-                .createdAt(now)
-                .build();
-        attachmentRepository.save(attachment);
-        String url = presignPutUrl(objectKey, contentType);
-        return new AttachmentInitResult(attachment.getId(), objectKey, url, now.plus(presignTtl));
+        return txTemplate.execute(status -> {
+            String objectKey = generateObjectKey(fileName);
+            OffsetDateTime now = OffsetDateTime.now();
+            ClaimAttachment attachment = ClaimAttachment.builder()
+                    .objectKey(objectKey)
+                    .fileName(fileName)
+                    .contentType(contentType)
+                    .purpose(purpose == null ? AttachmentPurpose.DAMAGE_EVIDENCE : purpose)
+                    .uploadedById(uploadedById)
+                    .uploaded(false)
+                    .createdAt(now)
+                    .build();
+            attachmentRepository.save(attachment);
+            String url = presignPutUrl(objectKey, contentType);
+            return new AttachmentInitResult(attachment.getId(), objectKey, url, now.plus(presignTtl));
+        });
     }
 
     public ClaimAttachment confirmUpload(String objectKey) {
-        ClaimAttachment attachment = attachmentRepository.findByObjectKey(objectKey)
-                .orElseThrow(() -> ResourceNotFoundException.of(ClaimAttachment.class, "objectKey", objectKey));
-        StatObjectResponse stat = stat(objectKey);
-        attachment.setSizeBytes(stat.size());
-        attachment.setContentType(stat.contentType());
-        attachment.setUploaded(true);
-        attachment.setConfirmedAt(OffsetDateTime.now());
-        attachmentRepository.save(attachment);
-        return attachment;
+        return txTemplate.execute(status -> {
+            ClaimAttachment attachment = attachmentRepository.findByObjectKey(objectKey)
+                    .orElseThrow(() -> ResourceNotFoundException.of(ClaimAttachment.class, "objectKey", objectKey));
+            StatObjectResponse stat = stat(objectKey);
+            attachment.setSizeBytes(stat.size());
+            attachment.setContentType(stat.contentType());
+            attachment.setUploaded(true);
+            attachment.setConfirmedAt(OffsetDateTime.now());
+            attachmentRepository.save(attachment);
+            return attachment;
+        });
     }
 
     public void attachExistingObjectsToClaim(Claim claim, Long uploadedById, List<String> objectKeys) {

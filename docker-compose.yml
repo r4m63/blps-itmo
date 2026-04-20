@@ -3,6 +3,10 @@ services:
     image: postgres:16
     restart: unless-stopped
     container_name: blps-postgres-business
+    command:
+      - postgres
+      - -c
+      - max_prepared_transactions=100
     ports:
       - "${BUSINESS_DB_PORT}:5432"
     environment:
@@ -11,6 +15,7 @@ services:
       POSTGRES_PASSWORD: ${BUSINESS_DB_PASSWORD}
     volumes:
       - pgdata_business:/var/lib/postgresql/data
+      - ./sql/init_1.sql:/docker-entrypoint-initdb.d/01-init_1.sql:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${BUSINESS_DB_USERNAME} -d ${BUSINESS_DB_NAME}" ]
       interval: 10s
@@ -21,6 +26,10 @@ services:
     image: postgres:16
     restart: unless-stopped
     container_name: blps-postgres-auth
+    command:
+      - postgres
+      - -c
+      - max_prepared_transactions=100
     ports:
       - "${AUTH_DB_PORT}:5432"
     environment:
@@ -29,6 +38,8 @@ services:
       POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
     volumes:
       - pgdata_auth:/var/lib/postgresql/data
+      - ./sql/init_2.sql:/docker-entrypoint-initdb.d/01-init_2.sql:ro
+      - ./sql/test_users_1.sql:/docker-entrypoint-initdb.d/02-test_users_1.sql:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${AUTH_DB_USERNAME} -d ${AUTH_DB_NAME}" ]
       interval: 10s

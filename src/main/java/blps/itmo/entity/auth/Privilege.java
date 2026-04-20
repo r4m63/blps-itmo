@@ -18,7 +18,7 @@ import lombok.ToString;
  * Справочник атомарных привилегий доступа к операциям бизнес-логики.
  */
 @Entity
-@Table(name = "privileges")
+@Table(schema = "public", name = "privileges")
 @Getter
 @Setter
 @NoArgsConstructor

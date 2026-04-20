@@ -8,7 +8,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -74,6 +73,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
             DaoAuthenticationProvider authenticationProvider) throws Exception {
+        AuthenticationEntryPoint authenticationEntryPoint = restAuthenticationEntryPoint();
+        AccessDeniedHandler accessDeniedHandler = restAccessDeniedHandler();
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
@@ -91,10 +93,10 @@ public class SecurityConfig {
                                 "/error")
                         .permitAll()
                         .anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults())
+                .httpBasic(httpBasic -> httpBasic.authenticationEntryPoint(authenticationEntryPoint))
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(restAuthenticationEntryPoint())
-                        .accessDeniedHandler(restAccessDeniedHandler()));
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler));
 
         return http.build();
     }

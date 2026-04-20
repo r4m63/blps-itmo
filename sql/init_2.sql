@@ -13,6 +13,7 @@ CREATE TABLE users (
     password_hash TEXT NOT NULL,
     role userrole NOT NULL DEFAULT 'TENANT',
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    penalty_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -66,6 +67,10 @@ VALUES (
     (
         'STORAGE_UPLOAD',
         'Инициация и подтверждение загрузки файлов-доказательств в объектное хранилище'
+    ),
+    (
+        'USER_DEACTIVATE',
+        'Деактивация пользователя с закрытием всех его открытых заявок'
     );
 
 INSERT INTO
@@ -101,7 +106,8 @@ WHERE
         'CLAIM_INTAKE_DECISION',
         'CLAIM_ASSESS',
         'CLAIM_SUPPORT_DECISION',
-        'STORAGE_UPLOAD'
+        'STORAGE_UPLOAD',
+        'USER_DEACTIVATE'
     );
 
 COMMIT;

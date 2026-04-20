@@ -3,6 +3,13 @@ spring:
     name: blps
   config:
     import: file:.env[.properties]
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
   mvc:
     problemdetails:
       enabled: true
@@ -20,18 +27,26 @@ app:
   persistence:
     business:
       persistence-unit-name: business
-      datasource:
-        url: jdbc:postgresql://${BUSINESS_DB_HOST}:${BUSINESS_DB_PORT}/${BUSINESS_DB_NAME}
-        username: ${BUSINESS_DB_USERNAME}
+      xa:
+        server-name: ${BUSINESS_DB_HOST}
+        port-number: ${BUSINESS_DB_PORT}
+        database-name: ${BUSINESS_DB_NAME}
+        user: ${BUSINESS_DB_USERNAME}
         password: ${BUSINESS_DB_PASSWORD}
-        driver-class-name: org.postgresql.Driver
     auth:
       persistence-unit-name: auth
-      datasource:
-        url: jdbc:postgresql://${AUTH_DB_HOST}:${AUTH_DB_PORT}/${AUTH_DB_NAME}
-        username: ${AUTH_DB_USERNAME}
+      xa:
+        server-name: ${AUTH_DB_HOST}
+        port-number: ${AUTH_DB_PORT}
+        database-name: ${AUTH_DB_NAME}
+        user: ${AUTH_DB_USERNAME}
         password: ${AUTH_DB_PASSWORD}
-        driver-class-name: org.postgresql.Driver
+
+narayana:
+  log-dir: ${java.io.tmpdir}/narayana-tx-logs
+  default-timeout: 60
+  node-identifier: ${spring.application.name}
+  shorten-node-identifier-if-necessary: true
 
 minio:
   url: ${MINIO_URL}

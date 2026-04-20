@@ -23,7 +23,8 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-security")
-	runtimeOnly("org.postgresql:postgresql")
+	implementation("dev.snowdrop:narayana-spring-boot-starter:3.2.0")
+	implementation("org.postgresql:postgresql")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0")
 	implementation("io.minio:minio:8.5.9")
 

@@ -20,9 +20,6 @@ import blps.itmo.security.AppUserPrincipal;
 import blps.itmo.service.MinioService;
 import jakarta.validation.Valid;
 
-/**
- * Операции с объектным хранилищем (MinIO).
- */
 @RestController
 @RequestMapping("/api/storage")
 @Validated

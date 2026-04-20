@@ -12,9 +12,9 @@ import blps.itmo.entity.auth.UserRole;
 public interface PrivilegeRepository extends JpaRepository<Privilege, Long> {
 
     @Query(value = """
-            SELECT p.code FROM privileges p
-            JOIN role_privileges rp ON rp.privilege_id = p.id
-            WHERE rp.role = CAST(:role AS userrole)
+            SELECT p.code FROM public.privileges p
+            JOIN public.role_privileges rp ON rp.privilege_id = p.id
+            WHERE CAST(rp.role AS text) = :role
             """, nativeQuery = true)
     List<String> findPrivilegeCodesByRole(@Param("role") String role);
 

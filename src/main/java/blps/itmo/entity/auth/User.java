@@ -20,7 +20,7 @@ import org.hibernate.annotations.JdbcType;
 import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 
 @Entity
-@Table(name = "users")
+@Table(schema = "public", name = "users")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -50,6 +50,10 @@ public class User {
     @Column(name = "enabled", nullable = false)
     @Builder.Default
     private Boolean enabled = Boolean.TRUE;
+
+    @Column(name = "penalty_count", nullable = false)
+    @Builder.Default
+    private Integer penaltyCount = 0;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
