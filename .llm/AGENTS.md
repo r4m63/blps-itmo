@@ -6,13 +6,13 @@ This repository is the `lab3` version of the project: an event-driven Spring Boo
 
 Current modules:
 
-- [platform-core](../platform-core)
-- [auth-service](../auth-service)
-- [claim-service](../claim-service)
-- [assessment-service](../assessment-service)
-- [penalty-service](../penalty-service)
-- [notification-service](../notification-service)
-- [audit-service](../audit-service)
+- [platform-core](../lib/platform-core)
+- [auth-service](../services/auth-service)
+- [claim-service](../services/claim-service)
+- [assessment-service](../services/assessment-service)
+- [penalty-service](../services/penalty-service)
+- [notification-service](../services/notification-service)
+- [audit-service](../services/audit-service)
 
 Not implemented in the current codebase:
 
@@ -63,11 +63,11 @@ Distributed consistency is implemented with:
 
 Primary implementation files:
 
-- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java](../platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java)
-- [platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java](../platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java)
-- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java](../platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java)
-- [platform-core/src/main/java/blps/itmo/platform/events/EventType.java](../platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
-- [platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java](../platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java)
+- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java)
+- [platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java)
+- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java)
+- [platform-core/src/main/java/blps/itmo/platform/events/EventType.java](../lib/platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
+- [platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java](../lib/platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java)
 
 Never re-introduce cross-service direct DB access.
 
@@ -84,9 +84,9 @@ Owns:
 
 Main files:
 
-- [AuthController.java](../auth-service/src/main/java/blps/itmo/auth/controller/AuthController.java)
-- [AuthUserService.java](../auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
-- [User.java](../auth-service/src/main/java/blps/itmo/auth/domain/User.java)
+- [AuthController.java](../services/auth-service/src/main/java/blps/itmo/auth/controller/AuthController.java)
+- [AuthUserService.java](../services/auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
+- [User.java](../services/auth-service/src/main/java/blps/itmo/auth/domain/User.java)
 
 Important behavior:
 
@@ -106,10 +106,10 @@ Owns:
 
 Main files:
 
-- [ClaimController.java](../claim-service/src/main/java/blps/itmo/claim/controller/ClaimController.java)
-- [ClaimProcessService.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
-- [ClaimStatus.java](../claim-service/src/main/java/blps/itmo/claim/domain/ClaimStatus.java)
-- [ClaimEventListeners.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimEventListeners.java)
+- [ClaimController.java](../services/claim-service/src/main/java/blps/itmo/claim/controller/ClaimController.java)
+- [ClaimProcessService.java](../services/claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
+- [ClaimStatus.java](../services/claim-service/src/main/java/blps/itmo/claim/domain/ClaimStatus.java)
+- [ClaimEventListeners.java](../services/claim-service/src/main/java/blps/itmo/claim/service/ClaimEventListeners.java)
 
 Public endpoints:
 
@@ -129,8 +129,8 @@ Owns:
 
 Main files:
 
-- [AssessmentWorkflowService.java](../assessment-service/src/main/java/blps/itmo/assessment/service/AssessmentWorkflowService.java)
-- [AssessmentJob.java](../assessment-service/src/main/java/blps/itmo/assessment/domain/AssessmentJob.java)
+- [AssessmentWorkflowService.java](../services/assessment-service/src/main/java/blps/itmo/assessment/service/AssessmentWorkflowService.java)
+- [AssessmentJob.java](../services/assessment-service/src/main/java/blps/itmo/assessment/domain/AssessmentJob.java)
 
 Consumes:
 
@@ -150,9 +150,9 @@ Owns:
 
 Main files:
 
-- [PenaltyWorkflowService.java](../penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyWorkflowService.java)
-- [PenaltyController.java](../penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyController.java)
-- [PenaltyOperation.java](../penalty-service/src/main/java/blps/itmo/penalty/domain/PenaltyOperation.java)
+- [PenaltyWorkflowService.java](../services/penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyWorkflowService.java)
+- [PenaltyController.java](../services/penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyController.java)
+- [PenaltyOperation.java](../services/penalty-service/src/main/java/blps/itmo/penalty/domain/PenaltyOperation.java)
 
 Consumes:
 
@@ -171,8 +171,8 @@ Owns:
 
 Main files:
 
-- [NotificationEventListener.java](../notification-service/src/main/java/blps/itmo/notification/service/NotificationEventListener.java)
-- [NotificationLog.java](../notification-service/src/main/java/blps/itmo/notification/domain/NotificationLog.java)
+- [NotificationEventListener.java](../services/notification-service/src/main/java/blps/itmo/notification/service/NotificationEventListener.java)
+- [NotificationLog.java](../services/notification-service/src/main/java/blps/itmo/notification/domain/NotificationLog.java)
 
 ### `audit-service`
 
@@ -182,13 +182,13 @@ Owns:
 
 Main files:
 
-- [AuditEventListener.java](../audit-service/src/main/java/blps/itmo/audit/service/AuditEventListener.java)
-- [AuditController.java](../audit-service/src/main/java/blps/itmo/audit/controller/AuditController.java)
-- [AuditRecord.java](../audit-service/src/main/java/blps/itmo/audit/domain/AuditRecord.java)
+- [AuditEventListener.java](../services/audit-service/src/main/java/blps/itmo/audit/service/AuditEventListener.java)
+- [AuditController.java](../services/audit-service/src/main/java/blps/itmo/audit/controller/AuditController.java)
+- [AuditRecord.java](../services/audit-service/src/main/java/blps/itmo/audit/domain/AuditRecord.java)
 
 ## Current business flow
 
-The BPMN in [bpmn/blps1.bpmn](../bpmn/blps1.bpmn) is a business reference, not an executable workflow.
+The BPMN in [bpmn/blps1.bpmn](../docs/bpmn/blps1.bpmn) is a business reference, not an executable workflow.
 
 The current runtime flow is:
 
@@ -233,7 +233,7 @@ User deactivation logic:
 
 Source of truth:
 
-- [ClaimStatus.java](../claim-service/src/main/java/blps/itmo/claim/domain/ClaimStatus.java)
+- [ClaimStatus.java](../services/claim-service/src/main/java/blps/itmo/claim/domain/ClaimStatus.java)
 - [init_claim_service.sql](../sql/init_claim_service.sql)
 
 Current statuses:
@@ -258,8 +258,8 @@ If you change the lifecycle, update together:
 
 Source of truth:
 
-- [EventType.java](../platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
-- [payload package](../platform-core/src/main/java/blps/itmo/platform/events/payload)
+- [EventType.java](../lib/platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
+- [payload package](../lib/platform-core/src/main/java/blps/itmo/platform/events/payload)
 
 Current event set:
 

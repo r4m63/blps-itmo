@@ -22,6 +22,10 @@ node "Developer Workstation" {
       component "Kafka UI" as KafkaUI
     }
 
+    node "Object Storage" {
+      database "MinIO" as MinIO
+    }
+
     node "Databases" {
       database "postgres-auth" as AuthDB
       database "postgres-claim" as ClaimDB
@@ -49,5 +53,6 @@ AuditJar ..> Kafka
 
 Kafka --> ZK
 KafkaUI --> Kafka
+ClaimJar ..> MinIO : future storage integration
 
 @enduml

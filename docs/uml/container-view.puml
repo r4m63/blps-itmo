@@ -19,6 +19,7 @@ component "audit-service" as Audit
 queue "Kafka" as Kafka
 component "Kafka UI" as KafkaUI
 component "ZooKeeper" as ZK
+database "MinIO" as MinIO
 
 database "claim-db" as ClaimDB
 database "auth-db" as AuthDB
@@ -51,5 +52,6 @@ Audit ..> Kafka : consume all domain topics
 
 KafkaUI --> Kafka
 Kafka --> ZK
+Claim ..> MinIO : reserved for future\nattachment saga
 
 @enduml

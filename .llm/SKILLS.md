@@ -13,7 +13,7 @@ Read in this order:
 3. [docker-compose.yml](../docker-compose.yml)
 4. [.env.sample](../.env.sample)
 5. [docs/lab3-runbook.md](../docs/lab3-runbook.md)
-6. [platform-core](../platform-core)
+6. [platform-core](../lib/platform-core)
 7. service `Application`/`Controller`/`Service` files in the affected modules
 8. matching `sql/init_*_service.sql`
 
@@ -30,10 +30,10 @@ Use when changing statuses, claim validation, timeline, or orchestration logic.
 
 Primary files:
 
-- [ClaimProcessService.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
-- [ClaimController.java](../claim-service/src/main/java/blps/itmo/claim/controller/ClaimController.java)
-- [ClaimStatus.java](../claim-service/src/main/java/blps/itmo/claim/domain/ClaimStatus.java)
-- [ClaimEventListeners.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimEventListeners.java)
+- [ClaimProcessService.java](../services/claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
+- [ClaimController.java](../services/claim-service/src/main/java/blps/itmo/claim/controller/ClaimController.java)
+- [ClaimStatus.java](../services/claim-service/src/main/java/blps/itmo/claim/domain/ClaimStatus.java)
+- [ClaimEventListeners.java](../services/claim-service/src/main/java/blps/itmo/claim/service/ClaimEventListeners.java)
 - [init_claim_service.sql](../sql/init_claim_service.sql)
 - [30-lab3-async-penalty.http](../rest-client/scenarios/30-lab3-async-penalty.http)
 - [31-lab3-penalty-failure-recovery.http](../rest-client/scenarios/31-lab3-penalty-failure-recovery.http)
@@ -53,12 +53,12 @@ Use when adding a new event, changing producer/consumer behavior, or touching ou
 
 Primary files:
 
-- [EventType.java](../platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
-- [TopicNames.java](../platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java)
-- [payload package](../platform-core/src/main/java/blps/itmo/platform/events/payload)
-- [OutboxService.java](../platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java)
-- [ProcessedMessageService.java](../platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java)
-- [OutboxRelay.java](../platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java)
+- [EventType.java](../lib/platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
+- [TopicNames.java](../lib/platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java)
+- [payload package](../lib/platform-core/src/main/java/blps/itmo/platform/events/payload)
+- [OutboxService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java)
+- [ProcessedMessageService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java)
+- [OutboxRelay.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java)
 
 Checklist:
 
@@ -75,9 +75,9 @@ Use when the claim assessment heuristic or async job behavior changes.
 
 Primary files:
 
-- [AssessmentWorkflowService.java](../assessment-service/src/main/java/blps/itmo/assessment/service/AssessmentWorkflowService.java)
-- [AssessmentJob.java](../assessment-service/src/main/java/blps/itmo/assessment/domain/AssessmentJob.java)
-- [ClaimEventListener.java](../assessment-service/src/main/java/blps/itmo/assessment/service/ClaimEventListener.java)
+- [AssessmentWorkflowService.java](../services/assessment-service/src/main/java/blps/itmo/assessment/service/AssessmentWorkflowService.java)
+- [AssessmentJob.java](../services/assessment-service/src/main/java/blps/itmo/assessment/domain/AssessmentJob.java)
+- [ClaimEventListener.java](../services/assessment-service/src/main/java/blps/itmo/assessment/service/ClaimEventListener.java)
 - [init_assessment_service.sql](../sql/init_assessment_service.sql)
 - [30-lab3-async-penalty.http](../rest-client/scenarios/30-lab3-async-penalty.http)
 
@@ -94,11 +94,11 @@ Use when changing penalty application, failure handling, or retry behavior.
 
 Primary files:
 
-- [PenaltyWorkflowService.java](../penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyWorkflowService.java)
-- [PenaltyController.java](../penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyController.java)
-- [PenaltyOperation.java](../penalty-service/src/main/java/blps/itmo/penalty/domain/PenaltyOperation.java)
-- [ClaimProcessService.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
-- [AuthUserService.java](../auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
+- [PenaltyWorkflowService.java](../services/penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyWorkflowService.java)
+- [PenaltyController.java](../services/penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyController.java)
+- [PenaltyOperation.java](../services/penalty-service/src/main/java/blps/itmo/penalty/domain/PenaltyOperation.java)
+- [ClaimProcessService.java](../services/claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
+- [AuthUserService.java](../services/auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
 - [init_penalty_service.sql](../sql/init_penalty_service.sql)
 - [31-lab3-penalty-failure-recovery.http](../rest-client/scenarios/31-lab3-penalty-failure-recovery.http)
 
@@ -115,10 +115,10 @@ Use when changing demo users, roles, internal user lookup, or deactivation behav
 
 Primary files:
 
-- [AuthController.java](../auth-service/src/main/java/blps/itmo/auth/controller/AuthController.java)
-- [AuthUserService.java](../auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
-- [User.java](../auth-service/src/main/java/blps/itmo/auth/domain/User.java)
-- [UserRole.java](../auth-service/src/main/java/blps/itmo/auth/domain/UserRole.java)
+- [AuthController.java](../services/auth-service/src/main/java/blps/itmo/auth/controller/AuthController.java)
+- [AuthUserService.java](../services/auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
+- [User.java](../services/auth-service/src/main/java/blps/itmo/auth/domain/User.java)
+- [UserRole.java](../services/auth-service/src/main/java/blps/itmo/auth/domain/UserRole.java)
 - [init_auth_service.sql](../sql/init_auth_service.sql)
 - [32-lab3-user-deactivation.http](../rest-client/scenarios/32-lab3-user-deactivation.http)
 
@@ -135,9 +135,9 @@ Use when changing `notification-service` or `audit-service`.
 
 Primary files:
 
-- [NotificationEventListener.java](../notification-service/src/main/java/blps/itmo/notification/service/NotificationEventListener.java)
-- [AuditEventListener.java](../audit-service/src/main/java/blps/itmo/audit/service/AuditEventListener.java)
-- [AuditController.java](../audit-service/src/main/java/blps/itmo/audit/controller/AuditController.java)
+- [NotificationEventListener.java](../services/notification-service/src/main/java/blps/itmo/notification/service/NotificationEventListener.java)
+- [AuditEventListener.java](../services/audit-service/src/main/java/blps/itmo/audit/service/AuditEventListener.java)
+- [AuditController.java](../services/audit-service/src/main/java/blps/itmo/audit/controller/AuditController.java)
 - [init_notification_service.sql](../sql/init_notification_service.sql)
 - [init_audit_service.sql](../sql/init_audit_service.sql)
 

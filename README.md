@@ -24,10 +24,16 @@
 - `notification-service` — consumer-проекция уведомлений
 - `audit-service` — аудит и event trail
 
+Физическая структура репозитория:
+
+- `lib/platform-core/` — общий модуль
+- `services/*` — все микросервисы
+
 Инфраструктура:
 
 - `Kafka`
 - `ZooKeeper`
+- `MinIO`
 - отдельная `PostgreSQL` для каждого сервиса
 - `Kafka UI` для демонстрации event backbone
 
@@ -177,6 +183,7 @@ PlantUML-источники лежат в `docs/uml/`:
 - `API Gateway` ещё не реализован
 - `JWT/login/security perimeter` ещё не реализованы
 - `storage-service` и attachment saga пока отсутствуют
+- `MinIO` уже поднят в инфраструктуре, но текущий lab3-код напрямую его не использует
 - `DLQ`, retry topics и schema registry пока не реализованы
 - `Kafka` в `docker-compose` поднят как single broker для demo-сценария
 - сервисы запускаются локально через Gradle, а не как отдельные docker images

@@ -35,6 +35,19 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
 
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+
   postgres-auth:
     image: postgres:16
     restart: unless-stopped
@@ -120,3 +133,4 @@ volumes:
   pgdata_penalty:
   pgdata_notification:
   pgdata_audit:
+  miniodata:

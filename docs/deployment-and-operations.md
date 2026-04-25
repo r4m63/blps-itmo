@@ -7,6 +7,7 @@
 - `zookeeper`
 - `kafka`
 - `kafka-ui`
+- `minio`
 - `postgres-auth`
 - `postgres-claim`
 - `postgres-assessment`
@@ -33,6 +34,8 @@
 - `Kafka internal host port` — `${KAFKA_PORT}` по умолчанию `9092`
 - `Kafka external host port` — `${KAFKA_EXTERNAL_PORT}` по умолчанию `29092`
 - `Kafka UI` — `${KAFKA_UI_PORT}` по умолчанию `8088`
+- `MinIO API` — `${MINIO_PORT}` по умолчанию `9000`
+- `MinIO Console` — `${MINIO_CONSOLE_PORT}` по умолчанию `9001`
 - `postgres-auth` — `5433`
 - `postgres-claim` — `5434`
 - `postgres-assessment` — `5435`
@@ -53,6 +56,10 @@
 - `KAFKA_EXTERNAL_PORT`
 - `KAFKA_UI_PORT`
 - `KAFKA_BOOTSTRAP_SERVERS`
+- `MINIO_PORT`
+- `MINIO_CONSOLE_PORT`
+- `MINIO_ROOT_USER`
+- `MINIO_ROOT_PASSWORD`
 - `AUTH_DB_*`
 - `CLAIM_DB_*`
 - `ASSESSMENT_DB_*`
@@ -188,6 +195,10 @@ docker compose up -d
 - metrics stack
 - alerts
 - dead-letter monitoring
+
+### MinIO status
+
+`MinIO` снова присутствует в инфраструктуре, но текущие сервисы lab3 ещё не используют его напрямую. Сейчас это подготовленный инфраструктурный компонент под будущий `storage-service` или attachment saga.
 
 ## 9. SQL и схема
 

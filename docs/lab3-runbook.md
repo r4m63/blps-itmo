@@ -21,6 +21,7 @@ This starts:
 - `zookeeper`
 - `kafka`
 - `kafka-ui`
+- `minio`
 - `postgres-auth`
 - `postgres-claim`
 - `postgres-assessment`
@@ -53,6 +54,8 @@ Default ports:
 - `kafka host port`: `${KAFKA_PORT}` by default `9092`
 - `kafka external port`: `${KAFKA_EXTERNAL_PORT}` by default `29092`
 - `kafka-ui`: `${KAFKA_UI_PORT}` by default `8088`
+- `minio api`: `${MINIO_PORT}` by default `9000`
+- `minio console`: `${MINIO_CONSOLE_PORT}` by default `9001`
 
 ## Demo flows
 

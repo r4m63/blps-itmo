@@ -47,6 +47,8 @@
 - `notification-service`
 - `audit-service`
 
+Физически сервисы лежат в каталоге `services/`, а общие модули вынесены в `lib/`. Сейчас shared module один: `lib/platform-core`.
+
 ## 4. Bounded Contexts
 
 ### `auth-service`
