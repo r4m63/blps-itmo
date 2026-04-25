@@ -1,4 +1,4 @@
-package blps.itmo.entity;
+package blps.itmo.entity.business;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -9,8 +9,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.NamedAttributeNode;
 import jakarta.persistence.NamedEntityGraph;
 import jakarta.persistence.NamedEntityGraphs;
@@ -36,9 +34,6 @@ import org.hibernate.dialect.PostgreSQLEnumJdbcType;
     @NamedEntityGraph(
             name = "Claim.withAll",
             attributeNodes = {
-                @NamedAttributeNode("landlord"),
-                @NamedAttributeNode("tenant"),
-                @NamedAttributeNode("adminReviewer"),
                 @NamedAttributeNode("attachments"),
                 @NamedAttributeNode("messages"),
                 @NamedAttributeNode("statusHistory")
@@ -47,9 +42,6 @@ import org.hibernate.dialect.PostgreSQLEnumJdbcType;
     @NamedEntityGraph(
             name = "Claim.withAttachments",
             attributeNodes = {
-                @NamedAttributeNode("landlord"),
-                @NamedAttributeNode("tenant"),
-                @NamedAttributeNode("adminReviewer"),
                 @NamedAttributeNode("attachments")
             }
     )
@@ -59,7 +51,7 @@ import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"landlord", "tenant", "adminReviewer", "messages", "attachments", "statusHistory"})
+@ToString(exclude = {"messages", "attachments", "statusHistory"})
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Claim {
 
@@ -68,13 +60,11 @@ public class Claim {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "landlord_id")
-    private User landlord;
+    @Column(name = "landlord_id", nullable = false)
+    private Long landlordId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tenant_id")
-    private User tenant;
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
@@ -102,9 +92,8 @@ public class Claim {
     @Column(name = "assessment_notes")
     private String assessmentNotes;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "admin_reviewer_id")
-    private User adminReviewer;
+    @Column(name = "admin_reviewer_id")
+    private Long adminReviewerId;
 
     @Column(name = "penalty_amount", precision = 12, scale = 2)
     private BigDecimal penaltyAmount;
@@ -128,15 +117,15 @@ public class Claim {
     @Column(name = "closed_at")
     private OffsetDateTime closedAt;
 
-    @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private Set<ClaimMessage> messages = new HashSet<>();
 
-    @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private Set<ClaimAttachment> attachments = new HashSet<>();
 
-    @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private Set<ClaimStatusHistory> statusHistory = new HashSet<>();
 }

@@ -1,15 +1,12 @@
-package blps.itmo.entity;
+package blps.itmo.entity.auth;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
@@ -23,42 +20,44 @@ import org.hibernate.annotations.JdbcType;
 import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 
 @Entity
-@Table(name = "claim_status_history")
+@Table(schema = "public", name = "users")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"claim", "actor"})
+@ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class ClaimStatusHistory {
+public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "claim_id")
-    private Claim claim;
+    @Column(nullable = false, unique = true, length = 255)
+    private String email;
+
+    @Column(name = "password_hash")
+    private String passwordHash;
 
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
-    @Column(name = "from_status")
-    private ClaimStatus fromStatus;
+    @Column(nullable = false)
+    @Builder.Default
+    private UserRole role = UserRole.TENANT;
 
-    @Enumerated(EnumType.STRING)
-    @JdbcType(PostgreSQLEnumJdbcType.class)
-    @Column(name = "to_status", nullable = false)
-    private ClaimStatus toStatus;
+    @Column(name = "enabled", nullable = false)
+    @Builder.Default
+    private Boolean enabled = Boolean.TRUE;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "actor_id")
-    private User actor;
-
-    @Column
-    private String note;
+    @Column(name = "penalty_count", nullable = false)
+    @Builder.Default
+    private Integer penaltyCount = 0;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
 }

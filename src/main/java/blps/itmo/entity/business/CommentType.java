@@ -1,4 +1,4 @@
-package blps.itmo.entity;
+package blps.itmo.entity.business;
 
 public enum CommentType {
     LANDLORD_STATEMENT,

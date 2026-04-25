@@ -1,13 +1,13 @@
 package blps.itmo.dto;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+/**
+ * Решение администратора на этапе первичной проверки заявки.
+ * Идентификатор администратора берётся из контекста аутентификации.
+ */
 @Data
 public class IntakeDecisionRequest {
-    @NotNull
-    private Long adminId;
-
     private boolean needMoreInfo;
     private String comment;
 }

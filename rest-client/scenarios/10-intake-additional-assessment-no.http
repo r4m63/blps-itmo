@@ -1,0 +1,136 @@
+@baseUrl = http://localhost:21001
+@landlord1Id = 1
+@tenant1Id = 4
+@admin1Id = 7
+@landlord1Basic = bGFuZGxvcmQxQGV4YW1wbGUuY29tOnBhc3N3b3Jk
+@admin1Basic = YWRtaW4xQGV4YW1wbGUuY29tOnBhc3N3b3Jk
+
+### Scenario 10
+### Full cycle:
+### init attachment -> upload -> confirm -> create claim -> get claim ->
+### intake asks additional info -> landlord uploads additional evidence ->
+### landlord replies -> admin reviews -> assessment says no penalty
+
+### 10.1 Landlord initializes main attachment
+# @name mainInit
+POST {{baseUrl}}/api/storage/attachments/init
+Authorization: Basic {{landlord1Basic}}
+Content-Type: application/json
+
+{
+  "fileName": "main-damage.png",
+  "contentType": "image/png",
+  "purpose": "DAMAGE_EVIDENCE"
+}
+
+### 10.2 Landlord uploads main attachment
+PUT {{mainInit.response.body.$.uploadUrl}}
+Content-Type: image/png
+
+< ../../test-resources/image.png
+
+### 10.3 Landlord confirms main attachment
+# @name mainConfirm
+POST {{baseUrl}}/api/storage/attachments/confirm
+Authorization: Basic {{landlord1Basic}}
+Content-Type: application/json
+
+{
+  "objectKey": "{{mainInit.response.body.$.objectKey}}"
+}
+
+### 10.4 Landlord creates claim
+# @name createClaim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlord1Basic}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenant1Id}},
+  "title": "Повреждена мебель",
+  "description": "Гость сломал стул и испачкал обивку дивана",
+  "claimedAmount": 250.00,
+  "currency": "USD",
+  "attachmentKeys": [
+    "{{mainConfirm.response.body.$.objectKey}}"
+  ]
+}
+
+### 10.5 Admin gets claim by id
+GET {{baseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+Authorization: Basic {{admin1Basic}}
+
+### 10.6 Admin requests additional info
+# @name intakeNeedMoreInfo
+POST {{baseUrl}}/api/claims/{{createClaim.response.body.$.id}}/intake
+Authorization: Basic {{admin1Basic}}
+Content-Type: application/json
+
+{
+  "needMoreInfo": true,
+  "comment": "Нужны фото серийного номера и общий вид комнаты"
+}
+
+### 10.7 Landlord initializes additional attachment
+# @name addInit
+POST {{baseUrl}}/api/storage/attachments/init
+Authorization: Basic {{landlord1Basic}}
+Content-Type: application/json
+
+{
+  "fileName": "additional-proof.png",
+  "contentType": "image/png",
+  "purpose": "ADDITIONAL_MATERIAL"
+}
+
+### 10.8 Landlord uploads additional attachment
+PUT {{addInit.response.body.$.uploadUrl}}
+Content-Type: image/png
+
+< ../../test-resources/image.png
+
+### 10.9 Landlord confirms additional attachment
+# @name addConfirm
+POST {{baseUrl}}/api/storage/attachments/confirm
+Authorization: Basic {{landlord1Basic}}
+Content-Type: application/json
+
+{
+  "objectKey": "{{addInit.response.body.$.objectKey}}"
+}
+
+### 10.10 Landlord replies with additional materials
+# @name addReply
+POST {{baseUrl}}/api/claims/{{createClaim.response.body.$.id}}/additional-info
+Authorization: Basic {{landlord1Basic}}
+Content-Type: application/json
+
+{
+  "comment": "Добавил серийник и общий план",
+  "attachmentIds": [
+    {{addConfirm.response.body.$.attachmentId}}
+  ]
+}
+
+### 10.11 Admin gets additional info attachments
+GET {{baseUrl}}/api/claims/{{createClaim.response.body.$.id}}/attachments/additional
+Authorization: Basic {{admin1Basic}}
+
+### 10.12 Admin gets claim again before assessment
+GET {{baseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+Authorization: Basic {{admin1Basic}}
+
+### 10.13 Admin assessment: no penalty grounds
+POST {{baseUrl}}/api/claims/{{createClaim.response.body.$.id}}/assessment
+Authorization: Basic {{admin1Basic}}
+Content-Type: application/json
+
+{
+  "assessmentAmount": 0.00,
+  "assessmentNotes": "Дополнительные материалы подтвердили отсутствие ущерба",
+  "penaltyGrounds": false
+}
+
+### 10.14 Final state
+GET {{baseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+Authorization: Basic {{admin1Basic}}

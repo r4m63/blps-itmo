@@ -1,17 +1,50 @@
-version: "3.9"
-
 services:
-  postgres:
+  postgres-business:
     image: postgres:16
     restart: unless-stopped
+    container_name: blps-postgres-business
+    command:
+      - postgres
+      - -c
+      - max_prepared_transactions=100
     ports:
-      - "5432:5432"
+      - "${BUSINESS_DB_PORT}:5432"
     environment:
-      POSTGRES_DB: blps
-      POSTGRES_USER: ${DATASOURCE_USERNAME}
-      POSTGRES_PASSWORD: ${DATASOURCE_PASSWORD}
+      POSTGRES_DB: ${BUSINESS_DB_NAME}
+      POSTGRES_USER: ${BUSINESS_DB_USERNAME}
+      POSTGRES_PASSWORD: ${BUSINESS_DB_PASSWORD}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_business:/var/lib/postgresql/data
+      - ./sql/init_1.sql:/docker-entrypoint-initdb.d/01-init_1.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${BUSINESS_DB_USERNAME} -d ${BUSINESS_DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-auth:
+    image: postgres:16
+    restart: unless-stopped
+    container_name: blps-postgres-auth
+    command:
+      - postgres
+      - -c
+      - max_prepared_transactions=100
+    ports:
+      - "${AUTH_DB_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME}
+      POSTGRES_USER: ${AUTH_DB_USERNAME}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+    volumes:
+      - pgdata_auth:/var/lib/postgresql/data
+      - ./sql/init_2.sql:/docker-entrypoint-initdb.d/01-init_2.sql:ro
+      - ./sql/test_users_1.sql:/docker-entrypoint-initdb.d/02-test_users_1.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${AUTH_DB_USERNAME} -d ${AUTH_DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   minio:
     image: minio/minio:latest
@@ -32,5 +65,6 @@ services:
       retries: 3
 
 volumes:
-  pgdata:
+  pgdata_business:
+  pgdata_auth:
   miniodata:

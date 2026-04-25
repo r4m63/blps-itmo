@@ -3,11 +3,6 @@ spring:
     name: blps
   config:
     import: file:.env[.properties]
-  datasource:
-    url: ${DATASOURCE_URL}
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
-    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: none
@@ -15,9 +10,6 @@ spring:
       hibernate:
         format_sql: true
     show-sql: true
-  mvc:
-    problemdetails:
-      enabled: true
 
 server:
   port: ${SERVER_PORT:8080}
@@ -27,6 +19,31 @@ springdoc:
     path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+app:
+  persistence:
+    business:
+      persistence-unit-name: business
+      xa:
+        server-name: ${BUSINESS_DB_HOST}
+        port-number: ${BUSINESS_DB_PORT}
+        database-name: ${BUSINESS_DB_NAME}
+        user: ${BUSINESS_DB_USERNAME}
+        password: ${BUSINESS_DB_PASSWORD}
+    auth:
+      persistence-unit-name: auth
+      xa:
+        server-name: ${AUTH_DB_HOST}
+        port-number: ${AUTH_DB_PORT}
+        database-name: ${AUTH_DB_NAME}
+        user: ${AUTH_DB_USERNAME}
+        password: ${AUTH_DB_PASSWORD}
+
+narayana:
+  log-dir: ${java.io.tmpdir}/narayana-tx-logs
+  default-timeout: 60
+  node-identifier: ${spring.application.name}
+  shorten-node-identifier-if-necessary: true
 
 minio:
   url: ${MINIO_URL}

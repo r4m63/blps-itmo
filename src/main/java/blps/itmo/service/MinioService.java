@@ -5,20 +5,21 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
-import blps.itmo.entity.AttachmentPurpose;
-import blps.itmo.entity.Claim;
-import blps.itmo.entity.ClaimAttachment;
-import blps.itmo.entity.User;
+import blps.itmo.entity.business.AttachmentPurpose;
+import blps.itmo.entity.business.Claim;
+import blps.itmo.entity.business.ClaimAttachment;
+import blps.itmo.entity.business.ClaimMessage;
 import blps.itmo.exception.BadRequestException;
 import blps.itmo.exception.ResourceNotFoundException;
-import blps.itmo.repository.ClaimAttachmentRepository;
+import blps.itmo.repository.business.ClaimAttachmentRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
@@ -34,13 +35,18 @@ public class MinioService {
     private final ClaimAttachmentRepository attachmentRepository;
     private final String bucket;
     private final Duration presignTtl;
+    private final TransactionTemplate txTemplate;
 
-    public MinioService(MinioClient minioClient, ClaimAttachmentRepository attachmentRepository,
-            @Value("${minio.bucket}") String bucket, @Value("${minio.presign-ttl-seconds:900}") long ttlSeconds) {
+    public MinioService(MinioClient minioClient,
+            ClaimAttachmentRepository attachmentRepository,
+            @Qualifier("jtaTransactionTemplate") TransactionTemplate txTemplate,
+            @Value("${minio.bucket}") String bucket,
+            @Value("${minio.presign-ttl-seconds:900}") long ttlSeconds) {
         this.minioClient = minioClient;
         this.attachmentRepository = attachmentRepository;
         this.bucket = bucket;
         this.presignTtl = Duration.ofSeconds(ttlSeconds);
+        this.txTemplate = txTemplate;
         ensureBucket();
     }
 
@@ -104,69 +110,48 @@ public class MinioService {
         }
     }
 
-    public void attachObjectsToClaim(blps.itmo.entity.Claim claim,
-            User uploader,
-            List<String> objectKeys) {
-        if (objectKeys == null || objectKeys.isEmpty()) {
-            return;
-        }
-        List<ClaimAttachment> attachmentsToSave = new ArrayList<>(objectKeys.size());
-        for (String key : objectKeys) {
-            StatObjectResponse stat = stat(key);
-            ClaimAttachment attachment = ClaimAttachment.builder()
-                    .claim(claim)
-                    .message(null)
-                    .uploadedBy(uploader)
-                    .purpose(AttachmentPurpose.DAMAGE_EVIDENCE)
-                    .objectKey(key)
-                    .fileName(stat.object())
-                    .contentType(stat.contentType())
-                    .sizeBytes(stat.size())
-                    .createdAt(OffsetDateTime.now())
-                    .build();
-            attachmentsToSave.add(attachment);
-        }
-        attachmentRepository.saveAll(attachmentsToSave);
-    }
-
     public AttachmentInitResult initAttachment(String fileName,
             String contentType,
             AttachmentPurpose purpose,
-            User uploader) {
-        String objectKey = generateObjectKey(fileName);
-        OffsetDateTime now = OffsetDateTime.now();
-        ClaimAttachment attachment = ClaimAttachment.builder()
-                .objectKey(objectKey)
-                .fileName(fileName)
-                .contentType(contentType)
-                .purpose(purpose == null ? AttachmentPurpose.DAMAGE_EVIDENCE : purpose)
-                .uploadedBy(uploader)
-                .uploaded(false)
-                .createdAt(now)
-                .build();
-        attachmentRepository.save(attachment);
-        String url = presignPutUrl(objectKey, contentType);
-        return new AttachmentInitResult(attachment.getId(), objectKey, url, now.plus(presignTtl));
+            Long uploadedById) {
+        return txTemplate.execute(status -> {
+            String objectKey = generateObjectKey(fileName);
+            OffsetDateTime now = OffsetDateTime.now();
+            ClaimAttachment attachment = ClaimAttachment.builder()
+                    .objectKey(objectKey)
+                    .fileName(fileName)
+                    .contentType(contentType)
+                    .purpose(purpose == null ? AttachmentPurpose.DAMAGE_EVIDENCE : purpose)
+                    .uploadedById(uploadedById)
+                    .uploaded(false)
+                    .createdAt(now)
+                    .build();
+            attachmentRepository.save(attachment);
+            String url = presignPutUrl(objectKey, contentType);
+            return new AttachmentInitResult(attachment.getId(), objectKey, url, now.plus(presignTtl));
+        });
     }
 
     public ClaimAttachment confirmUpload(String objectKey) {
-        ClaimAttachment attachment = attachmentRepository.findByObjectKey(objectKey)
-                .orElseThrow(() -> ResourceNotFoundException.of(ClaimAttachment.class, "objectKey", objectKey));
-        StatObjectResponse stat = stat(objectKey);
-        attachment.setSizeBytes(stat.size());
-        attachment.setContentType(stat.contentType());
-        attachment.setUploaded(true);
-        attachment.setConfirmedAt(OffsetDateTime.now());
-        attachmentRepository.save(attachment);
-        return attachment;
+        return txTemplate.execute(status -> {
+            ClaimAttachment attachment = attachmentRepository.findByObjectKey(objectKey)
+                    .orElseThrow(() -> ResourceNotFoundException.of(ClaimAttachment.class, "objectKey", objectKey));
+            StatObjectResponse stat = stat(objectKey);
+            attachment.setSizeBytes(stat.size());
+            attachment.setContentType(stat.contentType());
+            attachment.setUploaded(true);
+            attachment.setConfirmedAt(OffsetDateTime.now());
+            attachmentRepository.save(attachment);
+            return attachment;
+        });
     }
 
-    public void attachExistingObjectsToClaim(Claim claim, User uploader, List<String> objectKeys) {
-        attachExistingObjectsToClaim(claim, uploader, objectKeys, null);
+    public void attachExistingObjectsToClaim(Claim claim, Long uploadedById, List<String> objectKeys) {
+        attachExistingObjectsToClaim(claim, uploadedById, objectKeys, null);
     }
 
-    public void attachExistingObjectsToClaim(Claim claim, User uploader, List<String> objectKeys,
-            blps.itmo.entity.ClaimMessage message) {
+    public void attachExistingObjectsToClaim(Claim claim, Long uploadedById, List<String> objectKeys,
+            ClaimMessage message) {
         if (objectKeys == null || objectKeys.isEmpty()) {
             return;
         }
@@ -177,7 +162,6 @@ public class MinioService {
         }
         for (ClaimAttachment att : attachments) {
             if (!Boolean.TRUE.equals(att.getUploaded()) || att.getSizeBytes() == null) {
-                // attempt late confirmation/stat in case confirm step было пропущено
                 StatObjectResponse stat = stat(att.getObjectKey());
                 att.setSizeBytes(stat.size());
                 att.setContentType(stat.contentType());
@@ -185,7 +169,7 @@ public class MinioService {
                 att.setConfirmedAt(OffsetDateTime.now());
             }
             att.setClaim(claim);
-            att.setUploadedBy(uploader);
+            att.setUploadedById(uploadedById);
             att.setMessage(message);
         }
         attachmentRepository.saveAll(attachments);
