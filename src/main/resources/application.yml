@@ -10,9 +10,6 @@ spring:
       hibernate:
         format_sql: true
     show-sql: true
-  mvc:
-    problemdetails:
-      enabled: true
 
 server:
   port: ${SERVER_PORT:8080}

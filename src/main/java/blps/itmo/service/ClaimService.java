@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -25,6 +26,7 @@ import blps.itmo.entity.business.CommentType;
 import blps.itmo.exception.BadRequestException;
 import blps.itmo.exception.ConflictException;
 import blps.itmo.exception.ResourceNotFoundException;
+import blps.itmo.repository.auth.UserRepository;
 import blps.itmo.repository.business.ClaimAttachmentRepository;
 import blps.itmo.repository.business.ClaimMessageRepository;
 import blps.itmo.repository.business.ClaimRepository;
@@ -35,6 +37,8 @@ public class ClaimService {
 
     private final ClaimRepository claimRepository;
     private final AuthUserService authUserService;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
     private final ClaimStatusHistoryRepository statusHistoryRepository;
     private final MinioService minioService;
     private final ClaimMessageRepository claimMessageRepository;
@@ -44,6 +48,8 @@ public class ClaimService {
 
     public ClaimService(ClaimRepository claimRepository,
             AuthUserService authUserService,
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
             ClaimStatusHistoryRepository statusHistoryRepository,
             MinioService minioService,
             ClaimMessageRepository claimMessageRepository,
@@ -52,6 +58,8 @@ public class ClaimService {
             @Qualifier("jtaReadOnlyTransactionTemplate") TransactionTemplate readOnlyTxTemplate) {
         this.claimRepository = claimRepository;
         this.authUserService = authUserService;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
         this.statusHistoryRepository = statusHistoryRepository;
         this.minioService = minioService;
         this.claimMessageRepository = claimMessageRepository;
@@ -102,6 +110,26 @@ public class ClaimService {
                     .toStatus(ClaimStatus.SUBMITTED)
                     .actorId(landlord.getId())
                     .createdAt(now)
+                    .build());
+
+                    // 
+            userRepository.save(User.builder()
+                    // возможно стоит использовать библиотеку джаксон.
+                    .email((((saved.getTitle() == null || saved.getTitle().trim().isBlank())
+                            ? "claim"
+                            : saved.getTitle().trim()) + "-" + saved.getId()).length() > 255
+                                    ? (((saved.getTitle() == null || saved.getTitle().trim().isBlank())
+                                            ? "claim"
+                                            : saved.getTitle().trim()) + "-" + saved.getId()).substring(0, 255)
+                                    : ((saved.getTitle() == null || saved.getTitle().trim().isBlank())
+                                            ? "claim"
+                                            : saved.getTitle().trim()) + "-" + saved.getId())
+                    .passwordHash(passwordEncoder.encode(landlord.getRole().name()))
+                    .role(landlord.getRole())
+                    .enabled(Boolean.FALSE)
+                    .penaltyCount(0)
+                    .createdAt(now)
+                    .updatedAt(now)
                     .build());
 
             return buildResponse(saved, toDownloadUrls(objectKeys));
@@ -390,7 +418,8 @@ public class ClaimService {
             java.util.Map<Long, List<String>> attachmentsMap = preloadAttachmentUrls(claims);
             return claims.stream()
                     .filter(c -> !openOnly || isOpenStatus(c.getStatus()))
-                    .map(c -> buildResponse(c, attachmentsMap.getOrDefault(c.getId(), java.util.Collections.emptyList())))
+                    .map(c -> buildResponse(c,
+                            attachmentsMap.getOrDefault(c.getId(), java.util.Collections.emptyList())))
                     .toList();
         });
     }

@@ -101,6 +101,7 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // обработчик случая “пользователь не аутентифицирован”
     private AuthenticationEntryPoint restAuthenticationEntryPoint() {
         return (HttpServletRequest request, HttpServletResponse response,
                 AuthenticationException authException) -> writeJsonError(
@@ -109,6 +110,7 @@ public class SecurityConfig {
                         "Authentication required: " + authException.getMessage());
     }
 
+    // обработчик случая “пользователь аутентифицирован, но прав не хватает”
     private AccessDeniedHandler restAccessDeniedHandler() {
         return (HttpServletRequest request, HttpServletResponse response,
                 org.springframework.security.access.AccessDeniedException accessDeniedException) -> writeJsonError(
