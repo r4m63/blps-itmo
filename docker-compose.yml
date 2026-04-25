@@ -1,35 +1,43 @@
 services:
-  postgres-business:
-    image: postgres:16
+  zookeeper:
+    image: bitnami/zookeeper:3.9
     restart: unless-stopped
-    container_name: blps-postgres-business
-    command:
-      - postgres
-      - -c
-      - max_prepared_transactions=100
     ports:
-      - "${BUSINESS_DB_PORT}:5432"
+      - "${ZOOKEEPER_PORT}:2181"
     environment:
-      POSTGRES_DB: ${BUSINESS_DB_NAME}
-      POSTGRES_USER: ${BUSINESS_DB_USERNAME}
-      POSTGRES_PASSWORD: ${BUSINESS_DB_PASSWORD}
-    volumes:
-      - pgdata_business:/var/lib/postgresql/data
-      - ./sql/init_1.sql:/docker-entrypoint-initdb.d/01-init_1.sql:ro
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${BUSINESS_DB_USERNAME} -d ${BUSINESS_DB_NAME}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+
+  kafka:
+    image: bitnami/kafka:3.7
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "${KAFKA_PORT}:9092"
+      - "${KAFKA_EXTERNAL_PORT}:29092"
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:29092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${KAFKA_EXTERNAL_PORT}
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    ports:
+      - "${KAFKA_UI_PORT}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: lab3
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
 
   postgres-auth:
     image: postgres:16
     restart: unless-stopped
-    container_name: blps-postgres-auth
-    command:
-      - postgres
-      - -c
-      - max_prepared_transactions=100
     ports:
       - "${AUTH_DB_PORT}:5432"
     environment:
@@ -38,33 +46,77 @@ services:
       POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
     volumes:
       - pgdata_auth:/var/lib/postgresql/data
-      - ./sql/init_2.sql:/docker-entrypoint-initdb.d/01-init_2.sql:ro
-      - ./sql/test_users_1.sql:/docker-entrypoint-initdb.d/02-test_users_1.sql:ro
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${AUTH_DB_USERNAME} -d ${AUTH_DB_NAME}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - ./sql/init_auth_service.sql:/docker-entrypoint-initdb.d/01-init-auth.sql:ro
 
-  minio:
-    image: minio/minio:latest
+  postgres-claim:
+    image: postgres:16
     restart: unless-stopped
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${CLAIM_DB_PORT}:5432"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      POSTGRES_DB: ${CLAIM_DB_NAME}
+      POSTGRES_USER: ${CLAIM_DB_USERNAME}
+      POSTGRES_PASSWORD: ${CLAIM_DB_PASSWORD}
     volumes:
-      - miniodata:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      - pgdata_claim:/var/lib/postgresql/data
+      - ./sql/init_claim_service.sql:/docker-entrypoint-initdb.d/01-init-claim.sql:ro
+
+  postgres-assessment:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "${ASSESSMENT_DB_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${ASSESSMENT_DB_NAME}
+      POSTGRES_USER: ${ASSESSMENT_DB_USERNAME}
+      POSTGRES_PASSWORD: ${ASSESSMENT_DB_PASSWORD}
+    volumes:
+      - pgdata_assessment:/var/lib/postgresql/data
+      - ./sql/init_assessment_service.sql:/docker-entrypoint-initdb.d/01-init-assessment.sql:ro
+
+  postgres-penalty:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "${PENALTY_DB_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${PENALTY_DB_NAME}
+      POSTGRES_USER: ${PENALTY_DB_USERNAME}
+      POSTGRES_PASSWORD: ${PENALTY_DB_PASSWORD}
+    volumes:
+      - pgdata_penalty:/var/lib/postgresql/data
+      - ./sql/init_penalty_service.sql:/docker-entrypoint-initdb.d/01-init-penalty.sql:ro
+
+  postgres-notification:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "${NOTIFICATION_DB_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${NOTIFICATION_DB_NAME}
+      POSTGRES_USER: ${NOTIFICATION_DB_USERNAME}
+      POSTGRES_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
+    volumes:
+      - pgdata_notification:/var/lib/postgresql/data
+      - ./sql/init_notification_service.sql:/docker-entrypoint-initdb.d/01-init-notification.sql:ro
+
+  postgres-audit:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "${AUDIT_DB_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${AUDIT_DB_NAME}
+      POSTGRES_USER: ${AUDIT_DB_USERNAME}
+      POSTGRES_PASSWORD: ${AUDIT_DB_PASSWORD}
+    volumes:
+      - pgdata_audit:/var/lib/postgresql/data
+      - ./sql/init_audit_service.sql:/docker-entrypoint-initdb.d/01-init-audit.sql:ro
 
 volumes:
-  pgdata_business:
   pgdata_auth:
-  miniodata:
+  pgdata_claim:
+  pgdata_assessment:
+  pgdata_penalty:
+  pgdata_notification:
+  pgdata_audit:

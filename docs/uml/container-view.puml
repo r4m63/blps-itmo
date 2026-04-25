@@ -1,0 +1,55 @@
+@startuml
+title BLPS Lab3 - Container View
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+actor Landlord
+actor Tenant
+actor Admin
+
+component "claim-service" as Claim
+component "auth-service" as Auth
+component "assessment-service" as Assessment
+component "penalty-service" as Penalty
+component "notification-service" as Notification
+component "audit-service" as Audit
+
+queue "Kafka" as Kafka
+component "Kafka UI" as KafkaUI
+component "ZooKeeper" as ZK
+
+database "claim-db" as ClaimDB
+database "auth-db" as AuthDB
+database "assessment-db" as AssessmentDB
+database "penalty-db" as PenaltyDB
+database "notification-db" as NotificationDB
+database "audit-db" as AuditDB
+
+Landlord --> Claim : REST\ncreate/additional-info
+Tenant --> Claim : REST\ntenant-response
+Admin --> Claim : REST\nsupport-decision
+Admin --> Auth : REST\ndeactivate user
+Admin --> Audit : REST\nquery audit trail
+
+Claim --> Auth : HTTP\n/internal/users/{id}
+
+Claim --> ClaimDB
+Auth --> AuthDB
+Assessment --> AssessmentDB
+Penalty --> PenaltyDB
+Notification --> NotificationDB
+Audit --> AuditDB
+
+Claim ..> Kafka : publish\nclaim.events\npenalty.events
+Assessment ..> Kafka : consume claim.events\npublish assessment.events
+Penalty ..> Kafka : consume penalty.events\npublish penalty.events
+Auth ..> Kafka : consume penalty.events\npublish auth.events
+Notification ..> Kafka : consume all domain topics
+Audit ..> Kafka : consume all domain topics
+
+KafkaUI --> Kafka
+Kafka --> ZK
+
+@enduml

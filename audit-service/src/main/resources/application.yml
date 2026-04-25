@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: audit-service
+  datasource:
+    url: jdbc:postgresql://${AUDIT_DB_HOST:localhost}:${AUDIT_DB_PORT:5438}/${AUDIT_DB_NAME:blps_audit}
+    username: ${AUDIT_DB_USERNAME:blps_audit_user}
+    password: ${AUDIT_DB_PASSWORD:blps_audit_password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "*"
+
+server:
+  port: ${AUDIT_SERVICE_PORT:8086}
+
+app:
+  service-name: audit-service
+  outbox:
+    poll-interval-ms: 1000

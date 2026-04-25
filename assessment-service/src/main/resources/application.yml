@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: assessment-service
+  datasource:
+    url: jdbc:postgresql://${ASSESSMENT_DB_HOST:localhost}:${ASSESSMENT_DB_PORT:5435}/${ASSESSMENT_DB_NAME:blps_assessment}
+    username: ${ASSESSMENT_DB_USERNAME:blps_assessment_user}
+    password: ${ASSESSMENT_DB_PASSWORD:blps_assessment_password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "*"
+
+server:
+  port: ${ASSESSMENT_SERVICE_PORT:8083}
+
+app:
+  service-name: assessment-service
+  outbox:
+    poll-interval-ms: 1000
+  assessment:
+    poll-interval-ms: 2000

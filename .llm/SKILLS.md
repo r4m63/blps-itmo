@@ -1,223 +1,206 @@
-# BLPS Project Skills
+# BLPS Lab3 Skills
 
-This file defines project-specific playbooks for agents working in this repository. Use the smallest relevant playbook instead of re-discovering the system from scratch.
+Use the smallest relevant playbook. This repository is no longer a monolith.
 
 ## Skill: Architecture Sweep
 
-Use when the user asks a broad question, asks for a review of the whole project, or the task spans multiple layers.
+Use when the task spans multiple services or the user asks how the system works now.
 
 Read in this order:
 
-1. [build.gradle.kts](../build.gradle.kts)
-2. [src/main/resources/application.yml](../src/main/resources/application.yml)
+1. [settings.gradle.kts](../settings.gradle.kts)
+2. [build.gradle.kts](../build.gradle.kts)
 3. [docker-compose.yml](../docker-compose.yml)
-4. [sql/init_1.sql](../sql/init_1.sql)
-5. [sql/init_2.sql](../sql/init_2.sql)
-6. [bpmn/blps1.bpmn](../bpmn/blps1.bpmn)
-7. [rest-client/scenarios](../rest-client/scenarios)
-8. [src/main/java/blps/itmo/controller](../src/main/java/blps/itmo/controller)
-9. [src/main/java/blps/itmo/service/ClaimService.java](../src/main/java/blps/itmo/service/ClaimService.java)
-10. [src/main/java/blps/itmo/service/MinioService.java](../src/main/java/blps/itmo/service/MinioService.java)
+4. [.env.sample](../.env.sample)
+5. [docs/lab3-runbook.md](../docs/lab3-runbook.md)
+6. [platform-core](../platform-core)
+7. service `Application`/`Controller`/`Service` files in the affected modules
+8. matching `sql/init_*_service.sql`
 
 Output focus:
 
-- identify which layer owns the behavior
-- identify whether the change touches business DB, auth DB, or MinIO
-- identify whether the contract is documented by REST client or Postman examples
-- identify whether BPMN and implementation are aligned or diverge
-
-## Skill: BPMN To Code Mapping
-
-Use when the user asks what the business process is, how BPMN is implemented, or whether code matches the process model.
-
-Primary files:
-
-- [bpmn/blps1.bpmn](../bpmn/blps1.bpmn)
-- [src/main/java/blps/itmo/service/ClaimService.java](../src/main/java/blps/itmo/service/ClaimService.java)
-- [src/main/java/blps/itmo/controller/ClaimController.java](../src/main/java/blps/itmo/controller/ClaimController.java)
-- [rest-client/scenarios](../rest-client/scenarios)
-
-Method:
-
-- map each BPMN gateway/task to one or more endpoints
-- map each endpoint to allowed source status and target status
-- compare BPMN branches against scenario coverage
-- explicitly list BPMN features that are conceptual only and not implemented in code
-
-Known current gaps to remember:
-
-- BPMN is not executed by an engine
-- timeout path for tenant response is not implemented
-- notification step is not implemented
-- `INTAKE_REVIEW` exists in enum but is not actively entered
-- `TenantResponseRequest.agree` currently has no workflow effect
+- which service owns the data
+- whether the flow is sync HTTP or async Kafka
+- which event starts and completes the flow
+- which DB schema must stay aligned
 
 ## Skill: Claim Lifecycle Change
 
-Use when the task affects statuses, transitions, validation, ownership, or claim read models.
+Use when changing statuses, claim validation, timeline, or orchestration logic.
 
 Primary files:
 
-- [src/main/java/blps/itmo/service/ClaimService.java](../src/main/java/blps/itmo/service/ClaimService.java)
-- [src/main/java/blps/itmo/controller/ClaimController.java](../src/main/java/blps/itmo/controller/ClaimController.java)
-- [src/main/java/blps/itmo/entity/business/ClaimStatus.java](../src/main/java/blps/itmo/entity/business/ClaimStatus.java)
-- [sql/init_1.sql](../sql/init_1.sql)
-- [src/main/java/blps/itmo/dto](../src/main/java/blps/itmo/dto)
-- [rest-client/scenarios](../rest-client/scenarios)
+- [ClaimProcessService.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
+- [ClaimController.java](../claim-service/src/main/java/blps/itmo/claim/controller/ClaimController.java)
+- [ClaimStatus.java](../claim-service/src/main/java/blps/itmo/claim/domain/ClaimStatus.java)
+- [ClaimEventListeners.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimEventListeners.java)
+- [init_claim_service.sql](../sql/init_claim_service.sql)
+- [30-lab3-async-penalty.http](../rest-client/scenarios/30-lab3-async-penalty.http)
+- [31-lab3-penalty-failure-recovery.http](../rest-client/scenarios/31-lab3-penalty-failure-recovery.http)
 
 Checklist:
 
-- confirm the allowed previous states and target state
-- compare the change against BPMN branch intent and existing scenario files
-- update status history writes if the transition changes
-- preserve landlord/tenant/admin ownership checks
-- keep DB enum and Java enum synchronized
-- update at least one end-to-end scenario if API behavior changed
-- run `./gradlew compileJava`
+- confirm allowed source status and target status
+- update emitted event if lifecycle changes
+- update timeline entry writing
+- keep landlord/tenant/admin validation aligned with `auth-service`
+- keep SQL enum aligned with Java enum
+- update scenario files if external behavior changed
 
-## Skill: RBAC Or Auth Change
+## Skill: Event Contract Or Distributed Transaction Change
 
-Use when the task adds a role, changes permissions, introduces a protected endpoint, or fixes authorization behavior.
+Use when adding a new event, changing producer/consumer behavior, or touching outbox/inbox logic.
 
 Primary files:
 
-- [src/main/java/blps/itmo/security/Privileges.java](../src/main/java/blps/itmo/security/Privileges.java)
-- [src/main/java/blps/itmo/config/SecurityConfig.java](../src/main/java/blps/itmo/config/SecurityConfig.java)
-- [src/main/java/blps/itmo/security/AppUserDetailsService.java](../src/main/java/blps/itmo/security/AppUserDetailsService.java)
-- [src/main/java/blps/itmo/controller](../src/main/java/blps/itmo/controller)
-- [sql/init_2.sql](../sql/init_2.sql)
-- [sql/test_users_1.sql](../sql/test_users_1.sql)
-- [rest-client/claims-rbac.http](../rest-client/claims-rbac.http)
+- [EventType.java](../platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
+- [TopicNames.java](../platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java)
+- [payload package](../platform-core/src/main/java/blps/itmo/platform/events/payload)
+- [OutboxService.java](../platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java)
+- [ProcessedMessageService.java](../platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java)
+- [OutboxRelay.java](../platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java)
 
 Checklist:
 
-- keep privilege constants and SQL seed data aligned
-- update `@PreAuthorize` annotations where needed
-- keep service-level ownership checks; controller guards are not enough
-- if new users/roles are needed for manual checks, extend seed data consciously
-- validate with the RBAC smoke scenario or a targeted manual request
+- keep business write and outbox write in one local transaction
+- keep consumers idempotent through `processed_messages`
+- do not introduce direct DB reads across services
+- update every producer and consumer impacted by the event
+- keep SQL schemas aligned if outbox/inbox structure changes
+- update at least one demo flow that proves the event is used
 
-## Skill: Attachment Or MinIO Flow
+## Skill: Assessment Rule Change
 
-Use when the task touches file uploads, attachment confirmation, presigned URLs, or claim-linked files.
+Use when the claim assessment heuristic or async job behavior changes.
 
 Primary files:
 
-- [src/main/java/blps/itmo/controller/StorageController.java](../src/main/java/blps/itmo/controller/StorageController.java)
-- [src/main/java/blps/itmo/service/MinioService.java](../src/main/java/blps/itmo/service/MinioService.java)
-- [src/main/java/blps/itmo/entity/business/ClaimAttachment.java](../src/main/java/blps/itmo/entity/business/ClaimAttachment.java)
-- [sql/init_1.sql](../sql/init_1.sql)
-- [docs/how_minio.txt](../docs/how_minio.txt)
-- [rest-client/scenarios/11-intake-additional-final-penalty.http](../rest-client/scenarios/11-intake-additional-final-penalty.http)
+- [AssessmentWorkflowService.java](../assessment-service/src/main/java/blps/itmo/assessment/service/AssessmentWorkflowService.java)
+- [AssessmentJob.java](../assessment-service/src/main/java/blps/itmo/assessment/domain/AssessmentJob.java)
+- [ClaimEventListener.java](../assessment-service/src/main/java/blps/itmo/assessment/service/ClaimEventListener.java)
+- [init_assessment_service.sql](../sql/init_assessment_service.sql)
+- [30-lab3-async-penalty.http](../rest-client/scenarios/30-lab3-async-penalty.http)
 
 Checklist:
 
-- preserve `init -> direct upload -> confirm -> attach`
-- remember MinIO is outside XA/JTA
-- keep `objectKey` normalization behavior intact unless explicitly changing URL handling
-- distinguish `attachmentKeys` from `attachmentIds`
-- think about orphaned objects/rows if the task changes confirm or cleanup logic
-- remember that `attachments/additional` returns presigned URLs despite the method name mentioning keys
+- separate event ingestion from async processing
+- keep first-attempt and re-assessment behavior explicit
+- preserve idempotency on duplicate `CLAIM_CREATED` or `ADDITIONAL_INFO_PROVIDED`
+- verify resulting claim transitions in `claim-service`
 
-## Skill: Cross-DB Transaction Change
+## Skill: Penalty Flow Change
 
-Use when one use case writes to both auth DB and business DB, or when a bug smells like partial commit behavior.
+Use when changing penalty application, failure handling, or retry behavior.
 
 Primary files:
 
-- [src/main/java/blps/itmo/config/AuthPersistenceConfig.java](../src/main/java/blps/itmo/config/AuthPersistenceConfig.java)
-- [src/main/java/blps/itmo/config/BusinessPersistenceConfig.java](../src/main/java/blps/itmo/config/BusinessPersistenceConfig.java)
-- [src/main/java/blps/itmo/config/TransactionTemplateConfig.java](../src/main/java/blps/itmo/config/TransactionTemplateConfig.java)
-- [src/main/java/blps/itmo/service/AuthUserService.java](../src/main/java/blps/itmo/service/AuthUserService.java)
-- [src/main/java/blps/itmo/service/UserService.java](../src/main/java/blps/itmo/service/UserService.java)
-- [src/main/java/blps/itmo/service/ClaimService.java](../src/main/java/blps/itmo/service/ClaimService.java)
+- [PenaltyWorkflowService.java](../penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyWorkflowService.java)
+- [PenaltyController.java](../penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyController.java)
+- [PenaltyOperation.java](../penalty-service/src/main/java/blps/itmo/penalty/domain/PenaltyOperation.java)
+- [ClaimProcessService.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
+- [AuthUserService.java](../auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
+- [init_penalty_service.sql](../sql/init_penalty_service.sql)
+- [31-lab3-penalty-failure-recovery.http](../rest-client/scenarios/31-lab3-penalty-failure-recovery.http)
 
 Checklist:
 
-- verify which DB each repository belongs to
-- keep multi-DB writes inside existing JTA `TransactionTemplate`s
-- do not introduce entity relations across the two persistence units
-- explicitly classify the path:
-  create-claim style cross-DB write, support-decision penalty update, or user deactivation
-- remember MinIO is outside XA even when methods are called inside JTA templates
-- verify behavior against schema constraints in both SQL init files
-- run `./gradlew compileJava`
+- keep `PENALTY_PROCESSING` as an explicit intermediate state
+- emit success and failure events from `penalty-service`, not from `claim-service`
+- keep retry flow idempotent
+- confirm `auth-service` still reacts correctly to `PENALTY_APPLIED`
+
+## Skill: Auth Or User Deactivation Change
+
+Use when changing demo users, roles, internal user lookup, or deactivation behavior.
+
+Primary files:
+
+- [AuthController.java](../auth-service/src/main/java/blps/itmo/auth/controller/AuthController.java)
+- [AuthUserService.java](../auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
+- [User.java](../auth-service/src/main/java/blps/itmo/auth/domain/User.java)
+- [UserRole.java](../auth-service/src/main/java/blps/itmo/auth/domain/UserRole.java)
+- [init_auth_service.sql](../sql/init_auth_service.sql)
+- [32-lab3-user-deactivation.http](../rest-client/scenarios/32-lab3-user-deactivation.http)
+
+Checklist:
+
+- if user schema changes, update both seed logic and SQL
+- keep `/internal/users/{id}` contract stable unless every caller is updated
+- deactivation must still emit `USER_DEACTIVATED`
+- claim cleanup on deactivation belongs in `claim-service`, not `auth-service`
+
+## Skill: Read-Side Consumer Change
+
+Use when changing `notification-service` or `audit-service`.
+
+Primary files:
+
+- [NotificationEventListener.java](../notification-service/src/main/java/blps/itmo/notification/service/NotificationEventListener.java)
+- [AuditEventListener.java](../audit-service/src/main/java/blps/itmo/audit/service/AuditEventListener.java)
+- [AuditController.java](../audit-service/src/main/java/blps/itmo/audit/controller/AuditController.java)
+- [init_notification_service.sql](../sql/init_notification_service.sql)
+- [init_audit_service.sql](../sql/init_audit_service.sql)
+
+Checklist:
+
+- keep consumers idempotent
+- never let read-side consumers become source-of-truth owners
+- preserve event trail quality by keeping `correlationId`, `aggregateType`, and `aggregateId`
+
+## Skill: SQL Schema Sync
+
+Use when entity fields or enums changed.
+
+Primary files:
+
+- matching `domain` entity
+- matching `sql/init_*_service.sql`
+- matching `sql/drop_*_service.sql`
+
+Checklist:
+
+- one service, one schema file pair
+- keep enum values identical between Java and SQL
+- preserve indexes used by current query paths
+- remember `outbox_events` and `processed_messages` exist in every service DB
 
 ## Skill: Scenario-Driven Verification
 
-Use when the user refers to tests, scenarios, expected flows, or asks what behavior is currently supported.
+Use when the user asks what is currently implemented or asks to verify business behavior.
 
 Primary files:
 
-- [rest-client/scenarios/00-rbac-smoke.http](../rest-client/scenarios/00-rbac-smoke.http)
-- [rest-client/scenarios/10-intake-additional-assessment-no.http](../rest-client/scenarios/10-intake-additional-assessment-no.http)
-- [rest-client/scenarios/11-intake-additional-final-penalty.http](../rest-client/scenarios/11-intake-additional-final-penalty.http)
-- [rest-client/scenarios/12-intake-additional-final-no-penalty.http](../rest-client/scenarios/12-intake-additional-final-no-penalty.http)
-- [rest-client/scenarios/20-intake-ok-assessment-no.http](../rest-client/scenarios/20-intake-ok-assessment-no.http)
-- [rest-client/scenarios/21-intake-ok-final-penalty.http](../rest-client/scenarios/21-intake-ok-final-penalty.http)
-- [rest-client/scenarios/22-intake-ok-final-no-penalty.http](../rest-client/scenarios/22-intake-ok-final-no-penalty.http)
+- [rest-client/scenarios/README.md](../rest-client/scenarios/README.md)
+- [30-lab3-async-penalty.http](../rest-client/scenarios/30-lab3-async-penalty.http)
+- [31-lab3-penalty-failure-recovery.http](../rest-client/scenarios/31-lab3-penalty-failure-recovery.http)
+- [32-lab3-user-deactivation.http](../rest-client/scenarios/32-lab3-user-deactivation.http)
 
 What to extract:
 
-- covered happy-path branches
-- actor/role sequence for each branch
-- storage pre-step sequence before claim operations
-- which endpoints are exercised together as one business flow
-- which edge cases are not covered by scenarios and therefore must be checked in code
-
-## Skill: API Contract Update
-
-Use when the task adds fields to requests/responses, changes validation, or adds endpoints.
-
-Primary files:
-
-- [src/main/java/blps/itmo/dto](../src/main/java/blps/itmo/dto)
-- [src/main/java/blps/itmo/controller](../src/main/java/blps/itmo/controller)
-- [src/main/java/blps/itmo/service](../src/main/java/blps/itmo/service)
-- [src/main/java/blps/itmo/exception/GlobalExceptionHandler.java](../src/main/java/blps/itmo/exception/GlobalExceptionHandler.java)
-- [rest-client/scenarios](../rest-client/scenarios)
-- [postman/collections](../postman/collections)
-
-Checklist:
-
-- prefer actor identity from `@AuthenticationPrincipal`, not from request payload
-- add validation annotations on DTOs where the API contract requires them
-- keep error semantics consistent with existing `400/403/404/409` handling
-- update at least one reproducible manual request example
-- run `./gradlew compileJava`
+- which service receives the initial request
+- which event(s) carry the flow forward
+- where eventual consistency is visible
+- how failure and retry are demonstrated
 
 ## Skill: Manual Verification
 
-Use when there are no automated tests for the changed behavior.
+Use when no automated test covers the change.
 
 Fast path:
 
-1. start infra with `docker compose up -d`
-2. run the app with `./gradlew bootRun`
-3. choose the nearest scenario from [rest-client/scenarios/README.md](../rest-client/scenarios/README.md)
-4. align `@baseUrl` in the `.http` file with `SERVER_PORT` from `.env`
-5. use seeded users from [sql/test_users_1.sql](../sql/test_users_1.sql)
-
-Known reusable accounts:
-
-- `landlord1@example.com / password`
-- `landlord2@example.com / password`
-- `tenant1@example.com / password`
-- `tenant2@example.com / password`
-- `admin1@example.com / password`
-- `admin2@example.com / password`
+1. `docker compose up -d`
+2. run affected services with `./gradlew :<module>:bootRun`
+3. run the nearest scenario from `rest-client/scenarios`
+4. use `./gradlew build` before closing substantial changes
 
 ## Skill: Review Mode
 
-Use when the user asks for a review rather than a feature.
+Use when the user asks for a review.
 
-Review priorities for this repo:
+Priorities:
 
-- invalid state transitions in `ClaimService`
-- mismatch between BPMN and the actual coded workflow
-- RBAC mismatches between Java constants, SQL seed data, and controller annotations
-- partial-commit risk across auth DB, business DB, and MinIO
-- schema/code drift between entities and SQL init files
-- API examples that no longer match actual DTOs or response payloads
-
-Do not stop at style issues if there is any business-logic, security, or consistency risk.
+- broken claim state transitions
+- mismatched event producer/consumer contracts
+- lost-idempotency risks
+- schema drift between entities and SQL
+- stale docs or scenarios that describe components that no longer exist

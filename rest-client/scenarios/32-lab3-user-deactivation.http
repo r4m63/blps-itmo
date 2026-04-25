@@ -1,0 +1,33 @@
+@claimBaseUrl = http://localhost:8081
+@authBaseUrl = http://localhost:8082
+
+### Scenario 32
+### User deactivation publishes an auth event and claim-service closes active claims asynchronously
+
+### 32.1 Create a claim
+# @name createClaim
+POST {{claimBaseUrl}}/api/claims
+Content-Type: application/json
+
+{
+  "landlordUserId": 1,
+  "tenantUserId": 3,
+  "title": "Deactivation demo claim",
+  "description": "This claim should be closed when the tenant is deactivated.",
+  "claimedAmount": 70.00,
+  "currency": "USD"
+}
+
+### 32.2 Deactivate the tenant while the claim is still active
+POST {{authBaseUrl}}/api/auth/users/3/deactivate
+Content-Type: application/json
+
+{
+  "reason": "Manual operator deactivation for distributed transaction demo"
+}
+
+### 32.3 Poll claim until status becomes CLOSED_NO_PENALTY
+GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+
+### 32.4 Inspect timeline
+GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/timeline

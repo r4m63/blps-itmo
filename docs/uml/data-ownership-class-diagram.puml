@@ -1,0 +1,92 @@
+@startuml
+title Data Ownership and Cross-Service References
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "auth-service" {
+  class User {
+    +id: Long
+    +email: String
+    +role: UserRole
+    +enabled: boolean
+    +penaltyCount: int
+  }
+}
+
+package "claim-service" {
+  class Claim {
+    +id: Long
+    +correlationId: String
+    +landlordId: Long
+    +tenantId: Long
+    +status: ClaimStatus
+    +claimedAmount: BigDecimal
+    +assessmentAmount: BigDecimal
+    +penaltyAmount: BigDecimal
+  }
+
+  class ClaimTimelineEntry {
+    +id: Long
+    +claimId: Long
+    +eventType: String
+    +fromStatus: ClaimStatus
+    +toStatus: ClaimStatus
+    +actorId: Long
+  }
+}
+
+package "assessment-service" {
+  class AssessmentJob {
+    +id: Long
+    +claimId: Long
+    +attemptNo: int
+    +status: AssessmentJobStatus
+  }
+}
+
+package "penalty-service" {
+  class PenaltyOperation {
+    +id: Long
+    +claimId: Long
+    +tenantId: Long
+    +status: PenaltyOperationStatus
+    +simulateFailure: boolean
+  }
+}
+
+package "notification-service" {
+  class NotificationLog {
+    +id: Long
+    +eventId: String
+    +eventType: String
+    +aggregateId: String
+  }
+}
+
+package "audit-service" {
+  class AuditRecord {
+    +id: Long
+    +eventId: String
+    +eventType: String
+    +aggregateType: String
+    +aggregateId: String
+    +correlationId: String
+    +sagaId: String
+  }
+}
+
+Claim "1" -- "0..*" ClaimTimelineEntry : owns
+Claim ..> User : landlordId / tenantId\nlogical reference only
+AssessmentJob ..> Claim : claimId\nlogical reference only
+PenaltyOperation ..> Claim : claimId\nlogical reference only
+PenaltyOperation ..> User : tenantId\nlogical reference only
+NotificationLog ..> Claim : aggregateId\nprojection only
+AuditRecord ..> Claim : aggregateId\nprojection only
+
+note bottom
+  No cross-service foreign keys.
+  Bounded contexts are linked by identifiers and events.
+end note
+
+@enduml

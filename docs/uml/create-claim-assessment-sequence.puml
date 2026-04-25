@@ -1,0 +1,42 @@
+@startuml
+title Create Claim -> Async Assessment Sequence
+
+autonumber
+skinparam shadowing false
+
+actor Landlord
+participant "claim-service" as Claim
+participant "auth-service" as Auth
+database "claim-db" as ClaimDB
+participant "claim outbox relay" as ClaimRelay
+queue "Kafka" as Kafka
+participant "assessment-service" as Assessment
+database "assessment-db" as AssessmentDB
+
+Landlord -> Claim : POST /api/claims
+Claim -> Auth : GET /internal/users/{landlord}
+Auth --> Claim : RemoteUserView
+Claim -> Auth : GET /internal/users/{tenant}
+Auth --> Claim : RemoteUserView
+Claim -> ClaimDB : INSERT claims\nINSERT claim_timeline\nINSERT outbox(CLAIM_CREATED)
+Claim --> Landlord : ClaimResponse(status=ASSESSMENT_IN_PROGRESS)
+
+ClaimRelay -> ClaimDB : SELECT NEW outbox events
+ClaimRelay -> Kafka : publish CLAIM_CREATED
+
+Kafka -> Assessment : CLAIM_CREATED
+Assessment -> AssessmentDB : INSERT assessment_job\nINSERT processed_message
+
+... asynchronous worker delay ...
+
+Assessment -> AssessmentDB : UPDATE assessment_job=PROCESSING/COMPLETED\nINSERT outbox(ASSESSMENT_COMPLETED)
+Assessment -> Kafka : publish ASSESSMENT_COMPLETED\n(via local outbox relay)
+Kafka -> Claim : ASSESSMENT_COMPLETED
+Claim -> ClaimDB : UPDATE claim status\nINSERT claim_timeline\nINSERT processed_message
+
+note right of Claim
+  Eventual consistency window:
+  claim exists before assessment result
+end note
+
+@enduml

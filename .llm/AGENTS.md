@@ -1,288 +1,312 @@
-# BLPS Project Context For Agents
+# BLPS Lab3 Context For Agents
 
 ## What this repo is
 
-This repository is a single-module Spring Boot 3.2 / Java 17 REST service for handling penalty claims between three actors:
+This repository is the `lab3` version of the project: an event-driven Spring Boot multi-module system with Kafka and separate Postgres databases per service.
 
-- `LANDLORD` creates a claim and can provide additional materials.
-- `TENANT` responds to a claim if penalty grounds were found.
-- `ADMIN` performs intake, assessment, final support decision, and user deactivation.
+Current modules:
 
-The business reference process is documented in [bpmn/blps1.bpmn](../bpmn/blps1.bpmn), but the executable truth is the Java code and SQL schema.
+- [platform-core](../platform-core)
+- [auth-service](../auth-service)
+- [claim-service](../claim-service)
+- [assessment-service](../assessment-service)
+- [penalty-service](../penalty-service)
+- [notification-service](../notification-service)
+- [audit-service](../audit-service)
+
+Not implemented in the current codebase:
+
+- API gateway
+- JWT/authentication flow
+- storage-service / attachment MinIO saga
+- workflow engine execution of BPMN
+
+Do not reason from old monolith assumptions. The root `src/` and legacy SQL/scenario files were removed.
 
 ## Runtime topology
 
-The app is not a microservice system. It is one application connected to three external components:
+Infrastructure is defined in [docker-compose.yml](../docker-compose.yml).
 
-- business Postgres DB: claims, messages, status history, attachments
-- auth Postgres DB: users, roles, privileges
-- MinIO: object storage for attachments
+Current runtime components:
 
-Infrastructure and seed data live in:
+- ZooKeeper
+- Kafka
+- Kafka UI
+- `postgres-auth`
+- `postgres-claim`
+- `postgres-assessment`
+- `postgres-penalty`
+- `postgres-notification`
+- `postgres-audit`
 
-- [docker-compose.yml](../docker-compose.yml)
-- [sql/init_1.sql](../sql/init_1.sql)
-- [sql/init_2.sql](../sql/init_2.sql)
-- [sql/test_users_1.sql](../sql/test_users_1.sql)
-- [docs/how_minio.txt](../docs/how_minio.txt)
+Environment template:
 
-Configuration comes from `.env` via `spring.config.import=file:.env[.properties]`. Use [.env.sample](../.env.sample) as the template and do not hardcode secrets into code or docs.
+- [.env.sample](../.env.sample)
 
-## Distributed transaction topology
+Build structure:
 
-This project really does use distributed transactions across two physical Postgres databases:
-
-- `postgres-business` for claim workflow data
-- `postgres-auth` for users / roles / privileges
-
-Why this is true in practice:
-
-- both containers enable `max_prepared_transactions=100` in [docker-compose.yml](../docker-compose.yml)
-- both datasources are XA datasources based on `PGXADataSource`
-- Hibernate is configured for JTA in both persistence units
-- Narayana is the transaction manager and Hibernate JTA platform
-- services use shared JTA `TransactionTemplate` beans
-
-Relevant files:
-
-- [src/main/java/blps/itmo/config/BusinessPersistenceConfig.java](../src/main/java/blps/itmo/config/BusinessPersistenceConfig.java)
-- [src/main/java/blps/itmo/config/AuthPersistenceConfig.java](../src/main/java/blps/itmo/config/AuthPersistenceConfig.java)
-- [src/main/java/blps/itmo/config/TransactionTemplateConfig.java](../src/main/java/blps/itmo/config/TransactionTemplateConfig.java)
-- [src/main/java/blps/itmo/config/NarayanaJtaPlatform.java](../src/main/java/blps/itmo/config/NarayanaJtaPlatform.java)
-
-The two databases are XA participants. MinIO is not.
-
-## Core architecture
-
-Primary packages:
-
-- `config`: dual JPA persistence units, Narayana JTA, Security, MinIO client
-- `controller`: REST endpoints
-- `service`: business logic and transaction boundaries
-- `entity.business`: business DB model
-- `entity.auth`: auth/RBAC DB model
-- `repository.business` / `repository.auth`: Spring Data repositories
-- `dto`: request/response contracts
-- `security`: Basic auth, principal, privilege constants
-- `exception`: REST error handling
-
-Important entry files:
-
-- [src/main/java/blps/itmo/BlpsApplication.java](../src/main/java/blps/itmo/BlpsApplication.java)
-- [src/main/resources/application.yml](../src/main/resources/application.yml)
+- [settings.gradle.kts](../settings.gradle.kts)
 - [build.gradle.kts](../build.gradle.kts)
 
-## Source-of-truth map
+## Architectural truth
 
-When you need the real behavior, check these files first:
+This lab no longer uses XA/JTA across multiple databases.
 
-- claim lifecycle and transitions:
-  [src/main/java/blps/itmo/service/ClaimService.java](../src/main/java/blps/itmo/service/ClaimService.java)
-- user deactivation flow:
-  [src/main/java/blps/itmo/service/UserService.java](../src/main/java/blps/itmo/service/UserService.java)
-- MinIO upload/confirm/attach flow:
-  [src/main/java/blps/itmo/service/MinioService.java](../src/main/java/blps/itmo/service/MinioService.java)
-- public API surface:
-  [src/main/java/blps/itmo/controller](../src/main/java/blps/itmo/controller)
-- RBAC and method security:
-  [src/main/java/blps/itmo/security/Privileges.java](../src/main/java/blps/itmo/security/Privileges.java),
-  [src/main/java/blps/itmo/config/SecurityConfig.java](../src/main/java/blps/itmo/config/SecurityConfig.java),
-  [src/main/java/blps/itmo/security/AppUserDetailsService.java](../src/main/java/blps/itmo/security/AppUserDetailsService.java)
-- DB schemas and enum definitions:
-  [sql/init_1.sql](../sql/init_1.sql), [sql/init_2.sql](../sql/init_2.sql)
-- realistic end-to-end examples:
-  [rest-client/scenarios/README.md](../rest-client/scenarios/README.md),
-  [rest-client/claims-rbac.http](../rest-client/claims-rbac.http)
+Distributed consistency is implemented with:
 
-## Domain model and invariants
+- local DB transaction per service
+- `outbox_events`
+- `processed_messages`
+- Kafka topics
+- idempotent consumers
+- explicit intermediate statuses
 
-### Business process from BPMN
+Primary implementation files:
 
-The BPMN in [bpmn/blps1.bpmn](../bpmn/blps1.bpmn) is the business reference model for a penalty-claim workflow:
+- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java](../platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java)
+- [platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java](../platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java)
+- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java](../platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java)
+- [platform-core/src/main/java/blps/itmo/platform/events/EventType.java](../platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
+- [platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java](../platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java)
 
-1. landlord initiates a claim with evidence
-2. platform checks whether the data is sufficient
-3. if not sufficient, landlord provides additional materials
-4. platform assesses whether there are grounds for penalty
-5. if yes, tenant can provide a response
-6. support makes the final decision
-7. outcome is either penalty applied or claim closed without penalty
+Never re-introduce cross-service direct DB access.
 
-The BPMN is conceptual. There is no Camunda runtime or workflow engine in this repository. The real execution model is a hand-coded state machine in `ClaimService`.
+## Service ownership
 
-### BPMN to API mapping
+### `auth-service`
 
-Map BPMN elements to REST behavior like this:
+Owns:
 
-- `UserTask_CreateClaim` -> `POST /api/claims`
-- `Activity_1p30r0x` + `ExclusiveGateway_EnoughData` -> `POST /api/claims/{id}/intake`
-- `UserTask_ProvideDocs` -> `POST /api/claims/{id}/additional-info`
-- `Activity_0gw4i7b` + `ExclusiveGateway_RulesViolated` -> `POST /api/claims/{id}/assessment`
-- `IntermediateThrowEvent_RequestComment` + `UserTask_RespondComment` -> `POST /api/claims/{id}/tenant-response`
-- `UserTask_SupportReview` + `ExclusiveGateway_ApprovePenalty` -> `POST /api/claims/{id}/support-decision`
-- `ServiceTask_ApplyPenalty` -> `supportDecision(applyPenalty=true)` plus penalty counter update in auth DB
-- `ServiceTask_CloseWithoutPenalty` -> either `assessment(penaltyGrounds=false)` or `supportDecision(applyPenalty=false)`
+- users
+- roles
+- enabled/disabled flag
+- `penaltyCount`
 
-### Scenario matrix from `rest-client/scenarios`
+Main files:
 
-The `.http` scenarios act as the current executable business specification:
+- [AuthController.java](../auth-service/src/main/java/blps/itmo/auth/controller/AuthController.java)
+- [AuthUserService.java](../auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
+- [User.java](../auth-service/src/main/java/blps/itmo/auth/domain/User.java)
 
-- `00-rbac-smoke.http`: authn/authz smoke checks
-- `10-intake-additional-assessment-no.http`: insufficient data -> landlord adds materials -> admin closes without penalty during assessment
-- `11-intake-additional-final-penalty.http`: insufficient data -> landlord adds materials -> tenant responds -> final penalty applied
-- `12-intake-additional-final-no-penalty.http`: insufficient data -> landlord adds materials -> tenant responds -> final no-penalty decision
-- `20-intake-ok-assessment-no.http`: sufficient data immediately -> admin closes without penalty during assessment
-- `21-intake-ok-final-penalty.http`: sufficient data immediately -> tenant responds -> final penalty applied
-- `22-intake-ok-final-no-penalty.http`: sufficient data immediately -> tenant responds -> final no-penalty decision
+Important behavior:
 
-Together they cover the main decision branches:
+- seeds 6 demo users on startup
+- exposes `/internal/users/{id}` for other services
+- emits `USER_DEACTIVATED`
+- consumes `PENALTY_APPLIED` and increments `penaltyCount`
 
-- enough data now? yes/no
-- penalty grounds found? yes/no
-- if grounds exist and tenant responds, does support apply penalty? yes/no
+### `claim-service`
 
-Treat these files as the best behavioral reference after the Java service code.
+Owns:
 
-### Claim statuses
+- claim aggregate
+- claim status machine
+- claim timeline
+- orchestration of the claim lifecycle through events
 
-The claim state machine is implemented in `ClaimService` and backed by the `claimstatus` enum in `sql/init_1.sql`.
+Main files:
 
-Main path:
+- [ClaimController.java](../claim-service/src/main/java/blps/itmo/claim/controller/ClaimController.java)
+- [ClaimProcessService.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
+- [ClaimStatus.java](../claim-service/src/main/java/blps/itmo/claim/domain/ClaimStatus.java)
+- [ClaimEventListeners.java](../claim-service/src/main/java/blps/itmo/claim/service/ClaimEventListeners.java)
 
-1. `SUBMITTED` after `POST /api/claims`
-2. `NEED_ADDITIONAL_INFO` or `UNDER_ASSESSMENT` after intake
-3. `UNDER_ASSESSMENT` after landlord replies with additional info
-4. `AWAITING_TENANT_RESPONSE` or `CLOSED_NO_PENALTY` after assessment
-5. `SUPPORT_REVIEW` after tenant response
-6. `PENALTY_APPLIED` or `CLOSED_NO_PENALTY` after final support decision
+Public endpoints:
 
-Implementation note: `INTAKE_REVIEW` exists in the enum and is accepted by `intakeDecision`, but no current code path actually sets a claim into `INTAKE_REVIEW`. Treat it as a latent or unfinished status unless the task explicitly activates it.
+- `POST /api/claims`
+- `GET /api/claims/{id}`
+- `GET /api/claims/{id}/timeline`
+- `POST /api/claims/{id}/additional-info`
+- `POST /api/claims/{id}/tenant-response`
+- `POST /api/claims/{id}/support-decision`
 
-If you change statuses or transitions, update all of these together:
+### `assessment-service`
 
-- Java enum `ClaimStatus`
-- Postgres enum/check constraints in `sql/init_1.sql`
-- service transition logic in `ClaimService`
-- any affected rest-client/Postman scenarios
+Owns:
 
-### Cross-database model
+- async assessment jobs
+- simple assessment heuristic
 
-There are no cross-DB foreign keys. Business tables store user ids as plain numeric values that refer to rows in the auth DB. Never assume JPA relations between business entities and auth users exist or should exist.
+Main files:
 
-### Transactions
+- [AssessmentWorkflowService.java](../assessment-service/src/main/java/blps/itmo/assessment/service/AssessmentWorkflowService.java)
+- [AssessmentJob.java](../assessment-service/src/main/java/blps/itmo/assessment/domain/AssessmentJob.java)
 
-Cross-DB consistency is implemented with Narayana JTA and `TransactionTemplate`, not with local `@Transactional` assumptions.
+Consumes:
 
-Key files:
+- `CLAIM_CREATED`
+- `ADDITIONAL_INFO_PROVIDED`
 
-- [src/main/java/blps/itmo/config/BusinessPersistenceConfig.java](../src/main/java/blps/itmo/config/BusinessPersistenceConfig.java)
-- [src/main/java/blps/itmo/config/AuthPersistenceConfig.java](../src/main/java/blps/itmo/config/AuthPersistenceConfig.java)
-- [src/main/java/blps/itmo/config/TransactionTemplateConfig.java](../src/main/java/blps/itmo/config/TransactionTemplateConfig.java)
+Produces:
 
-If a change writes to both Postgres databases, keep it inside the JTA transaction templates already used by services.
+- `ASSESSMENT_COMPLETED`
 
-Current multi-DB write paths:
+### `penalty-service`
 
-- `ClaimService.createClaim(...)`
-  business DB: create claim + status history + attach evidence
-  auth DB: reads landlord/tenant and also writes a new disabled user row
-- `ClaimService.supportDecision(...)` when `applyPenalty=true`
-  business DB: final claim decision + history + optional note
-  auth DB: increments tenant `penalty_count`
-- `UserService.deactivateUser(...)`
-  auth DB: disables the user
-  business DB: closes all open claims where the user is landlord or tenant
+Owns:
 
-Not every service method is multi-write. Many actions only write the business DB and read the auth DB for role validation.
+- async penalty operations
+- retry of failed penalty processing
 
-### Attachments and MinIO
+Main files:
 
-MinIO is not XA-aware. The attachment flow is intentionally a saga:
+- [PenaltyWorkflowService.java](../penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyWorkflowService.java)
+- [PenaltyController.java](../penalty-service/src/main/java/blps/itmo/penalty/service/PenaltyController.java)
+- [PenaltyOperation.java](../penalty-service/src/main/java/blps/itmo/penalty/domain/PenaltyOperation.java)
 
-1. `POST /api/storage/attachments/init` creates DB metadata with `uploaded=false`
-2. client uploads directly to MinIO via presigned `PUT`
-3. `POST /api/storage/attachments/confirm` verifies the object and marks the attachment uploaded
-4. claim-related actions attach confirmed objects to claims/messages inside a DB transaction
+Consumes:
 
-Do not collapse this into a fake 2PC design. Read [docs/how_minio.txt](../docs/how_minio.txt) before changing attachment behavior.
+- `PENALTY_APPLICATION_REQUESTED`
 
-Important nuance: `initAttachment` and `confirmUpload` run inside the JTA transaction template, but MinIO itself is still outside the XA boundary. These methods combine DB writes with external MinIO calls, not true distributed commit with MinIO.
+Produces:
 
-### Security model
+- `PENALTY_APPLIED`
+- `PENALTY_APPLICATION_FAILED`
 
-Authentication is HTTP Basic against the auth DB.
+### `notification-service`
 
-Authorization has two layers:
+Owns:
 
-- controller method guards with `@PreAuthorize`
-- service-level ownership checks for landlord/tenant access
+- notification log only
 
-Never trust request payload actor ids when the authenticated principal already supplies them. This project intentionally derives the acting user from `AppUserPrincipal`.
+Main files:
 
-### Important implementation quirks
+- [NotificationEventListener.java](../notification-service/src/main/java/blps/itmo/notification/service/NotificationEventListener.java)
+- [NotificationLog.java](../notification-service/src/main/java/blps/itmo/notification/domain/NotificationLog.java)
 
-These are current behavioral facts, even if they look odd:
+### `audit-service`
 
-- `ClaimService.createClaim(...)` currently inserts a disabled auth-DB user whose email is derived from claim title and id. This makes claim creation a true auth+business distributed write, but it is not explained by the BPMN.
-- `TenantResponseRequest.agree` exists in the DTO, but current service logic does not use it to influence state transitions or decisions.
-- `getAdditionalInfoAttachmentKeys(...)` actually returns presigned download URLs, not raw object keys.
-- `ClaimResponse` does not expose assessment, penalty amount, history, or messages, so scenario final `GET`s mostly validate reachability and top-level claim state rather than the full internal decision payload.
+Owns:
 
-### BPMN vs implementation gaps
+- immutable event trail for demo and inspection
 
-Assume the following are not implemented unless you add them:
+Main files:
 
-- no workflow engine execution of the BPMN
-- no timer-driven path for the BPMN 3-day tenant response timeout
-- no automatic transition from `AWAITING_TENANT_RESPONSE` to `SUPPORT_REVIEW` without tenant action
-- no actual notification dispatch for `NotifyDecision`
-- no external penalty application integration beyond updating business state and incrementing `penalty_count`
-- BPMN assignee metadata is not authoritative; actual access control is role/privilege-based in Spring Security
+- [AuditEventListener.java](../audit-service/src/main/java/blps/itmo/audit/service/AuditEventListener.java)
+- [AuditController.java](../audit-service/src/main/java/blps/itmo/audit/controller/AuditController.java)
+- [AuditRecord.java](../audit-service/src/main/java/blps/itmo/audit/domain/AuditRecord.java)
 
-### Response shape
+## Current business flow
 
-`ClaimResponse` is intentionally compact. It currently returns only base claim data plus attachment download URLs. It does not expose every internal field from the entity. If a task needs assessment/penalty/history/message data, extend the DTO and controller/service flow deliberately instead of assuming it is already part of the API.
+The BPMN in [bpmn/blps1.bpmn](../bpmn/blps1.bpmn) is a business reference, not an executable workflow.
 
-## How to run and verify
+The current runtime flow is:
 
-Useful local commands:
+1. landlord creates claim in `claim-service`
+2. claim is stored with status `ASSESSMENT_IN_PROGRESS`
+3. `claim-service` writes `CLAIM_CREATED` to outbox
+4. `assessment-service` creates an async job
+5. assessment emits `ASSESSMENT_COMPLETED`
+6. `claim-service` moves the claim:
+   - to `NEED_ADDITIONAL_INFO` if materials are insufficient
+   - to `AWAITING_TENANT_RESPONSE` if penalty grounds exist
+   - to `CLOSED_NO_PENALTY` if grounds do not exist
+7. landlord may send additional info
+8. tenant may respond
+9. admin makes final support decision
+10. if penalty is requested, claim moves to `PENALTY_PROCESSING`
+11. `penalty-service` asynchronously applies or fails the penalty
+12. `auth-service` reacts to `PENALTY_APPLIED`
+13. `notification-service` and `audit-service` consume the same events independently
 
-- infra up: `docker compose up -d`
-- compile: `./gradlew compileJava`
-- tests: `./gradlew test`
-- app locally: `./gradlew bootRun`
-- packaged jar: `./gradlew bootJar`
+## Implemented business rules
 
-There is currently no meaningful automated test suite under `src/test`; practical verification lives in:
+Assessment logic is intentionally simple and code-driven, not BPMN-driven:
 
-- `rest-client/scenarios/*.http`
-- `rest-client/claims-rbac.http`
-- `postman/collections/**`
+- on first assessment attempt, `claimedAmount >= 200` leads to `requiresAdditionalInfo=true`
+- otherwise `penaltyGrounds = claimedAmount >= 50`
+- when grounds exist, `assessmentAmount = claimedAmount * 0.70`
 
-The REST client files keep their own `@baseUrl`; make sure it matches `SERVER_PORT` from `.env` before using them.
+Penalty logic:
 
-## Editing rules specific to this repo
+- `support-decision` with `applyPenalty=false` closes claim immediately as `CLOSED_NO_PENALTY`
+- `support-decision` with `applyPenalty=true` requires a positive `penaltyAmount`
+- `simulateFailure=true` forces `penalty-service` into the failure path
+- failed penalty processing can be retried through `POST /api/penalties/operations/{operationId}/retry`
 
-- Before changing behavior, read the relevant service method end-to-end. DTO names and BPMN labels are not enough to infer real logic.
-- When working on process logic, compare three layers together: BPMN, `rest-client/scenarios`, and `ClaimService`. The BPMN alone is not the implemented contract.
-- When changing privileges or roles, synchronize Java constants, SQL seed data, and controller annotations.
-- When changing schema-level enums or constraints, keep Java enums/entities in sync.
-- When changing upload behavior, preserve `init -> upload -> confirm -> attach` semantics unless the task explicitly redesigns the workflow.
-- When touching distributed logic, explicitly decide whether the change affects business DB only, auth DB only, both Postgres DBs under JTA, or MinIO saga steps outside XA.
-- When adding or changing endpoints, update at least one HTTP scenario or Postman request so the contract remains reproducible.
-- Check `git status` before editing. The worktree may already contain user changes; do not revert them unless explicitly asked.
+User deactivation logic:
 
-## Fast orientation order
+- `auth-service` emits `USER_DEACTIVATED`
+- `claim-service` closes open claims of that user asynchronously
 
-If the task is broad and you need to understand the repo quickly, read in this order:
+## Claim statuses
 
-1. `build.gradle.kts`
-2. `src/main/resources/application.yml`
-3. `docker-compose.yml`
-4. `sql/init_1.sql`
-5. `sql/init_2.sql`
-6. `bpmn/blps1.bpmn`
-7. `rest-client/scenarios/*`
-8. `controller/*`
-9. `service/ClaimService.java`
-10. `service/MinioService.java`
+Source of truth:
+
+- [ClaimStatus.java](../claim-service/src/main/java/blps/itmo/claim/domain/ClaimStatus.java)
+- [init_claim_service.sql](../sql/init_claim_service.sql)
+
+Current statuses:
+
+- `ASSESSMENT_IN_PROGRESS`
+- `NEED_ADDITIONAL_INFO`
+- `AWAITING_TENANT_RESPONSE`
+- `SUPPORT_REVIEW`
+- `PENALTY_PROCESSING`
+- `PENALTY_APPLIED`
+- `PENALTY_PROCESSING_FAILED`
+- `CLOSED_NO_PENALTY`
+
+If you change the lifecycle, update together:
+
+- Java enum
+- service transition logic
+- SQL enum in claim DB schema
+- relevant `.http` demo scenarios
+
+## Event contracts
+
+Source of truth:
+
+- [EventType.java](../platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
+- [payload package](../platform-core/src/main/java/blps/itmo/platform/events/payload)
+
+Current event set:
+
+- `CLAIM_CREATED`
+- `ADDITIONAL_INFO_PROVIDED`
+- `ASSESSMENT_COMPLETED`
+- `TENANT_RESPONSE_RECEIVED`
+- `CLAIM_CLOSED_NO_PENALTY`
+- `PENALTY_APPLICATION_REQUESTED`
+- `PENALTY_APPLIED`
+- `PENALTY_APPLICATION_FAILED`
+- `USER_DEACTIVATED`
+
+Use `claimId` or `userId` as the natural aggregate key when evolving flows.
+
+## SQL schemas
+
+Per-service schema files live in `sql/`:
+
+- [init_auth_service.sql](../sql/init_auth_service.sql)
+- [init_claim_service.sql](../sql/init_claim_service.sql)
+- [init_assessment_service.sql](../sql/init_assessment_service.sql)
+- [init_penalty_service.sql](../sql/init_penalty_service.sql)
+- [init_notification_service.sql](../sql/init_notification_service.sql)
+- [init_audit_service.sql](../sql/init_audit_service.sql)
+
+Matching drop scripts exist for each service.
+
+All service schemas include local `outbox_events` and `processed_messages`.
+
+## Manual verification
+
+Primary runbook:
+
+- [docs/lab3-runbook.md](../docs/lab3-runbook.md)
+
+Primary HTTP scenarios:
+
+- [30-lab3-async-penalty.http](../rest-client/scenarios/30-lab3-async-penalty.http)
+- [31-lab3-penalty-failure-recovery.http](../rest-client/scenarios/31-lab3-penalty-failure-recovery.http)
+- [32-lab3-user-deactivation.http](../rest-client/scenarios/32-lab3-user-deactivation.http)
+
+## Practical guardrails
+
+- Do not recreate the deleted monolith structure.
+- Prefer current service code over planning documents when they disagree.
+- Treat `.llm/lab3.md` and `.llm/distribution-transaction.md` as design docs, not as proof that a component already exists.
+- `auth-service` currently validates users by id and role lookup; there is no login flow yet.
+- `notification-service` and `audit-service` are read-side consumers; keep their handlers idempotent.
+- If you add a new event, update event enum, payload, topic routing, producer, consumer, SQL schemas if needed, and at least one demo scenario.

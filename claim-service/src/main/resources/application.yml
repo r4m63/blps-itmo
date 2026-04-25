@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: claim-service
+  datasource:
+    url: jdbc:postgresql://${CLAIM_DB_HOST:localhost}:${CLAIM_DB_PORT:5434}/${CLAIM_DB_NAME:blps_claim}
+    username: ${CLAIM_DB_USERNAME:blps_claim_user}
+    password: ${CLAIM_DB_PASSWORD:blps_claim_password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "*"
+
+server:
+  port: ${CLAIM_SERVICE_PORT:8081}
+
+app:
+  service-name: claim-service
+  auth-service-url: ${AUTH_SERVICE_URL:http://localhost:8082}
+  outbox:
+    poll-interval-ms: 1000

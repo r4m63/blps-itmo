@@ -1,0 +1,62 @@
+@claimBaseUrl = http://localhost:8081
+@penaltyBaseUrl = http://localhost:8084
+@auditBaseUrl = http://localhost:8086
+
+### Scenario 31
+### Penalty application fails, then operator retries the failed operation manually
+
+### 31.1 Create claim with amount < 200 so async assessment skips additional-info
+# @name createClaim
+POST {{claimBaseUrl}}/api/claims
+Content-Type: application/json
+
+{
+  "landlordUserId": 2,
+  "tenantUserId": 4,
+  "title": "Dining chair leg snapped",
+  "description": "Simple penalty flow for failure and recovery demo.",
+  "claimedAmount": 120.00,
+  "currency": "USD"
+}
+
+### 31.2 Poll claim until status becomes AWAITING_TENANT_RESPONSE
+GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+
+### 31.3 Tenant responds
+POST {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/tenant-response
+Content-Type: application/json
+
+{
+  "tenantUserId": 4,
+  "agree": false,
+  "comment": "I disagree and want support review."
+}
+
+### 31.4 Support decision requests penalty but simulates downstream failure
+POST {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/support-decision
+Content-Type: application/json
+
+{
+  "adminUserId": 6,
+  "applyPenalty": true,
+  "penaltyAmount": 84.00,
+  "penaltyCurrency": "USD",
+  "note": "Simulate failed external processor",
+  "simulateFailure": true
+}
+
+### 31.5 Poll claim until status becomes PENALTY_PROCESSING_FAILED
+GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+
+### 31.6 Inspect failed penalty operation
+# @name failedOps
+GET {{penaltyBaseUrl}}/api/penalties/claims/{{createClaim.response.body.$.id}}
+
+### 31.7 Retry the latest failed operation manually
+POST {{penaltyBaseUrl}}/api/penalties/operations/{{failedOps.response.body.$[0].id}}/retry
+
+### 31.8 Poll claim until status becomes PENALTY_APPLIED
+GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+
+### 31.9 Inspect audit trail
+GET {{auditBaseUrl}}/api/audit/claims/{{createClaim.response.body.$.id}}/events

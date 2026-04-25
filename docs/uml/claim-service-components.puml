@@ -1,0 +1,43 @@
+@startuml
+title claim-service - Component Diagram
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+package "claim-service" {
+  [ClaimController] as Controller
+  [ClaimProcessService] as Service
+  [ClaimEventListeners] as Listeners
+  [AuthClient] as AuthClient
+  [ClaimRepository] as ClaimRepo
+  [ClaimTimelineRepository] as TimelineRepo
+  [OutboxService] as OutboxService
+  [ProcessedMessageService] as InboxService
+  [OutboxRelay] as Relay
+}
+
+database "claim-db" as ClaimDB
+queue "Kafka" as Kafka
+component "auth-service" as AuthService
+
+Controller --> Service : command handling
+Listeners --> Service : event handling
+Service --> AuthClient : validate users
+AuthClient --> AuthService : GET /internal/users/{id}
+
+Service --> ClaimRepo
+Service --> TimelineRepo
+Service --> OutboxService
+Service --> InboxService
+
+ClaimRepo --> ClaimDB
+TimelineRepo --> ClaimDB
+OutboxService --> ClaimDB : write outbox_events
+InboxService --> ClaimDB : read/write processed_messages
+Relay --> ClaimDB : poll outbox_events
+Relay --> Kafka : publish EventEnvelope
+
+Listeners --> Kafka : consume events
+
+@enduml

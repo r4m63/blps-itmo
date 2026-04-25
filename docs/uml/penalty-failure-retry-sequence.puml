@@ -1,0 +1,45 @@
+@startuml
+title Penalty Failure and Manual Retry Saga
+
+autonumber
+skinparam shadowing false
+
+actor Admin
+actor Operator
+participant "claim-service" as Claim
+database "claim-db" as ClaimDB
+queue "Kafka" as Kafka
+participant "penalty-service" as Penalty
+database "penalty-db" as PenaltyDB
+
+Admin -> Claim : POST /support-decision\napplyPenalty=true\nsimulateFailure=true
+Claim -> ClaimDB : UPDATE claim=PENALTY_PROCESSING\nINSERT outbox(PENALTY_APPLICATION_REQUESTED)
+Claim -> Kafka : publish PENALTY_APPLICATION_REQUESTED
+
+Kafka -> Penalty : PENALTY_APPLICATION_REQUESTED
+Penalty -> PenaltyDB : INSERT penalty_operation=PENDING
+
+... asynchronous worker delay ...
+
+Penalty -> PenaltyDB : UPDATE penalty_operation=FAILED\nINSERT outbox(PENALTY_APPLICATION_FAILED)
+Penalty -> Kafka : publish PENALTY_APPLICATION_FAILED
+
+Kafka -> Claim : PENALTY_APPLICATION_FAILED
+Claim -> ClaimDB : UPDATE claim=PENALTY_PROCESSING_FAILED\nINSERT timeline\nINSERT processed_message
+
+Operator -> Penalty : POST /api/penalties/operations/{id}/retry
+Penalty -> PenaltyDB : UPDATE operation=PENDING\nsimulateFailure=false
+
+... next worker cycle ...
+
+Penalty -> PenaltyDB : UPDATE operation=APPLIED\nINSERT outbox(PENALTY_APPLIED)
+Penalty -> Kafka : publish PENALTY_APPLIED
+Kafka -> Claim : PENALTY_APPLIED
+Claim -> ClaimDB : UPDATE claim=PENALTY_APPLIED\nINSERT timeline
+
+note right of Penalty
+  Recovery is explicit and business-driven.
+  No global rollback is attempted.
+end note
+
+@enduml

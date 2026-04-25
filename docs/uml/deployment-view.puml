@@ -1,0 +1,53 @@
+@startuml
+title BLPS Lab3 - Deployment View
+
+top to bottom direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+node "Developer Workstation" {
+  node "Gradle JVM Processes" {
+    artifact "auth-service.jar" as AuthJar
+    artifact "claim-service.jar" as ClaimJar
+    artifact "assessment-service.jar" as AssessmentJar
+    artifact "penalty-service.jar" as PenaltyJar
+    artifact "notification-service.jar" as NotificationJar
+    artifact "audit-service.jar" as AuditJar
+  }
+
+  node "Docker Compose Network" {
+    node "Messaging" {
+      component "ZooKeeper" as ZK
+      queue "Kafka Broker" as Kafka
+      component "Kafka UI" as KafkaUI
+    }
+
+    node "Databases" {
+      database "postgres-auth" as AuthDB
+      database "postgres-claim" as ClaimDB
+      database "postgres-assessment" as AssessmentDB
+      database "postgres-penalty" as PenaltyDB
+      database "postgres-notification" as NotificationDB
+      database "postgres-audit" as AuditDB
+    }
+  }
+}
+
+AuthJar --> AuthDB
+ClaimJar --> ClaimDB
+AssessmentJar --> AssessmentDB
+PenaltyJar --> PenaltyDB
+NotificationJar --> NotificationDB
+AuditJar --> AuditDB
+
+AuthJar ..> Kafka
+ClaimJar ..> Kafka
+AssessmentJar ..> Kafka
+PenaltyJar ..> Kafka
+NotificationJar ..> Kafka
+AuditJar ..> Kafka
+
+Kafka --> ZK
+KafkaUI --> Kafka
+
+@enduml

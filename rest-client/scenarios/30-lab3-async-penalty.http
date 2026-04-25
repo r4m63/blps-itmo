@@ -1,0 +1,73 @@
+@claimBaseUrl = http://localhost:8081
+@authBaseUrl = http://localhost:8082
+@auditBaseUrl = http://localhost:8086
+
+### Scenario 30
+### Async claim -> additional info -> tenant response -> penalty applied
+### Notes:
+### - assessment runs asynchronously in assessment-service
+### - poll GET /api/claims/{id} after create and after additional-info
+
+### 30.1 List seeded users
+GET {{authBaseUrl}}/api/auth/users
+
+### 30.2 Create claim with amount >= 200 so first async assessment asks for additional info
+# @name createClaim
+POST {{claimBaseUrl}}/api/claims
+Content-Type: application/json
+
+{
+  "landlordUserId": 1,
+  "tenantUserId": 3,
+  "title": "Broken sofa and stained carpet",
+  "description": "Tenant left visible damage and the claim requires asynchronous assessment.",
+  "claimedAmount": 250.00,
+  "currency": "USD"
+}
+
+### 30.3 Poll claim until status becomes NEED_ADDITIONAL_INFO
+GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+
+### 30.4 Send additional info and trigger reassessment
+POST {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/additional-info
+Content-Type: application/json
+
+{
+  "landlordUserId": 1,
+  "comment": "Uploaded serial number and room overview separately; reassess please."
+}
+
+### 30.5 Poll claim until status becomes AWAITING_TENANT_RESPONSE
+GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+
+### 30.6 Tenant responds
+POST {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/tenant-response
+Content-Type: application/json
+
+{
+  "tenantUserId": 3,
+  "agree": false,
+  "comment": "I disagree with the final amount."
+}
+
+### 30.7 Admin requests penalty application
+POST {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/support-decision
+Content-Type: application/json
+
+{
+  "adminUserId": 5,
+  "applyPenalty": true,
+  "penaltyAmount": 175.00,
+  "penaltyCurrency": "USD",
+  "note": "Proceed with penalty application",
+  "simulateFailure": false
+}
+
+### 30.8 Poll claim until status becomes PENALTY_APPLIED
+GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+
+### 30.9 Inspect timeline
+GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/timeline
+
+### 30.10 Inspect audit trail
+GET {{auditBaseUrl}}/api/audit/claims/{{createClaim.response.body.$.id}}/events

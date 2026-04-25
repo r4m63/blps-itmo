@@ -1,59 +1,23 @@
-# Full Business Scenarios
+# Lab3 Scenarios
 
-Здесь каждый `.http` файл самодостаточен и покрывает полный цикл бизнес-логики от первой загрузки вложения до финального состояния заявки.
+В репозитории оставлены только актуальные `.http` сценарии для текущей event-driven реализации.
 
-- [00-rbac-smoke.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/00-rbac-smoke.http)
-  Базовые проверки безопасности, не полный business flow.
+- [30-lab3-async-penalty.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/30-lab3-async-penalty.http)
+  Основной happy path:
+  `claim-service -> assessment-service -> additional info -> tenant response -> support decision -> penalty-service -> auth-service`.
 
-- [10-intake-additional-assessment-no.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/10-intake-additional-assessment-no.http)
-  Полный цикл:
-  - загрузка вложения
-  - создание заявки
-  - запрос доп. материалов
-  - ответ арендодателя
-  - оценка без оснований для штрафа
+- [31-lab3-penalty-failure-recovery.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/31-lab3-penalty-failure-recovery.http)
+  Failure path:
+  `PENALTY_PROCESSING -> PENALTY_PROCESSING_FAILED -> manual retry -> PENALTY_APPLIED`.
 
-- [11-intake-additional-final-penalty.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/11-intake-additional-final-penalty.http)
-  Полный цикл:
-  - загрузка вложения
-  - создание заявки
-  - запрос доп. материалов
-  - ответ арендодателя
-  - есть основания для штрафа
-  - ответ арендатора
-  - финальное решение: штраф применён
+- [32-lab3-user-deactivation.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/32-lab3-user-deactivation.http)
+  Distributed reaction:
+  `auth-service` деактивирует пользователя, `claim-service` асинхронно закрывает его открытые заявки.
 
-- [12-intake-additional-final-no-penalty.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/12-intake-additional-final-no-penalty.http)
-  Полный цикл:
-  - загрузка вложения
-  - создание заявки
-  - запрос доп. материалов
-  - ответ арендодателя
-  - есть основания для штрафа
-  - ответ арендатора
-  - финальное решение: штраф не применён
+Что показывать на защите:
 
-- [20-intake-ok-assessment-no.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/20-intake-ok-assessment-no.http)
-  Полный цикл:
-  - загрузка вложения
-  - создание заявки
-  - intake сразу ок
-  - оценка без оснований для штрафа
-
-- [21-intake-ok-final-penalty.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/21-intake-ok-final-penalty.http)
-  Полный цикл:
-  - загрузка вложения
-  - создание заявки
-  - intake сразу ок
-  - есть основания для штрафа
-  - ответ арендатора
-  - финальное решение: штраф применён
-
-- [22-intake-ok-final-no-penalty.http](/Users/ramil/Projects/blps-itmo/rest-client/scenarios/22-intake-ok-final-no-penalty.http)
-  Полный цикл:
-  - загрузка вложения
-  - создание заявки
-  - intake сразу ок
-  - есть основания для штрафа
-  - ответ арендатора
-  - финальное решение: штраф не применён
+- outbox после локального коммита
+- eventual consistency между `claim-service` и `assessment-service`
+- идемпотентную обработку повторной доставки
+- ручное восстановление после `PENALTY_APPLICATION_FAILED`
+- audit trail через `audit-service`
