@@ -35,7 +35,8 @@ public class AuditEventListener {
             TopicNames.CLAIM_EVENTS,
             TopicNames.ASSESSMENT_EVENTS,
             TopicNames.PENALTY_EVENTS,
-            TopicNames.AUTH_EVENTS
+            TopicNames.AUTH_EVENTS,
+            TopicNames.STORAGE_EVENTS
     }, groupId = "audit-service")
     @Transactional
     public void onEvent(String rawEvent) throws Exception {

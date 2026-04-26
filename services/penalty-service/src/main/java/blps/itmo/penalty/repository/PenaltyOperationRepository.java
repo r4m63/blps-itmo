@@ -1,6 +1,7 @@
 package blps.itmo.penalty.repository;
 
 import java.util.List;
+import java.time.OffsetDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -11,4 +12,6 @@ public interface PenaltyOperationRepository extends JpaRepository<PenaltyOperati
     List<PenaltyOperation> findTop20ByStatusOrderByCreatedAtAsc(PenaltyOperationStatus status);
 
     List<PenaltyOperation> findByClaimIdOrderByCreatedAtDesc(Long claimId);
+
+    List<PenaltyOperation> findByStatusAndCreatedAtBefore(PenaltyOperationStatus status, OffsetDateTime createdAt);
 }

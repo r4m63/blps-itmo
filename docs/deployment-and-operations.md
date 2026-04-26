@@ -12,6 +12,7 @@
 - `postgres-claim`
 - `postgres-assessment`
 - `postgres-penalty`
+- `postgres-storage`
 - `postgres-notification`
 - `postgres-audit`
 
@@ -21,12 +22,22 @@
 
 ### Сервисы
 
+- `api-gateway` — `8080`
 - `claim-service` — `8081`
 - `auth-service` — `8082`
 - `assessment-service` — `8083`
 - `penalty-service` — `8084`
 - `notification-service` — `8085`
 - `audit-service` — `8086`
+- `storage-service` — `8087`
+
+### gRPC
+
+- `claim-service` — `19081`
+- `auth-service` — `19082`
+- `penalty-service` — `19084`
+- `audit-service` — `19086`
+- `storage-service` — `19087`
 
 ### Infra
 
@@ -42,6 +53,7 @@
 - `postgres-penalty` — `5436`
 - `postgres-notification` — `5437`
 - `postgres-audit` — `5438`
+- `postgres-storage` — `5439`
 
 ## 3. Конфигурация
 
@@ -64,10 +76,18 @@
 - `CLAIM_DB_*`
 - `ASSESSMENT_DB_*`
 - `PENALTY_DB_*`
+- `STORAGE_DB_*`
 - `NOTIFICATION_DB_*`
 - `AUDIT_DB_*`
-- `AUTH_SERVICE_URL`
 - `*_SERVICE_PORT`
+- `*_GRPC_PORT`
+- `AUTH_GRPC_TARGET`
+- `CLAIM_GRPC_TARGET`
+- `PENALTY_GRPC_TARGET`
+- `AUDIT_GRPC_TARGET`
+- `STORAGE_GRPC_TARGET`
+
+`*_SERVICE_PORT` нужны для HTTP edge/debug endpoints. Runtime sync-интеграция gateway и backend-сервисов использует `*_GRPC_TARGET`.
 
 ## 4. Порядок запуска
 
@@ -88,10 +108,12 @@ docker compose up -d
 ### Шаг 2. Сервисы
 
 ```bash
+./gradlew :api-gateway:bootRun
 ./gradlew :auth-service:bootRun
 ./gradlew :claim-service:bootRun
 ./gradlew :assessment-service:bootRun
 ./gradlew :penalty-service:bootRun
+./gradlew :storage-service:bootRun
 ./gradlew :notification-service:bootRun
 ./gradlew :audit-service:bootRun
 ```
@@ -126,12 +148,15 @@ docker compose up -d
 - `assessment.events`
 - `penalty.events`
 - `auth.events`
+- `storage.events`
+- `<topic>.dlt` for poison messages after retry exhaustion
 
 ### Consumer groups
 
 - `claim-service`
 - `assessment-service`
 - `penalty-service`
+- `storage-service`
 - `auth-service`
 - `notification-service`
 - `audit-service`
@@ -143,12 +168,13 @@ docker compose up -d
 
 ## 7. Масштабирование
 
-## 7.1. HTTP services
+## 7.1. HTTP/gRPC services
 
 Горизонтальное масштабирование возможно для:
 
 - `claim-service`
 - `auth-service`
+- `storage-service`
 - `notification-service`
 - `audit-service`
 
@@ -157,6 +183,7 @@ docker compose up -d
 - shared DB на сервис
 - stateless application layer
 - отсутствие in-memory coordination
+- gRPC target должен указывать на конкретный instance или на service discovery/load balancer
 
 ## 7.2. Worker services
 
@@ -198,7 +225,9 @@ docker compose up -d
 
 ### MinIO status
 
-`MinIO` снова присутствует в инфраструктуре, но текущие сервисы lab3 ещё не используют его напрямую. Сейчас это подготовленный инфраструктурный компонент под будущий `storage-service` или attachment saga.
+`MinIO` присутствует в инфраструктуре, а `storage-service` владеет attachment metadata и ведёт saga
+`init -> confirm -> bind`. По умолчанию `STORAGE_VERIFY_MINIO_OBJECT=false`, поэтому local demo может подтверждать
+metadata без обязательного HEAD-check объекта в MinIO.
 
 ## 9. SQL и схема
 
@@ -208,6 +237,7 @@ docker compose up -d
 - `sql/init_claim_service.sql`
 - `sql/init_assessment_service.sql`
 - `sql/init_penalty_service.sql`
+- `sql/init_storage_service.sql`
 - `sql/init_notification_service.sql`
 - `sql/init_audit_service.sql`
 
@@ -226,15 +256,14 @@ docker compose up -d
 - `rest-client/scenarios/30-lab3-async-penalty.http`
 - `rest-client/scenarios/31-lab3-penalty-failure-recovery.http`
 - `rest-client/scenarios/32-lab3-user-deactivation.http`
+- `rest-client/scenarios/33-lab3-attachment-saga.http`
 
 ## 11. Рекомендации по следующему развитию
 
 Если проект будет развиваться дальше, логичные следующие шаги такие:
 
-- добавить `API Gateway`
 - вынести сервисы в отдельные контейнеры
-- добавить `DLQ` и retry topics
 - добавить `schema registry`
 - добавить tracing/metrics stack
-- добавить security perimeter между сервисами
-- добавить `storage-service` как отдельную attachment saga
+- усилить security perimeter до OAuth2/resource-server модели
+- добавить DLT monitoring UI и alerts

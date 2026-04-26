@@ -7,9 +7,10 @@ skinparam shadowing false
 
 package "claim-service" {
   [ClaimController] as Controller
+  [ClaimGrpcService] as GrpcService
   [ClaimProcessService] as Service
   [ClaimEventListeners] as Listeners
-  [AuthClient] as AuthClient
+  [AuthClient gRPC stub] as AuthClient
   [ClaimRepository] as ClaimRepo
   [ClaimTimelineRepository] as TimelineRepo
   [OutboxService] as OutboxService
@@ -21,10 +22,11 @@ database "claim-db" as ClaimDB
 queue "Kafka" as Kafka
 component "auth-service" as AuthService
 
-Controller --> Service : command handling
+Controller --> Service : debug HTTP command handling
+GrpcService --> Service : gRPC command/query handling
 Listeners --> Service : event handling
 Service --> AuthClient : validate users
-AuthClient --> AuthService : GET /internal/users/{id}
+AuthClient --> AuthService : AuthRpcService.GetUser
 
 Service --> ClaimRepo
 Service --> TimelineRepo

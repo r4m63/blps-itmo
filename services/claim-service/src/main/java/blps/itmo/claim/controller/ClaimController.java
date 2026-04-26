@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,8 +28,10 @@ public class ClaimController {
     }
 
     @PostMapping
-    public ClaimResponse createClaim(@RequestBody CreateClaimRequest request) {
-        return claimProcessService.createClaim(request);
+    public ClaimResponse createClaim(
+            @RequestHeader(value = "X-User-Id", required = false) Long actorUserId,
+            @RequestBody CreateClaimRequest request) {
+        return claimProcessService.createClaim(request, actorUserId);
     }
 
     @GetMapping("/{id}")
@@ -41,19 +44,54 @@ public class ClaimController {
         return claimProcessService.getTimeline(id);
     }
 
+    @GetMapping("/{id}/attachments")
+    public List<ClaimAttachmentResponse> getAttachments(@PathVariable Long id) {
+        return claimProcessService.getAttachments(id);
+    }
+
+    @GetMapping("/{id}/process-status")
+    public ClaimProcessStatusResponse getProcessStatus(@PathVariable Long id) {
+        return claimProcessService.getProcessStatus(id);
+    }
+
     @PostMapping("/{id}/additional-info")
-    public ClaimResponse additionalInfo(@PathVariable Long id, @RequestBody AdditionalInfoRequest request) {
-        return claimProcessService.provideAdditionalInfo(id, request);
+    public ClaimResponse additionalInfo(
+            @RequestHeader(value = "X-User-Id", required = false) Long actorUserId,
+            @PathVariable Long id,
+            @RequestBody AdditionalInfoRequest request) {
+        return claimProcessService.provideAdditionalInfo(id, request, actorUserId);
     }
 
     @PostMapping("/{id}/tenant-response")
-    public ClaimResponse tenantResponse(@PathVariable Long id, @RequestBody TenantResponseRequest request) {
-        return claimProcessService.submitTenantResponse(id, request);
+    public ClaimResponse tenantResponse(
+            @RequestHeader(value = "X-User-Id", required = false) Long actorUserId,
+            @PathVariable Long id,
+            @RequestBody TenantResponseRequest request) {
+        return claimProcessService.submitTenantResponse(id, request, actorUserId);
     }
 
     @PostMapping("/{id}/support-decision")
-    public ClaimResponse supportDecision(@PathVariable Long id, @RequestBody SupportDecisionRequest request) {
-        return claimProcessService.supportDecision(id, request);
+    public ClaimResponse supportDecision(
+            @RequestHeader(value = "X-User-Id", required = false) Long actorUserId,
+            @PathVariable Long id,
+            @RequestBody SupportDecisionRequest request) {
+        return claimProcessService.supportDecision(id, request, actorUserId);
+    }
+
+    @PostMapping("/{id}/repair/reassess")
+    public ClaimResponse repairReassess(
+            @RequestHeader(value = "X-User-Id", required = false) Long actorUserId,
+            @PathVariable Long id,
+            @RequestBody(required = false) RepairRequest request) {
+        return claimProcessService.repairReassess(id, actorUserId, request == null ? null : request.note());
+    }
+
+    @PostMapping("/{id}/repair/close")
+    public ClaimResponse repairClose(
+            @RequestHeader(value = "X-User-Id", required = false) Long actorUserId,
+            @PathVariable Long id,
+            @RequestBody(required = false) RepairRequest request) {
+        return claimProcessService.repairClose(id, actorUserId, request == null ? null : request.note());
     }
 
     public record CreateClaimRequest(
@@ -62,7 +100,8 @@ public class ClaimController {
             @NotBlank String title,
             @NotBlank String description,
             @NotNull BigDecimal claimedAmount,
-            @NotBlank String currency) {
+            @NotBlank String currency,
+            List<Long> attachmentIds) {
     }
 
     public record AdditionalInfoRequest(
@@ -102,6 +141,24 @@ public class ClaimController {
             String resolutionNote,
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt,
-            OffsetDateTime closedAt) {
+            OffsetDateTime closedAt,
+            List<ClaimAttachmentResponse> attachments) {
+    }
+
+    public record ClaimAttachmentResponse(
+            Long attachmentId,
+            String status,
+            String failureReason) {
+    }
+
+    public record ClaimProcessStatusResponse(
+            Long claimId,
+            String status,
+            String correlationId,
+            boolean terminal,
+            List<ClaimAttachmentResponse> attachments) {
+    }
+
+    public record RepairRequest(String note) {
     }
 }

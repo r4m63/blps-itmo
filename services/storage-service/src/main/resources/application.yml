@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: storage-service
+  datasource:
+    url: jdbc:postgresql://${STORAGE_DB_HOST:localhost}:${STORAGE_DB_PORT:5439}/${STORAGE_DB_NAME:blps_storage}
+    username: ${STORAGE_DB_USERNAME:blps_storage_user}
+    password: ${STORAGE_DB_PASSWORD:blps_storage_password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "*"
+
+server:
+  port: ${STORAGE_SERVICE_PORT:8087}
+
+app:
+  service-name: storage-service
+  grpc:
+    server:
+      port: ${STORAGE_GRPC_PORT:19087}
+  outbox:
+    poll-interval-ms: 1000
+    max-retry-count: 10
+  kafka:
+    retry:
+      backoff-ms: 1000
+      max-attempts: 3
+  storage:
+    bucket-name: ${STORAGE_BUCKET_NAME:claim-attachments}
+    public-url: ${MINIO_PUBLIC_URL:http://localhost:9000}
+    verify-minio-object: ${STORAGE_VERIFY_MINIO_OBJECT:false}
+    binding-timeout-minutes: 30
+    reconciliation-poll-interval-ms: 60000

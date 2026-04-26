@@ -131,6 +131,19 @@ services:
       - pgdata_audit:/var/lib/postgresql/data
       - ./sql/init_audit_service.sql:/docker-entrypoint-initdb.d/01-init-audit.sql:ro
 
+  postgres-storage:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "${STORAGE_DB_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${STORAGE_DB_NAME}
+      POSTGRES_USER: ${STORAGE_DB_USERNAME}
+      POSTGRES_PASSWORD: ${STORAGE_DB_PASSWORD}
+    volumes:
+      - pgdata_storage:/var/lib/postgresql/data
+      - ./sql/init_storage_service.sql:/docker-entrypoint-initdb.d/01-init-storage.sql:ro
+
 volumes:
   pgdata_auth:
   pgdata_claim:
@@ -138,4 +151,5 @@ volumes:
   pgdata_penalty:
   pgdata_notification:
   pgdata_audit:
+  pgdata_storage:
   miniodata:

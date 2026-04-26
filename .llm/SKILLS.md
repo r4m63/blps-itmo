@@ -20,7 +20,7 @@ Read in this order:
 Output focus:
 
 - which service owns the data
-- whether the flow is sync HTTP or async Kafka
+- whether the flow is external HTTP, internal sync gRPC, or async Kafka
 - which event starts and completes the flow
 - which DB schema must stay aligned
 
@@ -59,6 +59,7 @@ Primary files:
 - [OutboxService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java)
 - [ProcessedMessageService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java)
 - [OutboxRelay.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java)
+- [PlatformKafkaConfig.java](../lib/platform-core/src/main/java/blps/itmo/platform/kafka/PlatformKafkaConfig.java)
 
 Checklist:
 
@@ -68,6 +69,50 @@ Checklist:
 - update every producer and consumer impacted by the event
 - keep SQL schemas aligned if outbox/inbox structure changes
 - update at least one demo flow that proves the event is used
+
+## Skill: Gateway Or Security Change
+
+Use when changing external routing, login, JWT claims, or actor header propagation.
+
+Primary files:
+
+- [GatewayAuthFilter.java](../services/api-gateway/src/main/java/blps/itmo/gateway/GatewayAuthFilter.java)
+- [GatewayHttpController.java](../services/api-gateway/src/main/java/blps/itmo/gateway/GatewayHttpController.java)
+- [GatewayGrpcClients.java](../services/api-gateway/src/main/java/blps/itmo/gateway/GatewayGrpcClients.java)
+- [GatewayExceptionHandler.java](../services/api-gateway/src/main/java/blps/itmo/gateway/GatewayExceptionHandler.java)
+- [grpc-contracts/src/main/proto](../lib/grpc-contracts/src/main/proto)
+- [DemoJwtService.java](../lib/platform-core/src/main/java/blps/itmo/platform/security/DemoJwtService.java)
+- [AuthController.java](../services/auth-service/src/main/java/blps/itmo/auth/controller/AuthController.java)
+- [AuthUserService.java](../services/auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
+
+Checklist:
+
+- keep `/api/auth/login` public
+- keep `/internal/**` out of gateway routing
+- propagate `X-User-Id`, `X-User-Role`, and `X-Correlation-Id`
+- keep gateway as HTTP edge and call backend services through gRPC stubs
+- update `.http` scenarios when external request shape changes
+
+## Skill: Storage Attachment Saga Change
+
+Use when changing attachment init/confirm/bind behavior or MinIO metadata ownership.
+
+Primary files:
+
+- [AttachmentController.java](../services/storage-service/src/main/java/blps/itmo/storage/controller/AttachmentController.java)
+- [StorageGrpcService.java](../services/storage-service/src/main/java/blps/itmo/storage/grpc/StorageGrpcService.java)
+- [StorageWorkflowService.java](../services/storage-service/src/main/java/blps/itmo/storage/service/StorageWorkflowService.java)
+- [Attachment.java](../services/storage-service/src/main/java/blps/itmo/storage/domain/Attachment.java)
+- [ClaimProcessService.java](../services/claim-service/src/main/java/blps/itmo/claim/service/ClaimProcessService.java)
+- [init_storage_service.sql](../sql/init_storage_service.sql)
+- [33-lab3-attachment-saga.http](../rest-client/scenarios/33-lab3-attachment-saga.http)
+
+Checklist:
+
+- keep MinIO object metadata owned by `storage-service`
+- keep claim-side data as attachment refs/read model only
+- use `ATTACHMENT_BINDING_REQUESTED -> ATTACHMENT_BOUND/FAILED`
+- preserve idempotency through `processed_messages`
 
 ## Skill: Assessment Rule Change
 
@@ -116,16 +161,19 @@ Use when changing demo users, roles, internal user lookup, or deactivation behav
 Primary files:
 
 - [AuthController.java](../services/auth-service/src/main/java/blps/itmo/auth/controller/AuthController.java)
+- [AuthGrpcService.java](../services/auth-service/src/main/java/blps/itmo/auth/grpc/AuthGrpcService.java)
+- [auth.proto](../lib/grpc-contracts/src/main/proto/auth.proto)
 - [AuthUserService.java](../services/auth-service/src/main/java/blps/itmo/auth/service/AuthUserService.java)
 - [User.java](../services/auth-service/src/main/java/blps/itmo/auth/domain/User.java)
 - [UserRole.java](../services/auth-service/src/main/java/blps/itmo/auth/domain/UserRole.java)
 - [init_auth_service.sql](../sql/init_auth_service.sql)
 - [32-lab3-user-deactivation.http](../rest-client/scenarios/32-lab3-user-deactivation.http)
+- [33-lab3-attachment-saga.http](../rest-client/scenarios/33-lab3-attachment-saga.http)
 
 Checklist:
 
 - if user schema changes, update both seed logic and SQL
-- keep `/internal/users/{id}` contract stable unless every caller is updated
+- keep `AuthRpcService.GetUser` stable unless every gRPC caller is updated
 - deactivation must still emit `USER_DEACTIVATED`
 - claim cleanup on deactivation belongs in `claim-service`, not `auth-service`
 

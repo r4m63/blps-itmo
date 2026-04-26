@@ -26,6 +26,7 @@ This starts:
 - `postgres-claim`
 - `postgres-assessment`
 - `postgres-penalty`
+- `postgres-storage`
 - `postgres-notification`
 - `postgres-audit`
 
@@ -34,22 +35,31 @@ This starts:
 Run each service in a separate shell:
 
 ```bash
+./gradlew :api-gateway:bootRun
 ./gradlew :auth-service:bootRun
 ./gradlew :claim-service:bootRun
 ./gradlew :assessment-service:bootRun
 ./gradlew :penalty-service:bootRun
+./gradlew :storage-service:bootRun
 ./gradlew :notification-service:bootRun
 ./gradlew :audit-service:bootRun
 ```
 
 Default ports:
 
+- `api-gateway`: `8080`
 - `claim-service`: `8081`
 - `auth-service`: `8082`
 - `assessment-service`: `8083`
 - `penalty-service`: `8084`
 - `notification-service`: `8085`
 - `audit-service`: `8086`
+- `storage-service`: `8087`
+- `claim-service gRPC`: `19081`
+- `auth-service gRPC`: `19082`
+- `penalty-service gRPC`: `19084`
+- `audit-service gRPC`: `19086`
+- `storage-service gRPC`: `19087`
 - `zookeeper`: `${ZOOKEEPER_PORT}` by default `2181`
 - `kafka host port`: `${KAFKA_PORT}` by default `9092`
 - `kafka external port`: `${KAFKA_EXTERNAL_PORT}` by default `29092`
@@ -59,11 +69,13 @@ Default ports:
 
 ## Demo flows
 
-Use these HTTP scenarios:
+Use these HTTP scenarios through `api-gateway` on `http://localhost:8080`.
+Inside the system, gateway and service-to-service sync calls use gRPC; async saga steps use Kafka:
 
 - `rest-client/scenarios/30-lab3-async-penalty.http`
 - `rest-client/scenarios/31-lab3-penalty-failure-recovery.http`
 - `rest-client/scenarios/32-lab3-user-deactivation.http`
+- `rest-client/scenarios/33-lab3-attachment-saga.http`
 
 ## What to show during the demo
 
@@ -72,4 +84,5 @@ Use these HTTP scenarios:
 3. `PenaltyApplicationRequested` moves claim into `PENALTY_PROCESSING`, not directly into final success.
 4. Duplicate delivery is tolerated by `processed_messages`.
 5. Manual recovery is possible through `POST /api/penalties/operations/{operationId}/retry`.
-6. `audit-service` shows the end-to-end event trail by `claimId`.
+6. Attachment init/confirm/bind is coordinated by `storage-service` without XA over MinIO.
+7. `audit-service` shows the end-to-end event trail by `claimId`.

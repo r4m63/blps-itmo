@@ -3,9 +3,12 @@ package blps.itmo.auth.service;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import blps.itmo.auth.domain.User;
 import blps.itmo.auth.domain.UserRole;
@@ -17,6 +20,7 @@ import blps.itmo.platform.events.payload.PenaltyAppliedPayload;
 import blps.itmo.platform.events.payload.UserDeactivatedPayload;
 import blps.itmo.platform.persistence.OutboxService;
 import blps.itmo.platform.persistence.ProcessedMessageService;
+import blps.itmo.platform.security.DemoJwtService;
 
 @Service
 public class AuthUserService {
@@ -26,13 +30,20 @@ public class AuthUserService {
     private final UserRepository userRepository;
     private final OutboxService outboxService;
     private final ProcessedMessageService processedMessageService;
+    private final DemoJwtService jwtService;
+    private final long jwtTtlSeconds;
 
     public AuthUserService(UserRepository userRepository,
             OutboxService outboxService,
-            ProcessedMessageService processedMessageService) {
+            ProcessedMessageService processedMessageService,
+            ObjectMapper objectMapper,
+            @Value("${app.security.jwt-secret:lab3-demo-secret}") String jwtSecret,
+            @Value("${app.security.jwt-ttl-seconds:86400}") long jwtTtlSeconds) {
         this.userRepository = userRepository;
         this.outboxService = outboxService;
         this.processedMessageService = processedMessageService;
+        this.jwtService = new DemoJwtService(objectMapper, jwtSecret);
+        this.jwtTtlSeconds = jwtTtlSeconds;
     }
 
     @Transactional(readOnly = true)
@@ -59,6 +70,21 @@ public class AuthUserService {
                         .penaltyCount(user.getPenaltyCount())
                         .build())
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public LoginResult login(Long userId, String email) {
+        User user = userId != null
+                ? userRepository.findById(userId)
+                        .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId))
+                : userRepository.findByEmail(email)
+                        .orElseThrow(() -> new IllegalArgumentException("User not found by email: " + email));
+        if (!user.isEnabled()) {
+            throw new IllegalArgumentException("User is disabled: " + user.getId());
+        }
+        return new LoginResult(
+                jwtService.issue(user.getId(), user.getEmail(), user.getRole().name(), jwtTtlSeconds),
+                toView(user));
     }
 
     @Transactional
@@ -115,5 +141,18 @@ public class AuthUserService {
                     User.builder().email("admin2@example.com").role(UserRole.ADMIN).createdAt(now).updatedAt(now)
                             .build()));
         };
+    }
+
+    private RemoteUserView toView(User user) {
+        return RemoteUserView.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .enabled(user.isEnabled())
+                .penaltyCount(user.getPenaltyCount())
+                .build();
+    }
+
+    public record LoginResult(String token, RemoteUserView user) {
     }
 }

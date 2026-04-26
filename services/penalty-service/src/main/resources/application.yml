@@ -24,7 +24,17 @@ server:
 
 app:
   service-name: penalty-service
+  grpc:
+    server:
+      port: ${PENALTY_GRPC_PORT:19084}
   outbox:
     poll-interval-ms: 1000
+    max-retry-count: 10
+  kafka:
+    retry:
+      backoff-ms: 1000
+      max-attempts: 3
   penalty:
     poll-interval-ms: 2000
+    timeout-minutes: 30
+    timeout-poll-interval-ms: 60000

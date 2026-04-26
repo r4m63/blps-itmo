@@ -1,10 +1,12 @@
 # BLPS ITMO Lab3
 
-`BLPS ITMO Lab3` — это event-driven микросервисная система на `Spring Boot 3.2`, `Java 17`, `PostgreSQL`, `Kafka` и `ZooKeeper`, построенная вокруг обработки заявок на штраф между арендодателем, арендатором и администратором.
+`BLPS ITMO Lab3` — это event-driven микросервисная система на `Spring Boot 3.2`, `Java 17`, `PostgreSQL`, `Kafka`, `gRPC` и `ZooKeeper`, построенная вокруг обработки заявок на штраф между арендодателем, арендатором и администратором.
 
 Проект демонстрирует не просто декомпозицию монолита на сервисы, а именно **System Design для распределённых транзакций**:
 
 - `database per service`
+- `HTTP API Gateway` для входных клиентских запросов
+- `gRPC` для синхронных внутренних вызовов
 - `Transactional Outbox`
 - `processed_messages` как inbox/idempotency layer
 - `Saga choreography`
@@ -17,16 +19,20 @@
 Текущая кодовая база состоит из следующих модулей:
 
 - `platform-core` — общие event contracts, outbox/inbox, relay, exception mapping
+- `grpc-contracts` — protobuf-контракты внутренних синхронных API
+- `api-gateway` — внешний HTTP edge service для `/api/**`
 - `auth-service` — пользователи, роли, деактивация, счётчик штрафов
 - `claim-service` — жизненный цикл заявки и timeline
 - `assessment-service` — асинхронная оценка заявки
 - `penalty-service` — асинхронное применение штрафа и retry failed operation
+- `storage-service` — metadata attachments и saga `init -> confirm -> bind`
 - `notification-service` — consumer-проекция уведомлений
 - `audit-service` — аудит и event trail
 
 Физическая структура репозитория:
 
-- `lib/platform-core/` — общий модуль
+- `lib/platform-core/` — общая инфраструктура Outbox/Kafka/gRPC/security
+- `lib/grpc-contracts/` — protobuf и generated gRPC stubs
 - `services/*` — все микросервисы
 
 Инфраструктура:
@@ -63,12 +69,14 @@
 
 | Сервис | Ответственность | Своя БД | Синхронный API | Kafka |
 | --- | --- | --- | --- | --- |
-| `auth-service` | пользователи, роли, деактивация, `penaltyCount` | `blps_auth` | да | consume `PENALTY_APPLIED`, produce `USER_DEACTIVATED` |
-| `claim-service` | заявки, статусы, timeline, центральная бизнес-логика | `blps_claim` | да | produce claim events, consume assessment/penalty/auth events |
-| `assessment-service` | async assessment jobs | `blps_assessment` | нет | consume claim events, produce `ASSESSMENT_COMPLETED` |
-| `penalty-service` | async penalty operations | `blps_penalty` | частично | consume `PENALTY_APPLICATION_REQUESTED`, produce penalty result events |
+| `api-gateway` | внешний HTTP API, JWT perimeter, HTTP-to-gRPC mapping | нет | HTTP external / gRPC clients | нет |
+| `auth-service` | пользователи, роли, деактивация, `penaltyCount` | `blps_auth` | gRPC | consume `PENALTY_APPLIED`, produce `USER_DEACTIVATED` |
+| `claim-service` | заявки, статусы, timeline, центральная бизнес-логика | `blps_claim` | gRPC | produce claim events, consume assessment/penalty/auth/storage events |
+| `assessment-service` | async assessment jobs | `blps_assessment` | нет | consume claim events, produce `ASSESSMENT_COMPLETED` / `ASSESSMENT_FAILED` |
+| `penalty-service` | async penalty operations | `blps_penalty` | gRPC для query/retry | consume `PENALTY_APPLICATION_REQUESTED`, produce penalty result events |
+| `storage-service` | attachment metadata и MinIO object-key lifecycle | `blps_storage` | gRPC | consume `ATTACHMENT_BINDING_REQUESTED`, produce storage events |
 | `notification-service` | notification log | `blps_notification` | нет | consume all domain topics |
-| `audit-service` | audit trail и трассировка саг | `blps_audit` | да | consume all domain topics |
+| `audit-service` | audit trail и трассировка саг | `blps_audit` | gRPC | consume all domain topics |
 
 ## Ключевые паттерны распределённых транзакций
 
@@ -127,21 +135,23 @@ docker compose up -d
 3. Запустить сервисы:
 
 ```bash
+./gradlew :api-gateway:bootRun
 ./gradlew :auth-service:bootRun
 ./gradlew :claim-service:bootRun
 ./gradlew :assessment-service:bootRun
 ./gradlew :penalty-service:bootRun
+./gradlew :storage-service:bootRun
 ./gradlew :notification-service:bootRun
 ./gradlew :audit-service:bootRun
 ```
 
-4. Прогнать сценарии из `rest-client/scenarios`
+4. Прогнать HTTP-сценарии через `api-gateway` из `rest-client/scenarios`
 
 ## Документация
 
 - [docs/architecture.md](docs/architecture.md) — общий System Design и архитектура по сервисам
 - [docs/business-process.md](docs/business-process.md) — бизнес-процесс, BPMN mapping и state machine
-- [docs/api-reference.md](docs/api-reference.md) — HTTP API и контракты
+- [docs/api-reference.md](docs/api-reference.md) — внешний HTTP API и внутренние gRPC контракты
 - [docs/event-catalog.md](docs/event-catalog.md) — event envelope, топики, payloads, producers/consumers
 - [docs/data-model.md](docs/data-model.md) — data ownership и схемы БД
 - [docs/distributed-transactions.md](docs/distributed-transactions.md) — Saga, Outbox, Inbox, failure handling
@@ -171,20 +181,25 @@ PlantUML-источники лежат в `docs/uml/`:
 - `Spring Web`
 - `Spring Data JPA`
 - `Spring Kafka`
+- `gRPC`
+- `Protocol Buffers`
 - `PostgreSQL 16`
 - `Kafka 3.7`
 - `ZooKeeper 3.9`
+- `API Gateway`
+- `JWT demo auth`
+- `MinIO`
 - `Gradle multi-module`
 
 ## Текущие ограничения
 
 Это важно для честного описания текущего System Design:
 
-- `API Gateway` ещё не реализован
-- `JWT/login/security perimeter` ещё не реализованы
-- `storage-service` и attachment saga пока отсутствуют
-- `MinIO` уже поднят в инфраструктуре, но текущий lab3-код напрямую его не использует
-- `DLQ`, retry topics и schema registry пока не реализованы
+- `API Gateway` реализован как внешний edge service для `/api/**`
+- `JWT/login/security perimeter` реализованы в demo-режиме
+- `storage-service` реализует attachment metadata saga поверх MinIO flow
+- `DLT` publishing и retry/backoff настроены через общий Kafka error handler
+- `schema registry` пока не реализован
 - `Kafka` в `docker-compose` поднят как single broker для demo-сценария
 - сервисы запускаются локально через Gradle, а не как отдельные docker images
 - `ddl-auto=update` включён для удобства локальной разработки, а не как production-практика

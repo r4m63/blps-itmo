@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package blps.itmo.grpc;
+
+option java_multiple_files = true;
+option java_package = "blps.itmo.grpc";
+
+import "common.proto";
+
+service StorageRpcService {
+  rpc InitAttachment(InitAttachmentRequest) returns (AttachmentDto);
+  rpc ConfirmAttachment(ConfirmAttachmentRequest) returns (AttachmentDto);
+  rpc GetAttachment(GetAttachmentRequest) returns (AttachmentDto);
+  rpc ListAttachments(ListAttachmentsRequest) returns (ListAttachmentsResponse);
+}
+
+message InitAttachmentRequest {
+  int64 actor_user_id = 1;
+  int64 owner_user_id = 2;
+  string original_filename = 3;
+  string content_type = 4;
+}
+
+message ConfirmAttachmentRequest {
+  int64 attachment_id = 1;
+  int64 actor_user_id = 2;
+  string object_key = 3;
+}
+
+message GetAttachmentRequest {
+  int64 attachment_id = 1;
+}
+
+message ListAttachmentsRequest {
+  int64 owner_user_id = 1;
+}
+
+message ListAttachmentsResponse {
+  repeated AttachmentDto attachments = 1;
+}

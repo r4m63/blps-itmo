@@ -8,6 +8,8 @@ BEGIN;
 
 CREATE TYPE claim_status AS ENUM (
     'ASSESSMENT_IN_PROGRESS',
+    'ASSESSMENT_FAILED',
+    'MANUAL_REVIEW_REQUIRED',
     'NEED_ADDITIONAL_INFO',
     'AWAITING_TENANT_RESPONSE',
     'SUPPORT_REVIEW',
@@ -21,18 +23,26 @@ CREATE TYPE outbox_event_type AS ENUM (
     'CLAIM_CREATED',
     'ADDITIONAL_INFO_PROVIDED',
     'ASSESSMENT_COMPLETED',
+    'ASSESSMENT_FAILED',
     'TENANT_RESPONSE_RECEIVED',
+    'TENANT_RESPONSE_EXPIRED',
     'CLAIM_CLOSED_NO_PENALTY',
     'PENALTY_APPLICATION_REQUESTED',
     'PENALTY_APPLIED',
     'PENALTY_APPLICATION_FAILED',
-    'USER_DEACTIVATED'
+    'USER_DEACTIVATED',
+    'ATTACHMENT_INITIALIZED',
+    'ATTACHMENT_CONFIRMED',
+    'ATTACHMENT_BINDING_REQUESTED',
+    'ATTACHMENT_BOUND',
+    'ATTACHMENT_BINDING_FAILED'
 );
 
 CREATE TYPE outbox_status AS ENUM (
     'NEW',
     'PUBLISHED',
-    'FAILED'
+    'FAILED',
+    'DEAD'
 );
 
 CREATE TABLE claims (
@@ -67,6 +77,17 @@ CREATE TABLE claim_timeline (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE claim_attachments (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    claim_id BIGINT NOT NULL REFERENCES claims (id) ON DELETE CASCADE,
+    attachment_id BIGINT NOT NULL,
+    status TEXT NOT NULL,
+    failure_reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uk_claim_attachment UNIQUE (claim_id, attachment_id)
+);
+
 CREATE TABLE outbox_events (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     event_id TEXT NOT NULL UNIQUE,
@@ -99,6 +120,7 @@ CREATE INDEX idx_claims_status ON claims (status);
 CREATE INDEX idx_claims_landlord_id ON claims (landlord_id);
 CREATE INDEX idx_claims_tenant_id ON claims (tenant_id);
 CREATE INDEX idx_claim_timeline_claim_id_created_at ON claim_timeline (claim_id, created_at);
+CREATE INDEX idx_claim_attachments_claim_id ON claim_attachments (claim_id);
 CREATE INDEX idx_claim_outbox_status_created_at ON outbox_events (status, created_at);
 CREATE INDEX idx_claim_processed_correlation_id ON processed_messages (correlation_id);
 

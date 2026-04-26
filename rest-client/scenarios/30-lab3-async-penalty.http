@@ -1,6 +1,4 @@
-@claimBaseUrl = http://localhost:8081
-@authBaseUrl = http://localhost:8082
-@auditBaseUrl = http://localhost:8086
+@gatewayBaseUrl = http://localhost:8080
 
 ### Scenario 30
 ### Async claim -> additional info -> tenant response -> penalty applied
@@ -8,16 +6,44 @@
 ### - assessment runs asynchronously in assessment-service
 ### - poll GET /api/claims/{id} after create and after additional-info
 
-### 30.1 List seeded users
-GET {{authBaseUrl}}/api/auth/users
-
-### 30.2 Create claim with amount >= 200 so first async assessment asks for additional info
-# @name createClaim
-POST {{claimBaseUrl}}/api/claims
+### 30.1 Login as landlord, tenant, and admin through api-gateway
+# @name loginLandlord
+POST {{gatewayBaseUrl}}/api/auth/login
 Content-Type: application/json
 
 {
-  "landlordUserId": 1,
+  "userId": 1
+}
+
+###
+# @name loginTenant
+POST {{gatewayBaseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userId": 3
+}
+
+###
+# @name loginAdmin
+POST {{gatewayBaseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userId": 5
+}
+
+### 30.2 List seeded users
+GET {{gatewayBaseUrl}}/api/auth/users
+Authorization: Bearer {{loginAdmin.response.body.$.token}}
+
+### 30.3 Create claim with amount >= 200 so first async assessment asks for additional info
+# @name createClaim
+POST {{gatewayBaseUrl}}/api/claims
+Content-Type: application/json
+Authorization: Bearer {{loginLandlord.response.body.$.token}}
+
+{
   "tenantUserId": 3,
   "title": "Broken sofa and stained carpet",
   "description": "Tenant left visible damage and the claim requires asynchronous assessment.",
@@ -25,37 +51,39 @@ Content-Type: application/json
   "currency": "USD"
 }
 
-### 30.3 Poll claim until status becomes NEED_ADDITIONAL_INFO
-GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+### 30.4 Poll claim until status becomes NEED_ADDITIONAL_INFO
+GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+Authorization: Bearer {{loginLandlord.response.body.$.token}}
 
-### 30.4 Send additional info and trigger reassessment
-POST {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/additional-info
+### 30.5 Send additional info and trigger reassessment
+POST {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/additional-info
 Content-Type: application/json
+Authorization: Bearer {{loginLandlord.response.body.$.token}}
 
 {
-  "landlordUserId": 1,
   "comment": "Uploaded serial number and room overview separately; reassess please."
 }
 
-### 30.5 Poll claim until status becomes AWAITING_TENANT_RESPONSE
-GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+### 30.6 Poll claim until status becomes AWAITING_TENANT_RESPONSE
+GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+Authorization: Bearer {{loginLandlord.response.body.$.token}}
 
-### 30.6 Tenant responds
-POST {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/tenant-response
+### 30.7 Tenant responds
+POST {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/tenant-response
 Content-Type: application/json
+Authorization: Bearer {{loginTenant.response.body.$.token}}
 
 {
-  "tenantUserId": 3,
   "agree": false,
   "comment": "I disagree with the final amount."
 }
 
-### 30.7 Admin requests penalty application
-POST {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/support-decision
+### 30.8 Admin requests penalty application
+POST {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/support-decision
 Content-Type: application/json
+Authorization: Bearer {{loginAdmin.response.body.$.token}}
 
 {
-  "adminUserId": 5,
   "applyPenalty": true,
   "penaltyAmount": 175.00,
   "penaltyCurrency": "USD",
@@ -63,11 +91,18 @@ Content-Type: application/json
   "simulateFailure": false
 }
 
-### 30.8 Poll claim until status becomes PENALTY_APPLIED
-GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+### 30.9 Poll claim until status becomes PENALTY_APPLIED
+GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
+Authorization: Bearer {{loginLandlord.response.body.$.token}}
 
-### 30.9 Inspect timeline
-GET {{claimBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/timeline
+### 30.10 Inspect process status
+GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/process-status
+Authorization: Bearer {{loginAdmin.response.body.$.token}}
 
-### 30.10 Inspect audit trail
-GET {{auditBaseUrl}}/api/audit/claims/{{createClaim.response.body.$.id}}/events
+### 30.11 Inspect timeline
+GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/timeline
+Authorization: Bearer {{loginAdmin.response.body.$.token}}
+
+### 30.12 Inspect audit trail
+GET {{gatewayBaseUrl}}/api/audit/claims/{{createClaim.response.body.$.id}}/events
+Authorization: Bearer {{loginAdmin.response.body.$.token}}

@@ -2,6 +2,7 @@ BEGIN;
 
 DROP TABLE IF EXISTS processed_messages;
 DROP TABLE IF EXISTS outbox_events;
+DROP TABLE IF EXISTS claim_attachments;
 DROP TABLE IF EXISTS claim_timeline;
 DROP TABLE IF EXISTS claims;
 

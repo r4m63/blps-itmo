@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":platform-core"))
+    implementation(project(":grpc-contracts"))
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")

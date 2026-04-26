@@ -5,6 +5,7 @@ autonumber
 skinparam shadowing false
 
 actor Landlord
+participant "api-gateway" as Gateway
 participant "claim-service" as Claim
 participant "auth-service" as Auth
 database "claim-db" as ClaimDB
@@ -13,13 +14,15 @@ queue "Kafka" as Kafka
 participant "assessment-service" as Assessment
 database "assessment-db" as AssessmentDB
 
-Landlord -> Claim : POST /api/claims
-Claim -> Auth : GET /internal/users/{landlord}
+Landlord -> Gateway : HTTP POST /api/claims
+Gateway -> Claim : gRPC ClaimRpcService.CreateClaim
+Claim -> Auth : gRPC AuthRpcService.GetUser(landlord)
 Auth --> Claim : RemoteUserView
-Claim -> Auth : GET /internal/users/{tenant}
+Claim -> Auth : gRPC AuthRpcService.GetUser(tenant)
 Auth --> Claim : RemoteUserView
 Claim -> ClaimDB : INSERT claims\nINSERT claim_timeline\nINSERT outbox(CLAIM_CREATED)
-Claim --> Landlord : ClaimResponse(status=ASSESSMENT_IN_PROGRESS)
+Claim --> Gateway : ClaimDto(status=ASSESSMENT_IN_PROGRESS)
+Gateway --> Landlord : HTTP ClaimResponse(status=ASSESSMENT_IN_PROGRESS)
 
 ClaimRelay -> ClaimDB : SELECT NEW outbox events
 ClaimRelay -> Kafka : publish CLAIM_CREATED

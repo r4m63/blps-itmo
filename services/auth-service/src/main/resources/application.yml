@@ -30,5 +30,16 @@ management:
 
 app:
   service-name: auth-service
+  grpc:
+    server:
+      port: ${AUTH_GRPC_PORT:19082}
+  security:
+    jwt-secret: ${JWT_SECRET:lab3-demo-secret}
+    jwt-ttl-seconds: 86400
   outbox:
     poll-interval-ms: 1000
+    max-retry-count: 10
+  kafka:
+    retry:
+      backoff-ms: 1000
+      max-attempts: 3

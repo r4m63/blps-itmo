@@ -2,6 +2,7 @@ package blps.itmo.penalty.service;
 
 import java.time.OffsetDateTime;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,13 +26,16 @@ public class PenaltyWorkflowService {
     private final PenaltyOperationRepository penaltyOperationRepository;
     private final ProcessedMessageService processedMessageService;
     private final OutboxService outboxService;
+    private final long timeoutMinutes;
 
     public PenaltyWorkflowService(PenaltyOperationRepository penaltyOperationRepository,
             ProcessedMessageService processedMessageService,
-            OutboxService outboxService) {
+            OutboxService outboxService,
+            @Value("${app.penalty.timeout-minutes:30}") long timeoutMinutes) {
         this.penaltyOperationRepository = penaltyOperationRepository;
         this.processedMessageService = processedMessageService;
         this.outboxService = outboxService;
+        this.timeoutMinutes = timeoutMinutes;
     }
 
     @Transactional
@@ -95,6 +99,32 @@ public class PenaltyWorkflowService {
                             .penaltyAmount(operation.getPenaltyAmount())
                             .penaltyCurrency(operation.getPenaltyCurrency())
                             .operationId(operation.getId())
+                            .build());
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${app.penalty.timeout-poll-interval-ms:60000}")
+    @Transactional
+    public void failTimedOutOperations() {
+        OffsetDateTime threshold = OffsetDateTime.now().minusMinutes(timeoutMinutes);
+        for (PenaltyOperation operation : penaltyOperationRepository.findByStatusAndCreatedAtBefore(
+                PenaltyOperationStatus.PROCESSING, threshold)) {
+            operation.setStatus(PenaltyOperationStatus.FAILED);
+            operation.setProcessedAt(OffsetDateTime.now());
+            operation.setReason("Penalty operation timed out");
+            penaltyOperationRepository.save(operation);
+            outboxService.record(
+                    EventType.PENALTY_APPLICATION_FAILED,
+                    "CLAIM",
+                    operation.getClaimId(),
+                    operation.getCorrelationId(),
+                    "penalty-application-" + operation.getClaimId(),
+                    operation.getTenantId(),
+                    PenaltyApplicationFailedPayload.builder()
+                            .claimId(operation.getClaimId())
+                            .tenantId(operation.getTenantId())
+                            .operationId(operation.getId())
+                            .reason(operation.getReason())
                             .build());
         }
     }

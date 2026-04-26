@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package blps.itmo.grpc;
+
+option java_multiple_files = true;
+option java_package = "blps.itmo.grpc";
+
+import "common.proto";
+
+service AuditRpcService {
+  rpc GetClaimEvents(GetClaimEventsRequest) returns (GetClaimEventsResponse);
+}
+
+message GetClaimEventsRequest {
+  int64 claim_id = 1;
+}
+
+message GetClaimEventsResponse {
+  repeated AuditRecordDto records = 1;
+}

@@ -10,9 +10,11 @@ actor Tenant
 actor Admin
 
 component "claim-service" as Claim
+component "api-gateway" as Gateway
 component "auth-service" as Auth
 component "assessment-service" as Assessment
 component "penalty-service" as Penalty
+component "storage-service" as Storage
 component "notification-service" as Notification
 component "audit-service" as Audit
 
@@ -25,33 +27,40 @@ database "claim-db" as ClaimDB
 database "auth-db" as AuthDB
 database "assessment-db" as AssessmentDB
 database "penalty-db" as PenaltyDB
+database "storage-db" as StorageDB
 database "notification-db" as NotificationDB
 database "audit-db" as AuditDB
 
-Landlord --> Claim : REST\ncreate/additional-info
-Tenant --> Claim : REST\ntenant-response
-Admin --> Claim : REST\nsupport-decision
-Admin --> Auth : REST\ndeactivate user
-Admin --> Audit : REST\nquery audit trail
+Landlord --> Gateway : HTTP REST + JWT\nclaims/attachments
+Tenant --> Gateway : HTTP REST + JWT\ntenant-response
+Admin --> Gateway : HTTP REST + JWT\nsupport/repair/audit
 
-Claim --> Auth : HTTP\n/internal/users/{id}
+Gateway --> Claim : gRPC ClaimRpcService
+Gateway --> Auth : gRPC AuthRpcService
+Gateway --> Penalty : gRPC PenaltyRpcService
+Gateway --> Storage : gRPC StorageRpcService
+Gateway --> Audit : gRPC AuditRpcService
+
+Claim --> Auth : gRPC AuthRpcService.GetUser
 
 Claim --> ClaimDB
 Auth --> AuthDB
 Assessment --> AssessmentDB
 Penalty --> PenaltyDB
+Storage --> StorageDB
 Notification --> NotificationDB
 Audit --> AuditDB
 
 Claim ..> Kafka : publish\nclaim.events\npenalty.events
 Assessment ..> Kafka : consume claim.events\npublish assessment.events
 Penalty ..> Kafka : consume penalty.events\npublish penalty.events
+Storage ..> Kafka : consume claim.events\npublish storage.events
 Auth ..> Kafka : consume penalty.events\npublish auth.events
 Notification ..> Kafka : consume all domain topics
 Audit ..> Kafka : consume all domain topics
 
 KafkaUI --> Kafka
 Kafka --> ZK
-Claim ..> MinIO : reserved for future\nattachment saga
+Storage ..> MinIO : attachment object\nmetadata saga
 
 @enduml

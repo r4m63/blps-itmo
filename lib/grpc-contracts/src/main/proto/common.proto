@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package blps.itmo.grpc;
+
+option java_multiple_files = true;
+option java_package = "blps.itmo.grpc";
+
+import "google/protobuf/timestamp.proto";
+
+message EmptyRequest {
+}
+
+message UserDto {
+  int64 id = 1;
+  string email = 2;
+  string role = 3;
+  bool enabled = 4;
+  int32 penalty_count = 5;
+}
+
+message AttachmentRefDto {
+  int64 attachment_id = 1;
+  string status = 2;
+  string failure_reason = 3;
+}
+
+message ClaimDto {
+  int64 id = 1;
+  string correlation_id = 2;
+  int64 landlord_id = 3;
+  int64 tenant_id = 4;
+  string status = 5;
+  string title = 6;
+  string description = 7;
+  string claimed_amount = 8;
+  string currency = 9;
+  string assessment_amount = 10;
+  string assessment_notes = 11;
+  string penalty_amount = 12;
+  string penalty_currency = 13;
+  string resolution_note = 14;
+  google.protobuf.Timestamp created_at = 15;
+  google.protobuf.Timestamp updated_at = 16;
+  google.protobuf.Timestamp closed_at = 17;
+  repeated AttachmentRefDto attachments = 18;
+}
+
+message ClaimTimelineEntryDto {
+  int64 id = 1;
+  int64 claim_id = 2;
+  string event_type = 3;
+  string from_status = 4;
+  string to_status = 5;
+  int64 actor_id = 6;
+  string note = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message PenaltyOperationDto {
+  int64 id = 1;
+  int64 claim_id = 2;
+  int64 tenant_id = 3;
+  string correlation_id = 4;
+  string penalty_amount = 5;
+  string penalty_currency = 6;
+  bool simulate_failure = 7;
+  string reason = 8;
+  string status = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp processed_at = 11;
+}
+
+message AttachmentDto {
+  int64 id = 1;
+  int64 owner_user_id = 2;
+  int64 claim_id = 3;
+  string bucket_name = 4;
+  string object_key = 5;
+  string upload_url = 6;
+  string original_filename = 7;
+  string content_type = 8;
+  string status = 9;
+  string failure_reason = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message AuditRecordDto {
+  int64 id = 1;
+  string event_id = 2;
+  string event_type = 3;
+  string aggregate_type = 4;
+  string aggregate_id = 5;
+  string correlation_id = 6;
+  string saga_id = 7;
+  string payload_json = 8;
+  google.protobuf.Timestamp created_at = 9;
+}

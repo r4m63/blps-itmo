@@ -14,6 +14,8 @@
 
 - `microservices`
 - `database per service`
+- `HTTP API gateway`
+- `gRPC` для синхронных внутренних вызовов
 - `event-driven integration`
 - `saga choreography`
 - `eventual consistency`
@@ -26,6 +28,7 @@
 ### Общий модуль
 
 - `platform-core`
+- `grpc-contracts`
 
 Содержит:
 
@@ -37,6 +40,8 @@
 - `OutboxRelay`
 - `ProcessedMessageService`
 - общий `ApiExceptionHandler`
+- protobuf-контракты и generated gRPC stubs
+- lifecycle для gRPC servers и фабрику gRPC clients
 
 ### Бизнес-сервисы
 
@@ -44,10 +49,11 @@
 - `claim-service`
 - `assessment-service`
 - `penalty-service`
+- `storage-service`
 - `notification-service`
 - `audit-service`
 
-Физически сервисы лежат в каталоге `services/`, а общие модули вынесены в `lib/`. Сейчас shared module один: `lib/platform-core`.
+Физически сервисы лежат в каталоге `services/`, а общие модули вынесены в `lib/`.
 
 ## 4. Bounded Contexts
 
@@ -90,6 +96,17 @@
 - асинхронную обработку заявки
 - публикацию результата оценки
 
+### `storage-service`
+
+Контекст attachment metadata и MinIO object-key lifecycle.
+
+Отвечает за:
+
+- инициализацию attachment metadata
+- подтверждение загрузки объекта
+- привязку attachments к claim через saga
+- публикацию storage events
+
 ### `penalty-service`
 
 Контекст применения штрафа.
@@ -121,17 +138,39 @@ Read-side контекст трассировки.
 
 ## 5. Коммуникации
 
-### Синхронные вызовы
+### Внешние HTTP вызовы
 
-Сейчас в системе есть один важный sync path:
+Клиенты не ходят напрямую в бизнес-сервисы. Внешняя точка входа:
 
-- `claim-service -> auth-service` через `GET /internal/users/{id}`
+- `api-gateway`
+- HTTP `/api/**`
+- demo JWT в `Authorization: Bearer ...`
 
-Этот вызов нужен для:
+Gateway валидирует токен, достаёт actor identity и вызывает backend-сервисы через gRPC.
+
+### Синхронные внутренние вызовы
+
+Все runtime sync path внутри системы оформляются через gRPC-контракты из `lib/grpc-contracts`.
+
+Ключевой service-to-service path:
+
+- `claim-service -> auth-service` через `AuthRpcService.GetUser`
+
+Он нужен для:
 
 - проверки существования пользователя
 - проверки роли
 - проверки, что пользователь не деактивирован
+
+Gateway также использует gRPC stubs:
+
+- `AuthRpcService`
+- `ClaimRpcService`
+- `PenaltyRpcService`
+- `StorageRpcService`
+- `AuditRpcService`
+
+REST-контроллеры в backend-сервисах могут оставаться для прямого локального debug, но не являются контрактом межсервисной синхронной интеграции.
 
 ### Асинхронные вызовы
 
@@ -141,19 +180,22 @@ Read-side контекст трассировки.
 - `assessment.events`
 - `penalty.events`
 - `auth.events`
+- `storage.events`
 
 `notification-service` и `audit-service` подписаны на все доменные топики.
 
 ## 6. Матрица ответственности по сервисам
 
-| Сервис | Владеет данными | Пишет в Kafka | Читает из Kafka | Публичный REST |
+| Сервис | Владеет данными | Пишет в Kafka | Читает из Kafka | Внешний доступ |
 | --- | --- | --- | --- | --- |
-| `auth-service` | `users` | `USER_DEACTIVATED` | `PENALTY_APPLIED` | да |
-| `claim-service` | `claims`, `claim_timeline` | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `TENANT_RESPONSE_RECEIVED`, `CLAIM_CLOSED_NO_PENALTY`, `PENALTY_APPLICATION_REQUESTED` | `ASSESSMENT_COMPLETED`, `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED`, `USER_DEACTIVATED` | да |
-| `assessment-service` | `assessment_jobs` | `ASSESSMENT_COMPLETED` | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED` | нет |
-| `penalty-service` | `penalty_operations` | `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED` | `PENALTY_APPLICATION_REQUESTED` | да |
+| `api-gateway` | нет | нет | нет | HTTP edge |
+| `auth-service` | `users` | `USER_DEACTIVATED` | `PENALTY_APPLIED` | через gateway/gRPC |
+| `claim-service` | `claims`, `claim_timeline`, attachment refs | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `TENANT_RESPONSE_RECEIVED`, `TENANT_RESPONSE_EXPIRED`, `CLAIM_CLOSED_NO_PENALTY`, `PENALTY_APPLICATION_REQUESTED`, `ATTACHMENT_BINDING_REQUESTED` | `ASSESSMENT_COMPLETED`, `ASSESSMENT_FAILED`, `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED`, `USER_DEACTIVATED`, `ATTACHMENT_BOUND`, `ATTACHMENT_BINDING_FAILED` | через gateway/gRPC |
+| `assessment-service` | `assessment_jobs` | `ASSESSMENT_COMPLETED`, `ASSESSMENT_FAILED` | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED` | нет |
+| `penalty-service` | `penalty_operations` | `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED` | `PENALTY_APPLICATION_REQUESTED` | через gateway/gRPC |
+| `storage-service` | `attachments` | `ATTACHMENT_INITIALIZED`, `ATTACHMENT_CONFIRMED`, `ATTACHMENT_BOUND`, `ATTACHMENT_BINDING_FAILED` | `ATTACHMENT_BINDING_REQUESTED` | через gateway/gRPC |
 | `notification-service` | `notification_log` | нет | все доменные события | нет |
-| `audit-service` | `audit_records` | нет | все доменные события | да |
+| `audit-service` | `audit_records` | нет | все доменные события | через gateway/gRPC |
 
 ## 7. Топология данных
 
@@ -163,6 +205,7 @@ Read-side контекст трассировки.
 - `blps_claim`
 - `blps_assessment`
 - `blps_penalty`
+- `blps_storage`
 - `blps_notification`
 - `blps_audit`
 
@@ -194,13 +237,14 @@ Read-side контекст трассировки.
 
 - `claim-service`
 - `auth-service`
+- `storage-service`
 - `notification-service`
 - `audit-service`
 
 Почему:
 
 - состояние хранится в БД
-- сервисы stateless на уровне HTTP/API
+- сервисы stateless на уровне HTTP/gRPC API
 - dedup идёт через таблицы, а не через memory
 
 ### Масштабируются как async worker’ы
@@ -222,21 +266,25 @@ Read-side контекст трассировки.
 
 ### Уже реализовано
 
+- API gateway
+- internal gRPC contracts and servers
+- demo JWT/login/security perimeter
 - outbox
 - inbox/idempotency
 - choreography saga
 - manual retry для penalty flow
+- DLT publishing through shared Kafka error handler
+- timeout/reconciliation jobs for core async flows
+- storage-service attachment saga
 - read-side audit trail
 
 ### Пока не реализовано
 
-- API gateway
 - distributed tracing stack
 - metrics/Prometheus/Grafana
-- DLQ/retry topics
 - schema registry / contract evolution policy
 - compensating workers общего назначения
-- security perimeter между сервисами
+- production-grade OAuth2/service-to-service auth
 
 ## 11. Почему это хороший учебный System Design
 

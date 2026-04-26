@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import blps.itmo.claim.domain.Claim;
+import blps.itmo.claim.domain.ClaimAttachment;
 import blps.itmo.claim.domain.ClaimTimelineEntry;
+import blps.itmo.claim.repository.ClaimAttachmentRepository;
 import blps.itmo.claim.repository.ClaimRepository;
 import blps.itmo.claim.repository.ClaimTimelineRepository;
 import blps.itmo.platform.persistence.OutboxEvent;
@@ -17,8 +19,9 @@ import blps.itmo.platform.persistence.ProcessedMessageRepository;
 
 @SpringBootApplication(scanBasePackages = {"blps.itmo.claim", "blps.itmo.platform"})
 @EnableScheduling
-@EntityScan(basePackageClasses = {Claim.class, ClaimTimelineEntry.class, OutboxEvent.class, ProcessedMessage.class})
+@EntityScan(basePackageClasses = {Claim.class, ClaimAttachment.class, ClaimTimelineEntry.class, OutboxEvent.class, ProcessedMessage.class})
 @EnableJpaRepositories(basePackageClasses = {
+        ClaimAttachmentRepository.class,
         ClaimRepository.class,
         ClaimTimelineRepository.class,
         OutboxEventRepository.class,

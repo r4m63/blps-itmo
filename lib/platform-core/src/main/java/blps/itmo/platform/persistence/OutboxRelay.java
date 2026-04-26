@@ -19,15 +19,18 @@ public class OutboxRelay {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final String serviceName;
+    private final int maxRetryCount;
 
     public OutboxRelay(OutboxEventRepository outboxEventRepository,
             KafkaTemplate<String, String> kafkaTemplate,
             ObjectMapper objectMapper,
-            @Value("${app.service-name}") String serviceName) {
+            @Value("${app.service-name}") String serviceName,
+            @Value("${app.outbox.max-retry-count:10}") int maxRetryCount) {
         this.outboxEventRepository = outboxEventRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.serviceName = serviceName;
+        this.maxRetryCount = maxRetryCount;
     }
 
     @Scheduled(fixedDelayString = "${app.outbox.poll-interval-ms:1000}")
@@ -54,8 +57,9 @@ public class OutboxRelay {
                 event.setPublishedAt(Instant.now());
                 event.setErrorMessage(null);
             } catch (Exception e) {
-                event.setStatus(OutboxStatus.FAILED);
-                event.setRetryCount(event.getRetryCount() + 1);
+                int retryCount = event.getRetryCount() + 1;
+                event.setRetryCount(retryCount);
+                event.setStatus(retryCount >= maxRetryCount ? OutboxStatus.DEAD : OutboxStatus.FAILED);
                 event.setErrorMessage(e.getMessage());
             }
             outboxEventRepository.save(event);

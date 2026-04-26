@@ -2,6 +2,8 @@ package blps.itmo.claim.domain;
 
 public enum ClaimStatus {
     ASSESSMENT_IN_PROGRESS,
+    ASSESSMENT_FAILED,
+    MANUAL_REVIEW_REQUIRED,
     NEED_ADDITIONAL_INFO,
     AWAITING_TENANT_RESPONSE,
     SUPPORT_REVIEW,

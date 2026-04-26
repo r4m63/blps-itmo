@@ -24,5 +24,13 @@ server:
 
 app:
   service-name: audit-service
+  grpc:
+    server:
+      port: ${AUDIT_GRPC_PORT:19086}
   outbox:
     poll-interval-ms: 1000
+    max-retry-count: 10
+  kafka:
+    retry:
+      backoff-ms: 1000
+      max-attempts: 3

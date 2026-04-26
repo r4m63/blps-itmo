@@ -26,5 +26,12 @@ app:
   service-name: assessment-service
   outbox:
     poll-interval-ms: 1000
+    max-retry-count: 10
+  kafka:
+    retry:
+      backoff-ms: 1000
+      max-attempts: 3
   assessment:
     poll-interval-ms: 2000
+    timeout-minutes: 30
+    timeout-poll-interval-ms: 60000

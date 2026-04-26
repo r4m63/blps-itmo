@@ -7,6 +7,8 @@
 правильную микросервисную модель через:
 
 - локальную транзакцию в каждом сервисе
+- HTTP только на входе через api-gateway
+- gRPC для синхронных внутренних запросов
 - Transactional Outbox
 - Kafka как транспорт
 - Saga для межсервисных процессов
@@ -224,7 +226,7 @@ Lab3 должен показать три класса distributed transaction p
 4. При создании claim клиент передаёт attachment refs
 5. claim-service валидирует, что attachment ids/object keys подтверждены
     - лучше не прямым DB join
-    - а через sync internal query в storage-service или локальный attachment-read model
+    - а через sync gRPC query в storage-service или локальный attachment-read model
 6. claim-service сохраняет claim и пишет AttachmentBindingRequested
 7. storage-service помечает attachment как BOUND_TO_CLAIM
 
@@ -445,13 +447,8 @@ Lab3 должен показать три класса distributed transaction p
 - assessment.events
 - penalty.events
 - auth.events
-- notification.events
-- audit.events
 
-Для внутренних команд можно оставить:
-
-- penalty.commands
-- assessment.commands
+Синхронные command/query вызовы не оформляются как HTTP между сервисами: для них используется gRPC.
 
 Но для lab3 достаточно и domain-event style без выделенных command topics, если не хочется переусложнять.
 

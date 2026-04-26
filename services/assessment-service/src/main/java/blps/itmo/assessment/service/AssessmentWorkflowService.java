@@ -3,6 +3,7 @@ package blps.itmo.assessment.service;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import blps.itmo.platform.events.EventEnvelope;
 import blps.itmo.platform.events.EventType;
 import blps.itmo.platform.events.payload.AdditionalInfoProvidedPayload;
 import blps.itmo.platform.events.payload.AssessmentCompletedPayload;
+import blps.itmo.platform.events.payload.AssessmentFailedPayload;
 import blps.itmo.platform.events.payload.ClaimCreatedPayload;
 import blps.itmo.platform.persistence.OutboxService;
 import blps.itmo.platform.persistence.ProcessedMessageService;
@@ -26,13 +28,16 @@ public class AssessmentWorkflowService {
     private final AssessmentJobRepository assessmentJobRepository;
     private final ProcessedMessageService processedMessageService;
     private final OutboxService outboxService;
+    private final long timeoutMinutes;
 
     public AssessmentWorkflowService(AssessmentJobRepository assessmentJobRepository,
             ProcessedMessageService processedMessageService,
-            OutboxService outboxService) {
+            OutboxService outboxService,
+            @Value("${app.assessment.timeout-minutes:30}") long timeoutMinutes) {
         this.assessmentJobRepository = assessmentJobRepository;
         this.processedMessageService = processedMessageService;
         this.outboxService = outboxService;
+        this.timeoutMinutes = timeoutMinutes;
     }
 
     @Transactional
@@ -109,6 +114,29 @@ public class AssessmentWorkflowService {
             job.setStatus(AssessmentJobStatus.COMPLETED);
             job.setProcessedAt(OffsetDateTime.now());
             assessmentJobRepository.save(job);
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${app.assessment.timeout-poll-interval-ms:60000}")
+    @Transactional
+    public void failTimedOutJobs() {
+        OffsetDateTime threshold = OffsetDateTime.now().minusMinutes(timeoutMinutes);
+        for (AssessmentJob job : assessmentJobRepository.findByStatusAndCreatedAtBefore(AssessmentJobStatus.PROCESSING, threshold)) {
+            job.setStatus(AssessmentJobStatus.FAILED);
+            job.setProcessedAt(OffsetDateTime.now());
+            assessmentJobRepository.save(job);
+            outboxService.record(
+                    EventType.ASSESSMENT_FAILED,
+                    "CLAIM",
+                    job.getClaimId(),
+                    job.getCorrelationId(),
+                    "claim-lifecycle-" + job.getClaimId(),
+                    job.getLandlordId(),
+                    AssessmentFailedPayload.builder()
+                            .claimId(job.getClaimId())
+                            .jobId(job.getId())
+                            .reason("Assessment job timed out")
+                            .build());
         }
     }
 }

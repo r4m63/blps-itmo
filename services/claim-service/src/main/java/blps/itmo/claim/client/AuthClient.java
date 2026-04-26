@@ -2,40 +2,50 @@ package blps.itmo.claim.client;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
 
+import blps.itmo.grpc.AuthRpcServiceGrpc;
+import blps.itmo.grpc.GetUserRequest;
 import blps.itmo.platform.events.RemoteUserView;
+import blps.itmo.platform.grpc.GrpcClientFactory;
+import io.grpc.ManagedChannel;
+import io.grpc.StatusRuntimeException;
+import jakarta.annotation.PreDestroy;
 
 @Component
 public class AuthClient {
 
-    private final RestClient restClient;
+    private final ManagedChannel channel;
+    private final AuthRpcServiceGrpc.AuthRpcServiceBlockingStub authStub;
 
-    public AuthClient(@Value("${app.auth-service-url:http://localhost:8082}") String authServiceUrl) {
-        this.restClient = RestClient.builder()
-                .baseUrl(authServiceUrl)
-                .build();
+    public AuthClient(@Value("${app.grpc.clients.auth.target:localhost:19082}") String authGrpcTarget) {
+        this.channel = GrpcClientFactory.plaintextChannel(authGrpcTarget);
+        this.authStub = AuthRpcServiceGrpc.newBlockingStub(channel);
     }
 
     public RemoteUserView requireUser(Long userId, String expectedRole) {
         try {
-            RemoteUserView user = restClient.get()
-                    .uri("/internal/users/{id}", userId)
-                    .retrieve()
-                    .body(RemoteUserView.class);
-            if (user == null) {
-                throw new IllegalArgumentException("User not found: " + userId);
-            }
+            var user = authStub.getUser(GetUserRequest.newBuilder().setUserId(userId).build());
             if (!expectedRole.equals(user.getRole())) {
                 throw new IllegalArgumentException("Expected role " + expectedRole + " for user " + userId);
             }
-            if (!user.isEnabled()) {
+            if (!user.getEnabled()) {
                 throw new IllegalArgumentException("User is disabled: " + userId);
             }
-            return user;
-        } catch (RestClientResponseException e) {
-            throw new IllegalStateException("Auth service returned " + e.getRawStatusCode() + " for user " + userId, e);
+            return RemoteUserView.builder()
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .role(user.getRole())
+                    .enabled(user.getEnabled())
+                    .penaltyCount(user.getPenaltyCount())
+                    .build();
+        } catch (StatusRuntimeException e) {
+            throw new IllegalStateException("Auth gRPC lookup failed for user " + userId + ": "
+                    + e.getStatus().getDescription(), e);
         }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        channel.shutdown();
     }
 }

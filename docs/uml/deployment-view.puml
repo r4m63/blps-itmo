@@ -7,10 +7,12 @@ skinparam shadowing false
 
 node "Developer Workstation" {
   node "Gradle JVM Processes" {
+    artifact "api-gateway.jar" as GatewayJar
     artifact "auth-service.jar" as AuthJar
     artifact "claim-service.jar" as ClaimJar
     artifact "assessment-service.jar" as AssessmentJar
     artifact "penalty-service.jar" as PenaltyJar
+    artifact "storage-service.jar" as StorageJar
     artifact "notification-service.jar" as NotificationJar
     artifact "audit-service.jar" as AuditJar
   }
@@ -31,6 +33,7 @@ node "Developer Workstation" {
       database "postgres-claim" as ClaimDB
       database "postgres-assessment" as AssessmentDB
       database "postgres-penalty" as PenaltyDB
+      database "postgres-storage" as StorageDB
       database "postgres-notification" as NotificationDB
       database "postgres-audit" as AuditDB
     }
@@ -41,18 +44,28 @@ AuthJar --> AuthDB
 ClaimJar --> ClaimDB
 AssessmentJar --> AssessmentDB
 PenaltyJar --> PenaltyDB
+StorageJar --> StorageDB
 NotificationJar --> NotificationDB
 AuditJar --> AuditDB
+
+GatewayJar --> AuthJar : gRPC 19082
+GatewayJar --> ClaimJar : gRPC 19081
+GatewayJar --> PenaltyJar : gRPC 19084
+GatewayJar --> StorageJar : gRPC 19087
+GatewayJar --> AuditJar : gRPC 19086
+
+ClaimJar --> AuthJar : gRPC user lookup
 
 AuthJar ..> Kafka
 ClaimJar ..> Kafka
 AssessmentJar ..> Kafka
 PenaltyJar ..> Kafka
+StorageJar ..> Kafka
 NotificationJar ..> Kafka
 AuditJar ..> Kafka
 
 Kafka --> ZK
 KafkaUI --> Kafka
-ClaimJar ..> MinIO : future storage integration
+StorageJar ..> MinIO : attachment object keys
 
 @enduml

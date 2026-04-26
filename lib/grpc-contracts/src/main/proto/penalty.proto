@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package blps.itmo.grpc;
+
+option java_multiple_files = true;
+option java_package = "blps.itmo.grpc";
+
+import "common.proto";
+
+service PenaltyRpcService {
+  rpc ListOperationsByClaim(ListPenaltyOperationsRequest) returns (ListPenaltyOperationsResponse);
+  rpc RetryOperation(RetryPenaltyOperationRequest) returns (PenaltyOperationDto);
+}
+
+message ListPenaltyOperationsRequest {
+  int64 claim_id = 1;
+}
+
+message ListPenaltyOperationsResponse {
+  repeated PenaltyOperationDto operations = 1;
+}
+
+message RetryPenaltyOperationRequest {
+  int64 operation_id = 1;
+  string actor_role = 2;
+}

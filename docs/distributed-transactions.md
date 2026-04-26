@@ -25,6 +25,7 @@
 Итоговая стратегия:
 
 - локальная транзакция на сервис
+- gRPC для синхронной валидации и query/command вызовов без общей транзакции
 - outbox для публикации
 - inbox для дедупликации
 - choreography saga
@@ -96,7 +97,7 @@
 
 1. `POST /api/claims`
 2. `claim-service`:
-   - валидирует пользователей через `auth-service`
+   - валидирует пользователей через `AuthRpcService.GetUser`
    - создаёт запись в `claims`
    - пишет timeline
    - пишет `CLAIM_CREATED` в `outbox_events`
@@ -196,17 +197,18 @@
 | assessment ещё не успел обработать заявку | claim остаётся в `ASSESSMENT_IN_PROGRESS` |
 | penalty processor упал | claim уходит в `PENALTY_PROCESSING_FAILED` |
 | нужен recovery после penalty failure | есть manual retry endpoint |
+| attachment привязан неатомарно с MinIO | `storage-service` ведёт `init -> confirm -> bind` saga |
+| consumer не может обработать poison message | shared Kafka error handler отправляет запись в `<topic>.dlt` |
+| долгий async шаг завис | scheduled timeout/reconciliation jobs переводят процесс в repair/failure state |
 | нужна трассировка всей саги | использовать `audit-service` и `correlationId`/`sagaId` |
 
 ## 9. Что пока не реализовано
 
 Для честности:
 
-- нет отдельного DLQ
-- нет retry topics
-- нет scheduled reconciliation job
-- нет timeout manager для зависших саг
 - нет schema registry
+- нет отдельного monitoring UI для DLT/stuck saga
+- нет production-grade distributed tracing stack
 
 Но базовый каркас distributed transaction handling уже есть:
 
@@ -214,6 +216,9 @@
 - inbox
 - explicit intermediate states
 - manual recovery
+- DLT publishing
+- timeout/reconciliation jobs
+- attachment saga
 
 ## 10. Что показывать на защите
 

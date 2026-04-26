@@ -1,0 +1,58 @@
+@gatewayBaseUrl = http://localhost:8080
+
+### Scenario 33
+### Attachment metadata is coordinated through storage-service + MinIO-outside-XA saga
+
+### 33.1 Login as landlord
+# @name loginLandlord
+POST {{gatewayBaseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+
+### 33.2 Initialize attachment metadata
+# @name initAttachment
+POST {{gatewayBaseUrl}}/api/attachments/init
+Content-Type: application/json
+Authorization: Bearer {{loginLandlord.response.body.$.token}}
+
+{
+  "originalFilename": "sofa-damage.jpg",
+  "contentType": "image/jpeg"
+}
+
+### 33.3 Confirm object upload
+### Demo note: STORAGE_VERIFY_MINIO_OBJECT=false by default, so this confirms metadata after an out-of-band MinIO upload.
+# @name confirmAttachment
+POST {{gatewayBaseUrl}}/api/attachments/{{initAttachment.response.body.$.id}}/confirm
+Content-Type: application/json
+Authorization: Bearer {{loginLandlord.response.body.$.token}}
+
+{
+  "objectKey": "{{initAttachment.response.body.$.objectKey}}"
+}
+
+### 33.4 Create claim with attachment ref; claim-service emits ATTACHMENT_BINDING_REQUESTED
+# @name createClaim
+POST {{gatewayBaseUrl}}/api/claims
+Content-Type: application/json
+Authorization: Bearer {{loginLandlord.response.body.$.token}}
+
+{
+  "tenantUserId": 3,
+  "title": "Damage claim with attachment",
+  "description": "Attachment binding is handled by storage-service through Kafka.",
+  "claimedAmount": 80.00,
+  "currency": "USD",
+  "attachmentIds": [{{initAttachment.response.body.$.id}}]
+}
+
+### 33.5 Poll claim attachments until status becomes BOUND
+GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/attachments
+Authorization: Bearer {{loginLandlord.response.body.$.token}}
+
+### 33.6 Inspect storage metadata
+GET {{gatewayBaseUrl}}/api/attachments/{{initAttachment.response.body.$.id}}
+Authorization: Bearer {{loginLandlord.response.body.$.token}}

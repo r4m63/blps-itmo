@@ -24,6 +24,19 @@ server:
 
 app:
   service-name: claim-service
-  auth-service-url: ${AUTH_SERVICE_URL:http://localhost:8082}
+  grpc:
+    server:
+      port: ${CLAIM_GRPC_PORT:19081}
+    clients:
+      auth:
+        target: ${AUTH_GRPC_TARGET:localhost:19082}
   outbox:
     poll-interval-ms: 1000
+    max-retry-count: 10
+  kafka:
+    retry:
+      backoff-ms: 1000
+      max-attempts: 3
+  claim:
+    tenant-response-timeout-minutes: 60
+    timeout-poll-interval-ms: 60000

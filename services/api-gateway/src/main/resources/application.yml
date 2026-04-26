@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: api-gateway
+
+server:
+  port: ${API_GATEWAY_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  service-name: api-gateway
+  security:
+    jwt-secret: ${JWT_SECRET:lab3-demo-secret}
+  grpc:
+    clients:
+      auth:
+        target: ${AUTH_GRPC_TARGET:localhost:19082}
+      claim:
+        target: ${CLAIM_GRPC_TARGET:localhost:19081}
+      penalty:
+        target: ${PENALTY_GRPC_TARGET:localhost:19084}
+      audit:
+        target: ${AUDIT_GRPC_TARGET:localhost:19086}
+      storage:
+        target: ${STORAGE_GRPC_TARGET:localhost:19087}
