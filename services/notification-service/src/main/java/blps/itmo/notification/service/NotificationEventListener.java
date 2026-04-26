@@ -12,7 +12,7 @@ import blps.itmo.notification.domain.NotificationLog;
 import blps.itmo.notification.repository.NotificationLogRepository;
 import blps.itmo.platform.events.EventEnvelope;
 import blps.itmo.platform.events.TopicNames;
-import blps.itmo.platform.persistence.ProcessedMessageService;
+import blps.itmo.platform.outbox.ProcessedMessageService;
 
 @Component
 public class NotificationEventListener {

@@ -1,4 +1,4 @@
-package blps.itmo.platform.persistence;
+package blps.itmo.platform.outbox.domain;
 
 import java.util.List;
 
@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import blps.itmo.platform.events.EventType;
 
+// Совместимость с PostgreSQL ENUM типами.
 @Component
 @ConditionalOnBean(JdbcTemplate.class)
 public class PostgresEnumCompatibilityRunner implements ApplicationRunner {

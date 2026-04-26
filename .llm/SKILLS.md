@@ -56,9 +56,9 @@ Primary files:
 - [EventType.java](../lib/platform-core/src/main/java/blps/itmo/platform/events/EventType.java)
 - [TopicNames.java](../lib/platform-core/src/main/java/blps/itmo/platform/events/TopicNames.java)
 - [payload package](../lib/platform-core/src/main/java/blps/itmo/platform/events/payload)
-- [OutboxService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java)
-- [ProcessedMessageService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java)
-- [OutboxRelay.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java)
+- [OutboxService.java](../lib/platform-core/src/main/java/blps/itmo/platform/outbox/OutboxService.java)
+- [ProcessedMessageService.java](../lib/platform-core/src/main/java/blps/itmo/platform/outbox/ProcessedMessageService.java)
+- [OutboxRelay.java](../lib/platform-core/src/main/java/blps/itmo/platform/outbox/OutboxRelay.java)
 - [PlatformKafkaConfig.java](../lib/platform-core/src/main/java/blps/itmo/platform/kafka/PlatformKafkaConfig.java)
 
 Checklist:

@@ -1,8 +1,11 @@
-package blps.itmo.platform.persistence;
+package blps.itmo.platform.outbox;
 
 import java.time.Instant;
 import java.util.UUID;
 
+import blps.itmo.platform.outbox.domain.OutboxEvent;
+import blps.itmo.platform.outbox.domain.OutboxEventRepository;
+import blps.itmo.platform.outbox.domain.OutboxStatus;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +24,10 @@ public class OutboxService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Используется в любом методе сервиса в бд транзакции
+     * Записывает событие в outbox для последующей отправки в Kafka.
+     */
     public void record(EventType eventType,
             String aggregateType,
             Object aggregateId,

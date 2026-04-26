@@ -65,9 +65,9 @@ Distributed consistency is implemented with:
 
 Primary implementation files:
 
-- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java)
-- [platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java)
-- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java](../lib/platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java)
+- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxService.java](../lib/platform-core/src/main/java/blps/itmo/platform/outbox/OutboxService.java)
+- [platform-core/src/main/java/blps/itmo/platform/persistence/ProcessedMessageService.java](../lib/platform-core/src/main/java/blps/itmo/platform/outbox/ProcessedMessageService.java)
+- [platform-core/src/main/java/blps/itmo/platform/persistence/OutboxRelay.java](../lib/platform-core/src/main/java/blps/itmo/platform/outbox/OutboxRelay.java)
 - [platform-core/src/main/java/blps/itmo/platform/kafka/PlatformKafkaConfig.java](../lib/platform-core/src/main/java/blps/itmo/platform/kafka/PlatformKafkaConfig.java)
 - [platform-core/src/main/java/blps/itmo/platform/grpc/GrpcServerLifecycle.java](../lib/platform-core/src/main/java/blps/itmo/platform/grpc/GrpcServerLifecycle.java)
 - [platform-core/src/main/java/blps/itmo/platform/events/EventType.java](../lib/platform-core/src/main/java/blps/itmo/platform/events/EventType.java)

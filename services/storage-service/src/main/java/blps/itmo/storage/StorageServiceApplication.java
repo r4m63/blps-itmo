@@ -6,10 +6,10 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-import blps.itmo.platform.persistence.OutboxEvent;
-import blps.itmo.platform.persistence.OutboxEventRepository;
-import blps.itmo.platform.persistence.ProcessedMessage;
-import blps.itmo.platform.persistence.ProcessedMessageRepository;
+import blps.itmo.platform.outbox.domain.OutboxEvent;
+import blps.itmo.platform.outbox.domain.OutboxEventRepository;
+import blps.itmo.platform.outbox.domain.ProcessedMessage;
+import blps.itmo.platform.outbox.domain.ProcessedMessageRepository;
 import blps.itmo.storage.domain.Attachment;
 import blps.itmo.storage.repository.AttachmentRepository;
 

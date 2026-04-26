@@ -12,10 +12,10 @@ import blps.itmo.claim.domain.ClaimTimelineEntry;
 import blps.itmo.claim.repository.ClaimAttachmentRepository;
 import blps.itmo.claim.repository.ClaimRepository;
 import blps.itmo.claim.repository.ClaimTimelineRepository;
-import blps.itmo.platform.persistence.OutboxEvent;
-import blps.itmo.platform.persistence.OutboxEventRepository;
-import blps.itmo.platform.persistence.ProcessedMessage;
-import blps.itmo.platform.persistence.ProcessedMessageRepository;
+import blps.itmo.platform.outbox.domain.OutboxEvent;
+import blps.itmo.platform.outbox.domain.OutboxEventRepository;
+import blps.itmo.platform.outbox.domain.ProcessedMessage;
+import blps.itmo.platform.outbox.domain.ProcessedMessageRepository;
 
 @SpringBootApplication(scanBasePackages = {"blps.itmo.claim", "blps.itmo.platform"})
 @EnableScheduling

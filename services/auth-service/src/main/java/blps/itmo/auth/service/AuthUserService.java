@@ -18,8 +18,8 @@ import blps.itmo.platform.events.EventType;
 import blps.itmo.platform.events.RemoteUserView;
 import blps.itmo.platform.events.payload.PenaltyAppliedPayload;
 import blps.itmo.platform.events.payload.UserDeactivatedPayload;
-import blps.itmo.platform.persistence.OutboxService;
-import blps.itmo.platform.persistence.ProcessedMessageService;
+import blps.itmo.platform.outbox.OutboxService;
+import blps.itmo.platform.outbox.ProcessedMessageService;
 import blps.itmo.platform.security.DemoJwtService;
 
 @Service

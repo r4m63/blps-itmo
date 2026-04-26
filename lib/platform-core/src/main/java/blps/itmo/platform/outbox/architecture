@@ -1,0 +1,36 @@
+[Клиент]
+    │
+    ▼
+[API Gateway] (HTTP → gRPC)
+    │
+    ▼
+[Сервис А] (например, Claim Service)
+    │
+    ├─ 1. Начинает @Transactional
+    ├─ 2. Сохраняет данные в БД (claim)
+    ├─ 3. Вызывает outboxService.record(...) ← событие в БД (таблица outbox_events)
+    └─ 4. Завершает транзакцию
+           │
+           ▼
+    [БД: outbox_events] статус = NEW
+           │
+           ▼
+    ⏰ OutboxRelay (каждые 1 сек)
+           │
+           ├─ Читает NEW/FAILED события
+           ├─ Отправляет в Kafka
+           └─ Статус → PUBLISHED
+           │
+           ▼
+    [Kafka Topic] Claim Events
+           │
+           ├─────────────────────┬─────────────────────┐
+           ▼                     ▼                     ▼
+    [Сервис B]            [Сервис C]            [Сервис D]
+    (Notification)       (Penalty)             (Audit)
+           │                     │                     │
+    Проверяет processedMessageService.isProcessed()
+           │
+    Если нет:
+      - Выполняет бизнес-логику
+      - processedMessageService.markProcessed()

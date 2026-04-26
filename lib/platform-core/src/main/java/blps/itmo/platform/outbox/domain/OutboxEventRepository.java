@@ -1,4 +1,4 @@
-package blps.itmo.platform.persistence;
+package blps.itmo.platform.outbox.domain;
 
 import java.util.Collection;
 import java.util.List;

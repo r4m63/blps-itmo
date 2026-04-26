@@ -1,4 +1,4 @@
-package blps.itmo.platform.persistence;
+package blps.itmo.platform.outbox.domain;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

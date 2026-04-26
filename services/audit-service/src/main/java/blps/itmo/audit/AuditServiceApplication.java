@@ -8,10 +8,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 import blps.itmo.audit.domain.AuditRecord;
 import blps.itmo.audit.repository.AuditRecordRepository;
-import blps.itmo.platform.persistence.OutboxEvent;
-import blps.itmo.platform.persistence.OutboxEventRepository;
-import blps.itmo.platform.persistence.ProcessedMessage;
-import blps.itmo.platform.persistence.ProcessedMessageRepository;
+import blps.itmo.platform.outbox.domain.OutboxEvent;
+import blps.itmo.platform.outbox.domain.OutboxEventRepository;
+import blps.itmo.platform.outbox.domain.ProcessedMessage;
+import blps.itmo.platform.outbox.domain.ProcessedMessageRepository;
 
 @SpringBootApplication(scanBasePackages = {"blps.itmo.audit", "blps.itmo.platform"})
 @EnableScheduling

@@ -17,8 +17,8 @@ import blps.itmo.platform.events.payload.AdditionalInfoProvidedPayload;
 import blps.itmo.platform.events.payload.AssessmentCompletedPayload;
 import blps.itmo.platform.events.payload.AssessmentFailedPayload;
 import blps.itmo.platform.events.payload.ClaimCreatedPayload;
-import blps.itmo.platform.persistence.OutboxService;
-import blps.itmo.platform.persistence.ProcessedMessageService;
+import blps.itmo.platform.outbox.OutboxService;
+import blps.itmo.platform.outbox.ProcessedMessageService;
 
 @Service
 public class AssessmentWorkflowService {

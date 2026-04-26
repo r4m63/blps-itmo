@@ -15,8 +15,8 @@ import blps.itmo.platform.events.EventType;
 import blps.itmo.platform.events.payload.PenaltyApplicationFailedPayload;
 import blps.itmo.platform.events.payload.PenaltyApplicationRequestedPayload;
 import blps.itmo.platform.events.payload.PenaltyAppliedPayload;
-import blps.itmo.platform.persistence.OutboxService;
-import blps.itmo.platform.persistence.ProcessedMessageService;
+import blps.itmo.platform.outbox.OutboxService;
+import blps.itmo.platform.outbox.ProcessedMessageService;
 
 @Service
 public class PenaltyWorkflowService {
