@@ -1,10 +1,7 @@
-@gatewayBaseUrl = http://localhost:8080
-
 ### Scenario 31
 ### Penalty application fails, then operator retries the failed operation manually
 
 ### 31.1 Login as landlord, tenant, and admin
-# @name loginLandlord
 POST {{gatewayBaseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -12,8 +9,12 @@ Content-Type: application/json
   "userId": 2
 }
 
+> {%
+client.global.set("landlordToken", response.body.token);
+%}
+
 ###
-# @name loginTenant
+
 POST {{gatewayBaseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -21,8 +22,12 @@ Content-Type: application/json
   "userId": 4
 }
 
+> {%
+client.global.set("tenantToken", response.body.token);
+%}
+
 ###
-# @name loginAdmin
+
 POST {{gatewayBaseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -30,11 +35,14 @@ Content-Type: application/json
   "userId": 6
 }
 
+> {%
+client.global.set("adminToken", response.body.token);
+%}
+
 ### 31.2 Create claim with amount < 200 so async assessment skips additional-info
-# @name createClaim
 POST {{gatewayBaseUrl}}/api/claims
 Content-Type: application/json
-Authorization: Bearer {{loginLandlord.response.body.$.token}}
+Authorization: Bearer {{landlordToken}}
 
 {
   "tenantUserId": 4,
@@ -44,14 +52,18 @@ Authorization: Bearer {{loginLandlord.response.body.$.token}}
   "currency": "USD"
 }
 
+> {%
+client.global.set("claimId31", response.body.id);
+%}
+
 ### 31.3 Poll claim until status becomes AWAITING_TENANT_RESPONSE
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
-Authorization: Bearer {{loginLandlord.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId31}}
+Authorization: Bearer {{landlordToken}}
 
 ### 31.4 Tenant responds
-POST {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/tenant-response
+POST {{gatewayBaseUrl}}/api/claims/{{claimId31}}/tenant-response
 Content-Type: application/json
-Authorization: Bearer {{loginTenant.response.body.$.token}}
+Authorization: Bearer {{tenantToken}}
 
 {
   "agree": false,
@@ -59,9 +71,9 @@ Authorization: Bearer {{loginTenant.response.body.$.token}}
 }
 
 ### 31.5 Support decision requests penalty but simulates downstream failure
-POST {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/support-decision
+POST {{gatewayBaseUrl}}/api/claims/{{claimId31}}/support-decision
 Content-Type: application/json
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+Authorization: Bearer {{adminToken}}
 
 {
   "applyPenalty": true,
@@ -72,22 +84,25 @@ Authorization: Bearer {{loginAdmin.response.body.$.token}}
 }
 
 ### 31.6 Poll claim until status becomes PENALTY_PROCESSING_FAILED
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId31}}
+Authorization: Bearer {{adminToken}}
 
 ### 31.7 Inspect failed penalty operation
-# @name failedOps
-GET {{gatewayBaseUrl}}/api/penalties/claims/{{createClaim.response.body.$.id}}
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/penalties/claims/{{claimId31}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.global.set("failedOpId31", response.body[0].id);
+%}
 
 ### 31.8 Retry the latest failed operation manually
-POST {{gatewayBaseUrl}}/api/penalties/operations/{{failedOps.response.body.$[0].id}}/retry
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+POST {{gatewayBaseUrl}}/api/penalties/operations/{{failedOpId31}}/retry
+Authorization: Bearer {{adminToken}}
 
 ### 31.9 Poll claim until status becomes PENALTY_APPLIED
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId31}}
+Authorization: Bearer {{adminToken}}
 
 ### 31.10 Inspect audit trail
-GET {{gatewayBaseUrl}}/api/audit/claims/{{createClaim.response.body.$.id}}/events
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/audit/claims/{{claimId31}}/events
+Authorization: Bearer {{adminToken}}

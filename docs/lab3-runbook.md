@@ -60,6 +60,7 @@ Default ports:
 - `penalty-service gRPC`: `19084`
 - `audit-service gRPC`: `19086`
 - `storage-service gRPC`: `19087`
+- `notification-service gRPC`: `19085`
 - `zookeeper`: `${ZOOKEEPER_PORT}` by default `2181`
 - `kafka host port`: `${KAFKA_PORT}` by default `9092`
 - `kafka external port`: `${KAFKA_EXTERNAL_PORT}` by default `29092`

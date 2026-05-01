@@ -1,9 +1,14 @@
+networks:
+  blps-net:
+    driver: bridge
+
 services:
+  # ── Infrastructure ────────────────────────────────────────────────────────────
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.8
     restart: unless-stopped
-    ports:
-      - "${ZOOKEEPER_PORT}:2181"
+    networks: [blps-net]
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -11,17 +16,14 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.7.8
     restart: unless-stopped
-    depends_on:
-      - zookeeper
-    ports:
-      - "${KAFKA_PORT}:9092"
-      - "${KAFKA_EXTERNAL_PORT}:29092"
+    depends_on: [zookeeper]
+    networks: [blps-net]
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${KAFKA_EXTERNAL_PORT}
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -31,10 +33,10 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     restart: unless-stopped
-    depends_on:
-      - kafka
+    depends_on: [kafka]
+    networks: [blps-net]
     ports:
-      - "${KAFKA_UI_PORT}:8080"
+      - "${KAFKA_UI_PORT:-8088}:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: lab3
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
@@ -43,12 +45,13 @@ services:
   minio:
     image: minio/minio:latest
     restart: unless-stopped
+    networks: [blps-net]
     ports:
-      - "${MINIO_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     volumes:
       - miniodata:/data
     command: server /data --console-address ":9001"
@@ -56,93 +59,238 @@ services:
   postgres-auth:
     image: postgres:16
     restart: unless-stopped
-    ports:
-      - "${AUTH_DB_PORT}:5432"
+    networks: [blps-net]
     environment:
-      POSTGRES_DB: ${AUTH_DB_NAME}
-      POSTGRES_USER: ${AUTH_DB_USERNAME}
-      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+      POSTGRES_DB: ${AUTH_DB_NAME:-blps_auth}
+      POSTGRES_USER: ${AUTH_DB_USERNAME:-blps_auth_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-blps_auth_password}
     volumes:
       - pgdata_auth:/var/lib/postgresql/data
-      - ./sql/init_auth_service.sql:/docker-entrypoint-initdb.d/01-init-auth.sql:ro
+      - ./sql/init_auth_service.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
 
   postgres-claim:
     image: postgres:16
     restart: unless-stopped
-    ports:
-      - "${CLAIM_DB_PORT}:5432"
+    networks: [blps-net]
     environment:
-      POSTGRES_DB: ${CLAIM_DB_NAME}
-      POSTGRES_USER: ${CLAIM_DB_USERNAME}
-      POSTGRES_PASSWORD: ${CLAIM_DB_PASSWORD}
+      POSTGRES_DB: ${CLAIM_DB_NAME:-blps_claim}
+      POSTGRES_USER: ${CLAIM_DB_USERNAME:-blps_claim_user}
+      POSTGRES_PASSWORD: ${CLAIM_DB_PASSWORD:-blps_claim_password}
     volumes:
       - pgdata_claim:/var/lib/postgresql/data
-      - ./sql/init_claim_service.sql:/docker-entrypoint-initdb.d/01-init-claim.sql:ro
+      - ./sql/init_claim_service.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
 
   postgres-assessment:
     image: postgres:16
     restart: unless-stopped
-    ports:
-      - "${ASSESSMENT_DB_PORT}:5432"
+    networks: [blps-net]
     environment:
-      POSTGRES_DB: ${ASSESSMENT_DB_NAME}
-      POSTGRES_USER: ${ASSESSMENT_DB_USERNAME}
-      POSTGRES_PASSWORD: ${ASSESSMENT_DB_PASSWORD}
+      POSTGRES_DB: ${ASSESSMENT_DB_NAME:-blps_assessment}
+      POSTGRES_USER: ${ASSESSMENT_DB_USERNAME:-blps_assessment_user}
+      POSTGRES_PASSWORD: ${ASSESSMENT_DB_PASSWORD:-blps_assessment_password}
     volumes:
       - pgdata_assessment:/var/lib/postgresql/data
-      - ./sql/init_assessment_service.sql:/docker-entrypoint-initdb.d/01-init-assessment.sql:ro
+      - ./sql/init_assessment_service.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
 
   postgres-penalty:
     image: postgres:16
     restart: unless-stopped
-    ports:
-      - "${PENALTY_DB_PORT}:5432"
+    networks: [blps-net]
     environment:
-      POSTGRES_DB: ${PENALTY_DB_NAME}
-      POSTGRES_USER: ${PENALTY_DB_USERNAME}
-      POSTGRES_PASSWORD: ${PENALTY_DB_PASSWORD}
+      POSTGRES_DB: ${PENALTY_DB_NAME:-blps_penalty}
+      POSTGRES_USER: ${PENALTY_DB_USERNAME:-blps_penalty_user}
+      POSTGRES_PASSWORD: ${PENALTY_DB_PASSWORD:-blps_penalty_password}
     volumes:
       - pgdata_penalty:/var/lib/postgresql/data
-      - ./sql/init_penalty_service.sql:/docker-entrypoint-initdb.d/01-init-penalty.sql:ro
+      - ./sql/init_penalty_service.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
 
   postgres-notification:
     image: postgres:16
     restart: unless-stopped
-    ports:
-      - "${NOTIFICATION_DB_PORT}:5432"
+    networks: [blps-net]
     environment:
-      POSTGRES_DB: ${NOTIFICATION_DB_NAME}
-      POSTGRES_USER: ${NOTIFICATION_DB_USERNAME}
-      POSTGRES_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
+      POSTGRES_DB: ${NOTIFICATION_DB_NAME:-blps_notification}
+      POSTGRES_USER: ${NOTIFICATION_DB_USERNAME:-blps_notification_user}
+      POSTGRES_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-blps_notification_password}
     volumes:
       - pgdata_notification:/var/lib/postgresql/data
-      - ./sql/init_notification_service.sql:/docker-entrypoint-initdb.d/01-init-notification.sql:ro
+      - ./sql/init_notification_service.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
 
   postgres-audit:
     image: postgres:16
     restart: unless-stopped
-    ports:
-      - "${AUDIT_DB_PORT}:5432"
+    networks: [blps-net]
     environment:
-      POSTGRES_DB: ${AUDIT_DB_NAME}
-      POSTGRES_USER: ${AUDIT_DB_USERNAME}
-      POSTGRES_PASSWORD: ${AUDIT_DB_PASSWORD}
+      POSTGRES_DB: ${AUDIT_DB_NAME:-blps_audit}
+      POSTGRES_USER: ${AUDIT_DB_USERNAME:-blps_audit_user}
+      POSTGRES_PASSWORD: ${AUDIT_DB_PASSWORD:-blps_audit_password}
     volumes:
       - pgdata_audit:/var/lib/postgresql/data
-      - ./sql/init_audit_service.sql:/docker-entrypoint-initdb.d/01-init-audit.sql:ro
+      - ./sql/init_audit_service.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
 
   postgres-storage:
     image: postgres:16
     restart: unless-stopped
-    ports:
-      - "${STORAGE_DB_PORT}:5432"
+    networks: [blps-net]
     environment:
-      POSTGRES_DB: ${STORAGE_DB_NAME}
-      POSTGRES_USER: ${STORAGE_DB_USERNAME}
-      POSTGRES_PASSWORD: ${STORAGE_DB_PASSWORD}
+      POSTGRES_DB: ${STORAGE_DB_NAME:-blps_storage}
+      POSTGRES_USER: ${STORAGE_DB_USERNAME:-blps_storage_user}
+      POSTGRES_PASSWORD: ${STORAGE_DB_PASSWORD:-blps_storage_password}
     volumes:
       - pgdata_storage:/var/lib/postgresql/data
-      - ./sql/init_storage_service.sql:/docker-entrypoint-initdb.d/01-init-storage.sql:ro
+      - ./sql/init_storage_service.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+
+  # ── Microservices ─────────────────────────────────────────────────────────────
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    restart: unless-stopped
+    networks: [blps-net]
+    depends_on: [postgres-auth, kafka]
+    environment:
+      AUTH_DB_HOST: postgres-auth
+      AUTH_DB_PORT: 5432
+      AUTH_DB_NAME: ${AUTH_DB_NAME:-blps_auth}
+      AUTH_DB_USERNAME: ${AUTH_DB_USERNAME:-blps_auth_user}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-blps_auth_password}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-lab3-demo-secret}
+      AUTH_GRPC_PORT: 19082
+      AUTH_SERVICE_PORT: 8082
+
+  claim-service:
+    build:
+      context: .
+      dockerfile: services/claim-service/Dockerfile
+    restart: unless-stopped
+    networks: [blps-net]
+    depends_on: [postgres-claim, kafka, auth-service]
+    environment:
+      CLAIM_DB_HOST: postgres-claim
+      CLAIM_DB_PORT: 5432
+      CLAIM_DB_NAME: ${CLAIM_DB_NAME:-blps_claim}
+      CLAIM_DB_USERNAME: ${CLAIM_DB_USERNAME:-blps_claim_user}
+      CLAIM_DB_PASSWORD: ${CLAIM_DB_PASSWORD:-blps_claim_password}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-lab3-demo-secret}
+      CLAIM_GRPC_PORT: 19081
+      CLAIM_SERVICE_PORT: 8081
+      AUTH_GRPC_TARGET: auth-service:19082
+
+  assessment-service:
+    build:
+      context: .
+      dockerfile: services/assessment-service/Dockerfile
+    restart: unless-stopped
+    networks: [blps-net]
+    depends_on: [postgres-assessment, kafka]
+    environment:
+      ASSESSMENT_DB_HOST: postgres-assessment
+      ASSESSMENT_DB_PORT: 5432
+      ASSESSMENT_DB_NAME: ${ASSESSMENT_DB_NAME:-blps_assessment}
+      ASSESSMENT_DB_USERNAME: ${ASSESSMENT_DB_USERNAME:-blps_assessment_user}
+      ASSESSMENT_DB_PASSWORD: ${ASSESSMENT_DB_PASSWORD:-blps_assessment_password}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ASSESSMENT_SERVICE_PORT: 8083
+
+  penalty-service:
+    build:
+      context: .
+      dockerfile: services/penalty-service/Dockerfile
+    restart: unless-stopped
+    networks: [blps-net]
+    depends_on: [postgres-penalty, kafka]
+    environment:
+      PENALTY_DB_HOST: postgres-penalty
+      PENALTY_DB_PORT: 5432
+      PENALTY_DB_NAME: ${PENALTY_DB_NAME:-blps_penalty}
+      PENALTY_DB_USERNAME: ${PENALTY_DB_USERNAME:-blps_penalty_user}
+      PENALTY_DB_PASSWORD: ${PENALTY_DB_PASSWORD:-blps_penalty_password}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      PENALTY_GRPC_PORT: 19084
+      PENALTY_SERVICE_PORT: 8084
+
+  storage-service:
+    build:
+      context: .
+      dockerfile: services/storage-service/Dockerfile
+    restart: unless-stopped
+    networks: [blps-net]
+    depends_on: [postgres-storage, kafka, minio]
+    environment:
+      STORAGE_DB_HOST: postgres-storage
+      STORAGE_DB_PORT: 5432
+      STORAGE_DB_NAME: ${STORAGE_DB_NAME:-blps_storage}
+      STORAGE_DB_USERNAME: ${STORAGE_DB_USERNAME:-blps_storage_user}
+      STORAGE_DB_PASSWORD: ${STORAGE_DB_PASSWORD:-blps_storage_password}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      STORAGE_GRPC_PORT: 19087
+      STORAGE_SERVICE_PORT: 8087
+      STORAGE_BUCKET_NAME: ${STORAGE_BUCKET_NAME:-claim-attachments}
+      MINIO_PUBLIC_URL: http://minio:9000
+      STORAGE_VERIFY_MINIO_OBJECT: ${STORAGE_VERIFY_MINIO_OBJECT:-false}
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    restart: unless-stopped
+    networks: [blps-net]
+    depends_on: [postgres-notification, kafka]
+    environment:
+      NOTIFICATION_DB_HOST: postgres-notification
+      NOTIFICATION_DB_PORT: 5432
+      NOTIFICATION_DB_NAME: ${NOTIFICATION_DB_NAME:-blps_notification}
+      NOTIFICATION_DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-blps_notification_user}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-blps_notification_password}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      NOTIFICATION_GRPC_PORT: 19085
+      NOTIFICATION_SERVICE_PORT: 8085
+
+  audit-service:
+    build:
+      context: .
+      dockerfile: services/audit-service/Dockerfile
+    restart: unless-stopped
+    networks: [blps-net]
+    depends_on: [postgres-audit, kafka]
+    environment:
+      AUDIT_DB_HOST: postgres-audit
+      AUDIT_DB_PORT: 5432
+      AUDIT_DB_NAME: ${AUDIT_DB_NAME:-blps_audit}
+      AUDIT_DB_USERNAME: ${AUDIT_DB_USERNAME:-blps_audit_user}
+      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-blps_audit_password}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      AUDIT_GRPC_PORT: 19086
+      AUDIT_SERVICE_PORT: 8086
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    restart: unless-stopped
+    networks: [blps-net]
+    ports:
+      - "${API_GATEWAY_HOST_PORT:-18080}:8080"
+    depends_on:
+      - auth-service
+      - claim-service
+      - assessment-service
+      - penalty-service
+      - storage-service
+      - notification-service
+      - audit-service
+    environment:
+      API_GATEWAY_PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:-lab3-demo-secret}
+      AUTH_GRPC_TARGET: auth-service:19082
+      CLAIM_GRPC_TARGET: claim-service:19081
+      PENALTY_GRPC_TARGET: penalty-service:19084
+      AUDIT_GRPC_TARGET: audit-service:19086
+      STORAGE_GRPC_TARGET: storage-service:19087
+      NOTIFICATION_GRPC_TARGET: notification-service:19085
 
 volumes:
   pgdata_auth:

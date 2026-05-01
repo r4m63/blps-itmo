@@ -70,6 +70,9 @@ public class Claim {
     @Column(name = "resolution_note")
     private String resolutionNote;
 
+    @Column(name = "tenant_agreed")
+    private Boolean tenantAgreed;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 

@@ -10,6 +10,24 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
+/**
+ * ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ДЛЯ GATEWAY
+ *
+ * Транслирует gRPC ошибки в HTTP статусы, понятные REST клиентам.
+ *
+ * Маппинг gRPC статусов → HTTP статусы:
+ * ======================================
+ * gRPC статус              | HTTP статус           | Когда возникает
+ * -------------------------|-----------------------|-----------------
+ * INVALID_ARGUMENT         | 400 Bad Request       | Неверные параметры
+ * FAILED_PRECONDITION      | 409 Conflict          | Неправильное состояние (например, нельзя отменить уже завершенную заявку)
+ * NOT_FOUND                | 404 Not Found         | Ресурс не найден
+ * UNAVAILABLE              | 502 Bad Gateway       | Бекенд-сервис недоступен
+ * DEADLINE_EXCEEDED        | 502 Bad Gateway       | Таймаут при вызове
+ * INTERNAL                 | 500 Internal Error    | Внутренняя ошибка сервера
+ *
+ * Важно: клиент (браузер) получает человеко-понятный HTTP статус, а не gRPC специфичный код
+ */
 @RestControllerAdvice
 public class GatewayExceptionHandler {
 

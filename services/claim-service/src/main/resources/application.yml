@@ -40,3 +40,5 @@ app:
   claim:
     tenant-response-timeout-minutes: 60
     timeout-poll-interval-ms: 60000
+    support-review-timeout-minutes: 120
+    support-review-poll-interval-ms: 60000

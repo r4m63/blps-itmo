@@ -55,6 +55,10 @@ public class AssessmentJob {
     @Builder.Default
     private int attemptNo = 1;
 
+    @Column(name = "attachment_count", nullable = false)
+    @Builder.Default
+    private int attachmentCount = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AssessmentJobStatus status;

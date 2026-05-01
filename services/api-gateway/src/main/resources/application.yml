@@ -27,3 +27,5 @@ app:
         target: ${AUDIT_GRPC_TARGET:localhost:19086}
       storage:
         target: ${STORAGE_GRPC_TARGET:localhost:19087}
+      notification:
+        target: ${NOTIFICATION_GRPC_TARGET:localhost:19085}

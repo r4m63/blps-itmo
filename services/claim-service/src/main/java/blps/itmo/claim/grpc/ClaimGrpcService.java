@@ -17,6 +17,8 @@ import blps.itmo.grpc.ClaimTimelineEntryDto;
 import blps.itmo.grpc.ClaimTimelineResponse;
 import blps.itmo.grpc.CreateClaimRequest;
 import blps.itmo.grpc.GetClaimRequest;
+import blps.itmo.grpc.ListMyClaimsRequest;
+import blps.itmo.grpc.ListMyClaimsResponse;
 import blps.itmo.grpc.RepairClaimRequest;
 import blps.itmo.grpc.SupportDecisionRequest;
 import blps.itmo.grpc.TenantResponseRequest;
@@ -159,6 +161,20 @@ public class ClaimGrpcService extends ClaimRpcServiceGrpc.ClaimRpcServiceImplBas
         repair(request, responseObserver, false);
     }
 
+    @Override
+    public void listMyClaims(ListMyClaimsRequest request, StreamObserver<ListMyClaimsResponse> responseObserver) {
+        try {
+            ListMyClaimsResponse.Builder response = ListMyClaimsResponse.newBuilder();
+            claimProcessService.listMyClaims(actor(request.getActorUserId())).stream()
+                    .map(this::toDto)
+                    .forEach(response::addClaims);
+            responseObserver.onNext(response.build());
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            responseObserver.onError(GrpcErrors.toStatus(e));
+        }
+    }
+
     private void repair(RepairClaimRequest request, StreamObserver<ClaimDto> responseObserver, boolean reassess) {
         try {
             ClaimController.ClaimResponse response = reassess
@@ -193,7 +209,8 @@ public class ClaimGrpcService extends ClaimRpcServiceGrpc.ClaimRpcServiceImplBas
                 .setResolutionNote(GrpcMapping.text(claim.resolutionNote()))
                 .setCreatedAt(GrpcMapping.timestamp(claim.createdAt()))
                 .setUpdatedAt(GrpcMapping.timestamp(claim.updatedAt()))
-                .setClosedAt(GrpcMapping.timestamp(claim.closedAt()));
+                .setClosedAt(GrpcMapping.timestamp(claim.closedAt()))
+                .setTenantAgreedValue(claim.tenantAgreed() == null ? "" : claim.tenantAgreed().toString());
         claim.attachments().stream().map(this::toDto).forEach(builder::addAttachments);
         return builder.build();
     }

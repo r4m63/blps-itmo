@@ -52,6 +52,7 @@ public class AssessmentWorkflowService {
                 .tenantId(payload.getTenantId())
                 .claimedAmount(payload.getClaimedAmount())
                 .currency(payload.getCurrency())
+                .attachmentCount(payload.getAttachmentCount())
                 .status(AssessmentJobStatus.PENDING)
                 .createdAt(OffsetDateTime.now())
                 .build());
@@ -83,7 +84,9 @@ public class AssessmentWorkflowService {
             job.setStatus(AssessmentJobStatus.PROCESSING);
             assessmentJobRepository.save(job);
 
-            boolean requiresAdditionalInfo = job.getAttemptNo() == 1 && job.getClaimedAmount().compareTo(new BigDecimal("200")) >= 0;
+            boolean requiresAdditionalInfo = job.getAttemptNo() == 1
+                    && (job.getClaimedAmount().compareTo(new BigDecimal("200")) >= 0
+                        || job.getAttachmentCount() == 0);
             boolean penaltyGrounds = !requiresAdditionalInfo
                     && job.getClaimedAmount().compareTo(new BigDecimal("50")) >= 0;
             BigDecimal assessmentAmount = penaltyGrounds

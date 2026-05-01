@@ -30,6 +30,7 @@ management:
 
 app:
   service-name: auth-service
+  penalty-threshold: 3
   grpc:
     server:
       port: ${AUTH_GRPC_PORT:19082}

@@ -1,0 +1,200 @@
+### Scenario 34
+### Penalty threshold cascade: 3 penalties -> auto-deactivation -> open claims closed
+### Notes:
+### - penalty threshold is 3 (app.penalty-threshold=3)
+### - after 3 penalties the tenant is auto-deactivated
+### - claim-service reacts to USER_DEACTIVATED and closes open claims asynchronously
+### - uses tenant user id=4 (tenant2) who starts with penalty_count=0
+
+### 34.1 Login as landlord1, tenant2, and admin1
+POST {{gatewayBaseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+
+> {%
+client.global.set("landlordToken", response.body.token);
+%}
+
+###
+
+POST {{gatewayBaseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userId": 4
+}
+
+> {%
+client.global.set("tenantToken", response.body.token);
+%}
+
+###
+
+POST {{gatewayBaseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userId": 5
+}
+
+> {%
+client.global.set("adminToken", response.body.token);
+%}
+
+### 34.2 Check tenant2 penalty count (should be 0)
+GET {{gatewayBaseUrl}}/api/auth/users
+Authorization: Bearer {{adminToken}}
+
+### 34.3 Create claim 1
+POST {{gatewayBaseUrl}}/api/claims
+Content-Type: application/json
+Authorization: Bearer {{landlordToken}}
+
+{
+  "tenantUserId": 4,
+  "title": "Penalty cascade claim 1",
+  "description": "First claim to accumulate penalty for tenant2.",
+  "claimedAmount": 100.00,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claimId34a", response.body.id);
+%}
+
+### 34.4 Poll claim 1 until AWAITING_TENANT_RESPONSE
+GET {{gatewayBaseUrl}}/api/claims/{{claimId34a}}
+Authorization: Bearer {{landlordToken}}
+
+### 34.5 Tenant2 responds to claim 1
+POST {{gatewayBaseUrl}}/api/claims/{{claimId34a}}/tenant-response
+Content-Type: application/json
+Authorization: Bearer {{tenantToken}}
+
+{
+  "agree": true,
+  "comment": "I accept the penalty."
+}
+
+### 34.6 Admin applies penalty on claim 1 (tenant agreed so penaltyAmount defaults to assessmentAmount)
+POST {{gatewayBaseUrl}}/api/claims/{{claimId34a}}/support-decision
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "applyPenalty": true,
+  "note": "Penalty 1 of 3 for cascade demo"
+}
+
+### 34.7 Poll claim 1 until PENALTY_APPLIED
+GET {{gatewayBaseUrl}}/api/claims/{{claimId34a}}
+Authorization: Bearer {{landlordToken}}
+
+### 34.8 Check tenant2 penalty_count (should be 1)
+GET {{gatewayBaseUrl}}/api/auth/users
+Authorization: Bearer {{adminToken}}
+
+### 34.9 Create claim 2
+POST {{gatewayBaseUrl}}/api/claims
+Content-Type: application/json
+Authorization: Bearer {{landlordToken}}
+
+{
+  "tenantUserId": 4,
+  "title": "Penalty cascade claim 2",
+  "description": "Second claim to accumulate penalty for tenant2.",
+  "claimedAmount": 80.00,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claimId34b", response.body.id);
+%}
+
+### 34.10 Poll claim 2 until AWAITING_TENANT_RESPONSE
+GET {{gatewayBaseUrl}}/api/claims/{{claimId34b}}
+Authorization: Bearer {{landlordToken}}
+
+### 34.11 Tenant2 responds to claim 2
+POST {{gatewayBaseUrl}}/api/claims/{{claimId34b}}/tenant-response
+Content-Type: application/json
+Authorization: Bearer {{tenantToken}}
+
+{
+  "agree": true,
+  "comment": "Accepted again."
+}
+
+### 34.12 Admin applies penalty on claim 2
+POST {{gatewayBaseUrl}}/api/claims/{{claimId34b}}/support-decision
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "applyPenalty": true,
+  "note": "Penalty 2 of 3 for cascade demo"
+}
+
+### 34.13 Poll claim 2 until PENALTY_APPLIED
+GET {{gatewayBaseUrl}}/api/claims/{{claimId34b}}
+Authorization: Bearer {{landlordToken}}
+
+### 34.14 Check tenant2 penalty_count (should be 2)
+GET {{gatewayBaseUrl}}/api/auth/users
+Authorization: Bearer {{adminToken}}
+
+### 34.15 Create claim 3 (will trigger auto-deactivation after penalty applied)
+POST {{gatewayBaseUrl}}/api/claims
+Content-Type: application/json
+Authorization: Bearer {{landlordToken}}
+
+{
+  "tenantUserId": 4,
+  "title": "Penalty cascade claim 3",
+  "description": "Third claim - will trigger auto-deactivation of tenant2.",
+  "claimedAmount": 75.00,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claimId34c", response.body.id);
+%}
+
+### 34.16 Poll claim 3 until AWAITING_TENANT_RESPONSE
+GET {{gatewayBaseUrl}}/api/claims/{{claimId34c}}
+Authorization: Bearer {{landlordToken}}
+
+### 34.17 Tenant2 responds to claim 3
+POST {{gatewayBaseUrl}}/api/claims/{{claimId34c}}/tenant-response
+Content-Type: application/json
+Authorization: Bearer {{tenantToken}}
+
+{
+  "agree": true,
+  "comment": "Last response before deactivation."
+}
+
+### 34.18 Admin applies 3rd penalty - triggers auto-deactivation of tenant2
+POST {{gatewayBaseUrl}}/api/claims/{{claimId34c}}/support-decision
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "applyPenalty": true,
+  "note": "Penalty 3 of 3 - cascade trigger"
+}
+
+### 34.19 Poll claim 3 until PENALTY_APPLIED
+GET {{gatewayBaseUrl}}/api/claims/{{claimId34c}}
+Authorization: Bearer {{landlordToken}}
+
+### 34.20 Check tenant2 is now DISABLED and penalty_count=3
+GET {{gatewayBaseUrl}}/api/auth/users
+Authorization: Bearer {{adminToken}}
+
+### 34.21 Check audit trail for claim 3 to see full saga
+GET {{gatewayBaseUrl}}/api/audit/claims/{{claimId34c}}/events
+Authorization: Bearer {{adminToken}}

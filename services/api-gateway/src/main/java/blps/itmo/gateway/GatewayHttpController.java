@@ -22,6 +22,8 @@ import blps.itmo.grpc.GetClaimRequest;
 import blps.itmo.grpc.GetUserRequest;
 import blps.itmo.grpc.InitAttachmentRequest;
 import blps.itmo.grpc.ListAttachmentsRequest;
+import blps.itmo.grpc.ListMyClaimsRequest;
+import blps.itmo.grpc.ListMyNotificationsRequest;
 import blps.itmo.grpc.ListPenaltyOperationsRequest;
 import blps.itmo.grpc.LoginRequest;
 import blps.itmo.grpc.RepairClaimRequest;
@@ -31,6 +33,24 @@ import blps.itmo.grpc.TenantResponseRequest;
 import blps.itmo.platform.grpc.GrpcMapping;
 import jakarta.servlet.http.HttpServletRequest;
 
+/**
+ * ОСНОВНОЙ REST КОНТРОЛЛЕР GATEWAY
+ *
+ * Транслирует HTTP запросы клиентов в gRPC вызовы бекенд-сервисов.
+ *
+ * Паттерн работы:
+ * ===============
+ * 1. Получает HTTP запрос (JSON)
+ * 2. Извлекает userId из атрибутов фильтра (уже проверенный JWT)
+ * 3. Конвертирует HTTP DTO в gRPC Protobuf запрос
+ * 4. Вызывает gRPC метод бекенд-сервиса
+ * 5. Конвертирует gRPC Protobuf ответ в HTTP DTO (JSON)
+ * 6. Возвращает клиенту
+ *
+ * Важно: все вызовы бекендов — через gRPC, даже если кажется,
+ * что можно было бы вызвать через HTTP. Это сделано для единообразия
+ * и производительности (Protobuf быстрее JSON).
+ */
 @RestController
 @RequestMapping("/api")
 public class GatewayHttpController {
@@ -229,6 +249,29 @@ public class GatewayHttpController {
                 .toList();
     }
 
+    @GetMapping("/claims/my")
+    public List<ClaimHttpResponse> listMyClaims(HttpServletRequest servletRequest) {
+        return grpcClients.claim().listMyClaims(ListMyClaimsRequest.newBuilder()
+                        .setActorUserId(actorUserId(servletRequest))
+                        .build())
+                .getClaimsList()
+                .stream()
+                .map(this::toHttp)
+                .toList();
+    }
+
+    @GetMapping("/notifications/my")
+    public List<NotificationHttpResponse> listMyNotifications(HttpServletRequest servletRequest) {
+        return grpcClients.notification().listMyNotifications(ListMyNotificationsRequest.newBuilder()
+                        .setUserId(actorUserId(servletRequest))
+                        .setLimit(20)
+                        .build())
+                .getNotificationsList()
+                .stream()
+                .map(this::toHttp)
+                .toList();
+    }
+
     @GetMapping("/audit/claims/{claimId}/events")
     public List<AuditRecordHttpResponse> getClaimEvents(@PathVariable Long claimId) {
         return grpcClients.audit().getClaimEvents(GetClaimEventsRequest.newBuilder().setClaimId(claimId).build())
@@ -284,6 +327,7 @@ public class GatewayHttpController {
                 GrpcMapping.offsetDateTime(claim.getCreatedAt()),
                 GrpcMapping.offsetDateTime(claim.getUpdatedAt()),
                 GrpcMapping.offsetDateTime(claim.getClosedAt()),
+                claim.getTenantAgreedValue().isEmpty() ? null : Boolean.parseBoolean(claim.getTenantAgreedValue()),
                 claim.getAttachmentsList().stream().map(this::toHttp).toList());
     }
 
@@ -350,6 +394,19 @@ public class GatewayHttpController {
                 GrpcMapping.offsetDateTime(record.getCreatedAt()));
     }
 
+    private NotificationHttpResponse toHttp(blps.itmo.grpc.NotificationRecordDto n) {
+        return new NotificationHttpResponse(
+                n.getId(),
+                n.getEventType(),
+                n.getAggregateId(),
+                n.getRecipientUserId() == 0 ? null : n.getRecipientUserId(),
+                n.getChannel(),
+                n.getTemplateKey(),
+                n.getSubject().isBlank() ? null : n.getSubject(),
+                n.getMessage(),
+                GrpcMapping.offsetDateTime(n.getCreatedAt()));
+    }
+
     public record LoginHttpRequest(Long userId, String email) {
     }
 
@@ -408,6 +465,7 @@ public class GatewayHttpController {
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt,
             OffsetDateTime closedAt,
+            Boolean tenantAgreed,
             List<ClaimAttachmentHttpResponse> attachments) {
     }
 
@@ -477,6 +535,18 @@ public class GatewayHttpController {
             String correlationId,
             String sagaId,
             String payloadJson,
+            OffsetDateTime createdAt) {
+    }
+
+    public record NotificationHttpResponse(
+            Long id,
+            String eventType,
+            String aggregateId,
+            Long recipientUserId,
+            String channel,
+            String templateKey,
+            String subject,
+            String message,
             OffsetDateTime createdAt) {
     }
 }

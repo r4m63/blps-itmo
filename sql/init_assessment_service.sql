@@ -6,39 +6,6 @@ BEGIN;
 -- Intended for database: blps_assessment
 -- =====================================================================
 
-CREATE TYPE assessment_job_status AS ENUM (
-    'PENDING',
-    'PROCESSING',
-    'COMPLETED',
-    'FAILED'
-);
-
-CREATE TYPE outbox_event_type AS ENUM (
-    'CLAIM_CREATED',
-    'ADDITIONAL_INFO_PROVIDED',
-    'ASSESSMENT_COMPLETED',
-    'ASSESSMENT_FAILED',
-    'TENANT_RESPONSE_RECEIVED',
-    'TENANT_RESPONSE_EXPIRED',
-    'CLAIM_CLOSED_NO_PENALTY',
-    'PENALTY_APPLICATION_REQUESTED',
-    'PENALTY_APPLIED',
-    'PENALTY_APPLICATION_FAILED',
-    'USER_DEACTIVATED',
-    'ATTACHMENT_INITIALIZED',
-    'ATTACHMENT_CONFIRMED',
-    'ATTACHMENT_BINDING_REQUESTED',
-    'ATTACHMENT_BOUND',
-    'ATTACHMENT_BINDING_FAILED'
-);
-
-CREATE TYPE outbox_status AS ENUM (
-    'NEW',
-    'PUBLISHED',
-    'FAILED',
-    'DEAD'
-);
-
 CREATE TABLE assessment_jobs (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     claim_id BIGINT NOT NULL,
@@ -49,7 +16,8 @@ CREATE TABLE assessment_jobs (
     currency CHAR(3) NOT NULL,
     comment TEXT,
     attempt_no INT NOT NULL DEFAULT 1 CHECK (attempt_no >= 1),
-    status assessment_job_status NOT NULL,
+    attachment_count INT NOT NULL DEFAULT 0 CHECK (attachment_count >= 0),
+    status VARCHAR(20) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     processed_at TIMESTAMPTZ
 );
@@ -57,7 +25,7 @@ CREATE TABLE assessment_jobs (
 CREATE TABLE outbox_events (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     event_id TEXT NOT NULL UNIQUE,
-    event_type outbox_event_type NOT NULL,
+    event_type TEXT NOT NULL,
     topic_name TEXT NOT NULL,
     event_key TEXT NOT NULL,
     aggregate_type TEXT NOT NULL,
@@ -66,7 +34,7 @@ CREATE TABLE outbox_events (
     saga_id TEXT NOT NULL,
     actor_id BIGINT,
     payload_json TEXT NOT NULL,
-    status outbox_status NOT NULL DEFAULT 'NEW',
+    status VARCHAR(10) NOT NULL DEFAULT 'NEW',
     retry_count INT NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
     error_message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

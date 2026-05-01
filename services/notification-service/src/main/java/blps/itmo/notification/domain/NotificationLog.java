@@ -36,6 +36,18 @@ public class NotificationLog {
     @Column(name = "aggregate_id", nullable = false)
     private String aggregateId;
 
+    @Column(name = "recipient_user_id")
+    private Long recipientUserId;
+
+    @Column(name = "channel", nullable = false)
+    private String channel;
+
+    @Column(name = "template_key", nullable = false)
+    private String templateKey;
+
+    @Column(name = "subject")
+    private String subject;
+
     @Column(name = "message", nullable = false)
     private String message;
 

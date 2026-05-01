@@ -142,6 +142,7 @@ public class ClaimController {
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt,
             OffsetDateTime closedAt,
+            Boolean tenantAgreed,
             List<ClaimAttachmentResponse> attachments) {
     }
 

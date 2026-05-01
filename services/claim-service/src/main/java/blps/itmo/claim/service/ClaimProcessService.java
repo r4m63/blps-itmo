@@ -38,6 +38,7 @@ import blps.itmo.platform.events.payload.ClaimCreatedPayload;
 import blps.itmo.platform.events.payload.PenaltyApplicationFailedPayload;
 import blps.itmo.platform.events.payload.PenaltyApplicationRequestedPayload;
 import blps.itmo.platform.events.payload.PenaltyAppliedPayload;
+import blps.itmo.platform.events.payload.ClaimSupportReviewExpiredPayload;
 import blps.itmo.platform.events.payload.TenantResponsePayload;
 import blps.itmo.platform.events.payload.UserDeactivatedPayload;
 import blps.itmo.platform.outbox.OutboxService;
@@ -58,6 +59,7 @@ public class ClaimProcessService {
     private final OutboxService outboxService;
     private final ProcessedMessageService processedMessageService;
     private final long tenantResponseTimeoutMinutes;
+    private final long supportReviewTimeoutMinutes;
 
     public ClaimProcessService(ClaimRepository claimRepository,
             ClaimAttachmentRepository claimAttachmentRepository,
@@ -65,7 +67,8 @@ public class ClaimProcessService {
             AuthClient authClient,
             OutboxService outboxService,
             ProcessedMessageService processedMessageService,
-            @Value("${app.claim.tenant-response-timeout-minutes:60}") long tenantResponseTimeoutMinutes) {
+            @Value("${app.claim.tenant-response-timeout-minutes:60}") long tenantResponseTimeoutMinutes,
+            @Value("${app.claim.support-review-timeout-minutes:120}") long supportReviewTimeoutMinutes) {
         this.claimRepository = claimRepository;
         this.claimAttachmentRepository = claimAttachmentRepository;
         this.claimTimelineRepository = claimTimelineRepository;
@@ -73,6 +76,7 @@ public class ClaimProcessService {
         this.outboxService = outboxService;
         this.processedMessageService = processedMessageService;
         this.tenantResponseTimeoutMinutes = tenantResponseTimeoutMinutes;
+        this.supportReviewTimeoutMinutes = supportReviewTimeoutMinutes;
     }
 
     @Transactional
@@ -99,6 +103,7 @@ public class ClaimProcessService {
                 .build());
         addTimeline(claim.getId(), "CLAIM_CREATED", null, claim.getStatus(), landlordId,
                 "Claim submitted and queued for asynchronous assessment");
+        List<Long> attachmentIds = request.attachmentIds() == null ? List.of() : request.attachmentIds();
         outboxService.record(
                 EventType.CLAIM_CREATED,
                 "CLAIM",
@@ -114,8 +119,8 @@ public class ClaimProcessService {
                         .description(request.description())
                         .claimedAmount(request.claimedAmount())
                         .currency(request.currency())
+                        .attachmentCount(attachmentIds.size())
                         .build());
-        List<Long> attachmentIds = request.attachmentIds() == null ? List.of() : request.attachmentIds();
         if (!attachmentIds.isEmpty()) {
             for (Long attachmentId : attachmentIds) {
                 claimAttachmentRepository.save(ClaimAttachment.builder()
@@ -217,10 +222,11 @@ public class ClaimProcessService {
         }
         ClaimStatus from = claim.getStatus();
         claim.setStatus(ClaimStatus.SUPPORT_REVIEW);
+        claim.setTenantAgreed(request.agree());
         claim.setUpdatedAt(OffsetDateTime.now());
         claimRepository.save(claim);
         addTimeline(claim.getId(), "TENANT_RESPONSE_RECEIVED", from, claim.getStatus(), tenantId,
-                request.comment());
+                "Tenant " + (request.agree() ? "agreed" : "disagreed") + ". " + (request.comment() == null ? "" : request.comment()));
         outboxService.record(
                 EventType.TENANT_RESPONSE_RECEIVED,
                 "CLAIM",
@@ -245,15 +251,26 @@ public class ClaimProcessService {
         }
         Long adminId = actorOrBody(actorUserId, request.adminUserId(), "admin user");
         authClient.requireUser(adminId, "ADMIN");
+        if (request.applyPenalty() && Boolean.FALSE.equals(claim.getTenantAgreed())
+                && (request.note() == null || request.note().isBlank())) {
+            throw new IllegalArgumentException("Admin must provide a note when tenant disagreed and penalty is applied");
+        }
         ClaimStatus from = claim.getStatus();
         claim.setUpdatedAt(OffsetDateTime.now());
         claim.setResolutionNote(request.note());
         if (request.applyPenalty()) {
-            if (request.penaltyAmount() == null || request.penaltyAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            BigDecimal effectivePenaltyAmount = request.penaltyAmount();
+            if ((effectivePenaltyAmount == null || effectivePenaltyAmount.compareTo(BigDecimal.ZERO) <= 0)
+                    && Boolean.TRUE.equals(claim.getTenantAgreed())
+                    && claim.getAssessmentAmount() != null
+                    && claim.getAssessmentAmount().compareTo(BigDecimal.ZERO) > 0) {
+                effectivePenaltyAmount = claim.getAssessmentAmount();
+            }
+            if (effectivePenaltyAmount == null || effectivePenaltyAmount.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException("Positive penaltyAmount is required when applyPenalty=true");
             }
             claim.setStatus(ClaimStatus.PENALTY_PROCESSING);
-            claim.setPenaltyAmount(request.penaltyAmount());
+            claim.setPenaltyAmount(effectivePenaltyAmount);
             claim.setPenaltyCurrency(
                     request.penaltyCurrency() == null || request.penaltyCurrency().isBlank()
                             ? claim.getCurrency()
@@ -271,7 +288,7 @@ public class ClaimProcessService {
                     PenaltyApplicationRequestedPayload.builder()
                             .claimId(claim.getId())
                             .tenantId(claim.getTenantId())
-                            .penaltyAmount(request.penaltyAmount())
+                            .penaltyAmount(effectivePenaltyAmount)
                             .penaltyCurrency(request.penaltyCurrency())
                             .note(request.note())
                             .simulateFailure(request.simulateFailure())
@@ -506,6 +523,43 @@ public class ClaimProcessService {
         }
     }
 
+    @Scheduled(fixedDelayString = "${app.claim.support-review-poll-interval-ms:60000}")
+    @Transactional
+    public void expireSupportReviews() {
+        OffsetDateTime threshold = OffsetDateTime.now().minusMinutes(supportReviewTimeoutMinutes);
+        for (Claim claim : claimRepository.findByStatusAndUpdatedAtBefore(ClaimStatus.SUPPORT_REVIEW, threshold)) {
+            ClaimStatus from = claim.getStatus();
+            claim.setStatus(ClaimStatus.MANUAL_REVIEW_REQUIRED);
+            claim.setUpdatedAt(OffsetDateTime.now());
+            claim.setResolutionNote("Support review SLA expired; moved to manual review");
+            claimRepository.save(claim);
+            addTimeline(claim.getId(), EventType.CLAIM_SUPPORT_REVIEW_EXPIRED.name(), from, claim.getStatus(), null,
+                    claim.getResolutionNote());
+            outboxService.record(
+                    EventType.CLAIM_SUPPORT_REVIEW_EXPIRED,
+                    "CLAIM",
+                    claim.getId(),
+                    claim.getCorrelationId(),
+                    "claim-lifecycle-" + claim.getId(),
+                    null,
+                    ClaimSupportReviewExpiredPayload.builder()
+                            .claimId(claim.getId())
+                            .reason(claim.getResolutionNote())
+                            .build());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<ClaimResponse> listMyClaims(Long actorUserId) {
+        if (actorUserId == null) {
+            throw new IllegalArgumentException("Actor user id is required");
+        }
+        return claimRepository.findByLandlordIdOrTenantIdOrderByCreatedAtDesc(actorUserId, actorUserId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     private Claim requireClaim(Long id) {
         return claimRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Claim not found: " + id));
@@ -568,6 +622,7 @@ public class ClaimProcessService {
                 claim.getCreatedAt(),
                 claim.getUpdatedAt(),
                 claim.getClosedAt(),
+                claim.getTenantAgreed(),
                 attachmentResponses(claim.getId()));
     }
 }

@@ -24,6 +24,9 @@ server:
 
 app:
   service-name: notification-service
+  grpc:
+    server:
+      port: ${NOTIFICATION_GRPC_PORT:19085}
   outbox:
     poll-interval-ms: 1000
     max-retry-count: 10

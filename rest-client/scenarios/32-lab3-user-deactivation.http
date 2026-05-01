@@ -1,10 +1,7 @@
-@gatewayBaseUrl = http://localhost:8080
-
 ### Scenario 32
 ### User deactivation publishes an auth event and claim-service closes active claims asynchronously
 
 ### 32.1 Login as landlord and admin
-# @name loginLandlord
 POST {{gatewayBaseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -12,8 +9,12 @@ Content-Type: application/json
   "userId": 1
 }
 
+> {%
+client.global.set("landlordToken", response.body.token);
+%}
+
 ###
-# @name loginAdmin
+
 POST {{gatewayBaseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -21,11 +22,14 @@ Content-Type: application/json
   "userId": 5
 }
 
+> {%
+client.global.set("adminToken", response.body.token);
+%}
+
 ### 32.2 Create a claim
-# @name createClaim
 POST {{gatewayBaseUrl}}/api/claims
 Content-Type: application/json
-Authorization: Bearer {{loginLandlord.response.body.$.token}}
+Authorization: Bearer {{landlordToken}}
 
 {
   "tenantUserId": 3,
@@ -35,19 +39,23 @@ Authorization: Bearer {{loginLandlord.response.body.$.token}}
   "currency": "USD"
 }
 
+> {%
+client.global.set("claimId32", response.body.id);
+%}
+
 ### 32.3 Deactivate the tenant while the claim is still active
 POST {{gatewayBaseUrl}}/api/auth/users/3/deactivate
 Content-Type: application/json
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+Authorization: Bearer {{adminToken}}
 
 {
   "reason": "Manual operator deactivation for distributed transaction demo"
 }
 
 ### 32.4 Poll claim until status becomes CLOSED_NO_PENALTY
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId32}}
+Authorization: Bearer {{adminToken}}
 
 ### 32.5 Inspect timeline
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/timeline
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId32}}/timeline
+Authorization: Bearer {{adminToken}}

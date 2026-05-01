@@ -6,40 +6,6 @@ BEGIN;
 -- Intended for database: blps_storage
 -- =====================================================================
 
-CREATE TYPE attachment_status AS ENUM (
-    'INITIALIZED',
-    'CONFIRMED',
-    'BINDING_REQUESTED',
-    'BOUND',
-    'BINDING_FAILED'
-);
-
-CREATE TYPE outbox_event_type AS ENUM (
-    'CLAIM_CREATED',
-    'ADDITIONAL_INFO_PROVIDED',
-    'ASSESSMENT_COMPLETED',
-    'ASSESSMENT_FAILED',
-    'TENANT_RESPONSE_RECEIVED',
-    'TENANT_RESPONSE_EXPIRED',
-    'CLAIM_CLOSED_NO_PENALTY',
-    'PENALTY_APPLICATION_REQUESTED',
-    'PENALTY_APPLIED',
-    'PENALTY_APPLICATION_FAILED',
-    'USER_DEACTIVATED',
-    'ATTACHMENT_INITIALIZED',
-    'ATTACHMENT_CONFIRMED',
-    'ATTACHMENT_BINDING_REQUESTED',
-    'ATTACHMENT_BOUND',
-    'ATTACHMENT_BINDING_FAILED'
-);
-
-CREATE TYPE outbox_status AS ENUM (
-    'NEW',
-    'PUBLISHED',
-    'FAILED',
-    'DEAD'
-);
-
 CREATE TABLE attachments (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     owner_user_id BIGINT NOT NULL,
@@ -48,7 +14,7 @@ CREATE TABLE attachments (
     object_key TEXT NOT NULL UNIQUE,
     original_filename TEXT NOT NULL,
     content_type TEXT,
-    status attachment_status NOT NULL,
+    status VARCHAR(30) NOT NULL,
     failure_reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -57,7 +23,7 @@ CREATE TABLE attachments (
 CREATE TABLE outbox_events (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     event_id TEXT NOT NULL UNIQUE,
-    event_type outbox_event_type NOT NULL,
+    event_type TEXT NOT NULL,
     topic_name TEXT NOT NULL,
     event_key TEXT NOT NULL,
     aggregate_type TEXT NOT NULL,
@@ -66,7 +32,7 @@ CREATE TABLE outbox_events (
     saga_id TEXT NOT NULL,
     actor_id BIGINT,
     payload_json TEXT NOT NULL,
-    status outbox_status NOT NULL DEFAULT 'NEW',
+    status VARCHAR(10) NOT NULL DEFAULT 'NEW',
     retry_count INT NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
     error_message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -19,4 +19,5 @@ public class ClaimCreatedPayload {
     private String description;
     private BigDecimal claimedAmount;
     private String currency;
+    private int attachmentCount;
 }

@@ -1,6 +1,7 @@
 package blps.itmo.notification.service;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -22,13 +23,16 @@ public class NotificationEventListener {
     private final ObjectMapper objectMapper;
     private final NotificationLogRepository notificationLogRepository;
     private final ProcessedMessageService processedMessageService;
+    private final NotificationDispatcher dispatcher;
 
     public NotificationEventListener(ObjectMapper objectMapper,
             NotificationLogRepository notificationLogRepository,
-            ProcessedMessageService processedMessageService) {
+            ProcessedMessageService processedMessageService,
+            NotificationDispatcher dispatcher) {
         this.objectMapper = objectMapper;
         this.notificationLogRepository = notificationLogRepository;
         this.processedMessageService = processedMessageService;
+        this.dispatcher = dispatcher;
     }
 
     @KafkaListener(topics = {
@@ -44,14 +48,34 @@ public class NotificationEventListener {
         if (processedMessageService.isProcessed(envelope.getEventId(), CONSUMER_NAME)) {
             return;
         }
-        notificationLogRepository.save(NotificationLog.builder()
-                .eventId(envelope.getEventId())
-                .eventType(envelope.getEventType().name())
-                .aggregateId(envelope.getAggregateId())
-                .message("Notify stakeholders about " + envelope.getEventType().name()
-                        + " for aggregate " + envelope.getAggregateId())
-                .createdAt(OffsetDateTime.now())
-                .build());
+        List<NotificationDispatcher.NotificationIntent> intents = dispatcher.dispatch(envelope);
+        if (intents.isEmpty()) {
+            notificationLogRepository.save(NotificationLog.builder()
+                    .eventId(envelope.getEventId())
+                    .eventType(envelope.getEventType().name())
+                    .aggregateId(envelope.getAggregateId())
+                    .channel("IN_APP")
+                    .templateKey("generic")
+                    .message("Notify stakeholders about " + envelope.getEventType().name()
+                            + " for aggregate " + envelope.getAggregateId())
+                    .createdAt(OffsetDateTime.now())
+                    .build());
+        } else {
+            for (NotificationDispatcher.NotificationIntent intent : intents) {
+                notificationLogRepository.save(NotificationLog.builder()
+                        .eventId(envelope.getEventId())
+                        .eventType(envelope.getEventType().name())
+                        .aggregateId(envelope.getAggregateId())
+                        .recipientUserId(intent.recipientUserId() != null && intent.recipientUserId() > 0
+                                ? intent.recipientUserId() : null)
+                        .channel(intent.channel())
+                        .templateKey(intent.templateKey())
+                        .subject(intent.subject())
+                        .message(intent.message())
+                        .createdAt(OffsetDateTime.now())
+                        .build());
+            }
+        }
         processedMessageService.markProcessed(envelope.getEventId(), CONSUMER_NAME, envelope.getCorrelationId());
     }
 }

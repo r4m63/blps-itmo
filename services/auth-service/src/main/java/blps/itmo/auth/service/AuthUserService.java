@@ -32,18 +32,21 @@ public class AuthUserService {
     private final ProcessedMessageService processedMessageService;
     private final DemoJwtService jwtService;
     private final long jwtTtlSeconds;
+    private final int penaltyThreshold;
 
     public AuthUserService(UserRepository userRepository,
             OutboxService outboxService,
             ProcessedMessageService processedMessageService,
             ObjectMapper objectMapper,
             @Value("${app.security.jwt-secret:lab3-demo-secret}") String jwtSecret,
-            @Value("${app.security.jwt-ttl-seconds:86400}") long jwtTtlSeconds) {
+            @Value("${app.security.jwt-ttl-seconds:86400}") long jwtTtlSeconds,
+            @Value("${app.penalty-threshold:3}") int penaltyThreshold) {
         this.userRepository = userRepository;
         this.outboxService = outboxService;
         this.processedMessageService = processedMessageService;
         this.jwtService = new DemoJwtService(objectMapper, jwtSecret);
         this.jwtTtlSeconds = jwtTtlSeconds;
+        this.penaltyThreshold = penaltyThreshold;
     }
 
     @Transactional(readOnly = true)
@@ -118,6 +121,22 @@ public class AuthUserService {
         user.setPenaltyCount(user.getPenaltyCount() + 1);
         user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
+        if (user.getPenaltyCount() >= penaltyThreshold && user.isEnabled()) {
+            user.setEnabled(false);
+            user.setUpdatedAt(OffsetDateTime.now());
+            userRepository.save(user);
+            outboxService.record(
+                    EventType.USER_DEACTIVATED,
+                    "USER",
+                    user.getId(),
+                    "user-deactivation-" + user.getId(),
+                    "user-deactivation-" + user.getId(),
+                    user.getId(),
+                    UserDeactivatedPayload.builder()
+                            .userId(user.getId())
+                            .reason("Auto-deactivated after " + user.getPenaltyCount() + " penalties")
+                            .build());
+        }
         processedMessageService.markProcessed(envelope.getEventId(), PENALTY_CONSUMER, envelope.getCorrelationId());
     }
 

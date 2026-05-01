@@ -43,6 +43,7 @@ message ClaimDto {
   google.protobuf.Timestamp updated_at = 16;
   google.protobuf.Timestamp closed_at = 17;
   repeated AttachmentRefDto attachments = 18;
+  string tenant_agreed_value = 19;
 }
 
 message ClaimTimelineEntryDto {

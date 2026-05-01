@@ -1,13 +1,10 @@
-@gatewayBaseUrl = http://localhost:8080
-
 ### Scenario 30
 ### Async claim -> additional info -> tenant response -> penalty applied
 ### Notes:
 ### - assessment runs asynchronously in assessment-service
 ### - poll GET /api/claims/{id} after create and after additional-info
 
-### 30.1 Login as landlord, tenant, and admin through api-gateway
-# @name loginLandlord
+### 30.1 Login as landlord
 POST {{gatewayBaseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -15,8 +12,12 @@ Content-Type: application/json
   "userId": 1
 }
 
+> {%
+client.global.set("landlordToken", response.body.token);
+%}
+
 ###
-# @name loginTenant
+
 POST {{gatewayBaseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -24,8 +25,12 @@ Content-Type: application/json
   "userId": 3
 }
 
+> {%
+client.global.set("tenantToken", response.body.token);
+%}
+
 ###
-# @name loginAdmin
+
 POST {{gatewayBaseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -33,15 +38,18 @@ Content-Type: application/json
   "userId": 5
 }
 
+> {%
+client.global.set("adminToken", response.body.token);
+%}
+
 ### 30.2 List seeded users
 GET {{gatewayBaseUrl}}/api/auth/users
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+Authorization: Bearer {{adminToken}}
 
 ### 30.3 Create claim with amount >= 200 so first async assessment asks for additional info
-# @name createClaim
 POST {{gatewayBaseUrl}}/api/claims
 Content-Type: application/json
-Authorization: Bearer {{loginLandlord.response.body.$.token}}
+Authorization: Bearer {{landlordToken}}
 
 {
   "tenantUserId": 3,
@@ -51,27 +59,31 @@ Authorization: Bearer {{loginLandlord.response.body.$.token}}
   "currency": "USD"
 }
 
+> {%
+client.global.set("claimId30", response.body.id);
+%}
+
 ### 30.4 Poll claim until status becomes NEED_ADDITIONAL_INFO
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
-Authorization: Bearer {{loginLandlord.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId30}}
+Authorization: Bearer {{landlordToken}}
 
 ### 30.5 Send additional info and trigger reassessment
-POST {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/additional-info
+POST {{gatewayBaseUrl}}/api/claims/{{claimId30}}/additional-info
 Content-Type: application/json
-Authorization: Bearer {{loginLandlord.response.body.$.token}}
+Authorization: Bearer {{landlordToken}}
 
 {
   "comment": "Uploaded serial number and room overview separately; reassess please."
 }
 
 ### 30.6 Poll claim until status becomes AWAITING_TENANT_RESPONSE
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
-Authorization: Bearer {{loginLandlord.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId30}}
+Authorization: Bearer {{landlordToken}}
 
 ### 30.7 Tenant responds
-POST {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/tenant-response
+POST {{gatewayBaseUrl}}/api/claims/{{claimId30}}/tenant-response
 Content-Type: application/json
-Authorization: Bearer {{loginTenant.response.body.$.token}}
+Authorization: Bearer {{tenantToken}}
 
 {
   "agree": false,
@@ -79,9 +91,9 @@ Authorization: Bearer {{loginTenant.response.body.$.token}}
 }
 
 ### 30.8 Admin requests penalty application
-POST {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/support-decision
+POST {{gatewayBaseUrl}}/api/claims/{{claimId30}}/support-decision
 Content-Type: application/json
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+Authorization: Bearer {{adminToken}}
 
 {
   "applyPenalty": true,
@@ -92,17 +104,17 @@ Authorization: Bearer {{loginAdmin.response.body.$.token}}
 }
 
 ### 30.9 Poll claim until status becomes PENALTY_APPLIED
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}
-Authorization: Bearer {{loginLandlord.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId30}}
+Authorization: Bearer {{landlordToken}}
 
 ### 30.10 Inspect process status
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/process-status
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId30}}/process-status
+Authorization: Bearer {{adminToken}}
 
 ### 30.11 Inspect timeline
-GET {{gatewayBaseUrl}}/api/claims/{{createClaim.response.body.$.id}}/timeline
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/claims/{{claimId30}}/timeline
+Authorization: Bearer {{adminToken}}
 
 ### 30.12 Inspect audit trail
-GET {{gatewayBaseUrl}}/api/audit/claims/{{createClaim.response.body.$.id}}/events
-Authorization: Bearer {{loginAdmin.response.body.$.token}}
+GET {{gatewayBaseUrl}}/api/audit/claims/{{claimId30}}/events
+Authorization: Bearer {{adminToken}}

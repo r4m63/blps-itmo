@@ -6,32 +6,6 @@ BEGIN;
 -- Intended for database: blps_audit
 -- =====================================================================
 
-CREATE TYPE outbox_event_type AS ENUM (
-    'CLAIM_CREATED',
-    'ADDITIONAL_INFO_PROVIDED',
-    'ASSESSMENT_COMPLETED',
-    'ASSESSMENT_FAILED',
-    'TENANT_RESPONSE_RECEIVED',
-    'TENANT_RESPONSE_EXPIRED',
-    'CLAIM_CLOSED_NO_PENALTY',
-    'PENALTY_APPLICATION_REQUESTED',
-    'PENALTY_APPLIED',
-    'PENALTY_APPLICATION_FAILED',
-    'USER_DEACTIVATED',
-    'ATTACHMENT_INITIALIZED',
-    'ATTACHMENT_CONFIRMED',
-    'ATTACHMENT_BINDING_REQUESTED',
-    'ATTACHMENT_BOUND',
-    'ATTACHMENT_BINDING_FAILED'
-);
-
-CREATE TYPE outbox_status AS ENUM (
-    'NEW',
-    'PUBLISHED',
-    'FAILED',
-    'DEAD'
-);
-
 CREATE TABLE audit_records (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     event_id TEXT NOT NULL,
@@ -47,7 +21,7 @@ CREATE TABLE audit_records (
 CREATE TABLE outbox_events (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     event_id TEXT NOT NULL UNIQUE,
-    event_type outbox_event_type NOT NULL,
+    event_type TEXT NOT NULL,
     topic_name TEXT NOT NULL,
     event_key TEXT NOT NULL,
     aggregate_type TEXT NOT NULL,
@@ -56,7 +30,7 @@ CREATE TABLE outbox_events (
     saga_id TEXT NOT NULL,
     actor_id BIGINT,
     payload_json TEXT NOT NULL,
-    status outbox_status NOT NULL DEFAULT 'NEW',
+    status VARCHAR(10) NOT NULL DEFAULT 'NEW',
     retry_count INT NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
     error_message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

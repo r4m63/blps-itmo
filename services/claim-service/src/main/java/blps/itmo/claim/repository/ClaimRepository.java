@@ -11,6 +11,8 @@ import blps.itmo.claim.domain.ClaimStatus;
 public interface ClaimRepository extends JpaRepository<Claim, Long> {
     List<Claim> findByLandlordIdOrTenantId(Long landlordId, Long tenantId);
 
+    List<Claim> findByLandlordIdOrTenantIdOrderByCreatedAtDesc(Long landlordId, Long tenantId);
+
     List<Claim> findByStatusNotIn(List<ClaimStatus> statuses);
 
     List<Claim> findByStatusAndUpdatedAtBefore(ClaimStatus status, OffsetDateTime updatedAt);

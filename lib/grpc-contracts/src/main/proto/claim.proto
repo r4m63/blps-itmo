@@ -18,6 +18,7 @@ service ClaimRpcService {
   rpc SupportDecision(SupportDecisionRequest) returns (ClaimDto);
   rpc RepairReassess(RepairClaimRequest) returns (ClaimDto);
   rpc RepairClose(RepairClaimRequest) returns (ClaimDto);
+  rpc ListMyClaims(ListMyClaimsRequest) returns (ListMyClaimsResponse);
 }
 
 message CreateClaimRequest {
@@ -65,6 +66,14 @@ message RepairClaimRequest {
   int64 claim_id = 1;
   int64 actor_user_id = 2;
   string note = 3;
+}
+
+message ListMyClaimsRequest {
+  int64 actor_user_id = 1;
+}
+
+message ListMyClaimsResponse {
+  repeated ClaimDto claims = 1;
 }
 
 message ClaimTimelineResponse {

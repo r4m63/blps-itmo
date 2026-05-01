@@ -1,0 +1,313 @@
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              EXTERNAL CLIENTS                                        │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                            │
+│  │ Браузер  │  │ Мобильное│  │   curl   │  │ Postman  │                            │
+│  │          │  │ приложение│  │          │  │          │                            │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘                            │
+│       │             │             │             │                                   │
+│       └─────────────┴─────────────┴─────────────┘                                   │
+│                                    │                                                 │
+│                              HTTP/JSON                                              │
+│                              (REST API)                                             │
+└────────────────────────────────────┼────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           API GATEWAY (port 8080)                                    │
+│                                                                                      │
+│  ┌────────────────────────────────────────────────────────────────────────────┐    │
+│  │                        1. HTTP FILTERS                                      │    │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │                    GatewayAuthFilter                                 │   │    │
+│  │  │  • Извлекает/генерирует Correlation ID                              │   │    │
+│  │  │  • Проверяет публичные эндпоинты (/login, /health)                 │   │    │
+│  │  │  • Валидирует JWT (подпись, срок)                                   │   │    │
+│  │  │  • Кладет userId/role в request attributes                         │   │    │
+│  │  │  • Reject при невалидном/отсутствующем токене                       │   │    │
+│  │  └─────────────────────────────────────────────────────────────────────┘   │    │
+│  └────────────────────────────────────────────────────────────────────────────┘    │
+│                                         │                                           │
+│                                         ▼                                           │
+│  ┌────────────────────────────────────────────────────────────────────────────┐    │
+│  │                        2. REST CONTROLLER                                   │    │
+│  │                    (GatewayHttpController)                                  │    │
+│  │                                                                             │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │    │
+│  │  │ /api/auth/*  │  │ /api/claims/*│  │/api/penalties│  │/api/attachments│   │    │
+│  │  │              │  │              │  │      /*      │  │      /*        │   │    │
+│  │  │ • login      │  │ • create     │  │ • list       │  │ • init        │   │    │
+│  │  │ • listUsers  │  │ • get        │  │ • retry      │  │ • confirm     │   │    │
+│  │  │ • deactivate │  │ • timeline   │  │              │  │ • get         │   │    │
+│  │  │              │  │ • attachments│  │              │  │ • list        │   │    │
+│  │  │              │  │ • status     │  │              │  │               │   │    │
+│  │  │              │  │ • additional │  │              │  │               │   │    │
+│  │  │              │  │ • tenantResp │  │              │  │               │   │    │
+│  │  │              │  │ • supportDec │  │              │  │               │   │    │
+│  │  │              │  │ • repair*    │  │              │  │               │   │    │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │    │
+│  │                                                                             │    │
+│  │  /api/audit/* → getClaimEvents                                             │    │
+│  └────────────────────────────────────────────────────────────────────────────┘    │
+│                                         │                                           │
+│                                         ▼                                           │
+│  ┌────────────────────────────────────────────────────────────────────────────┐    │
+│  │                    3. GRPC CLIENT FACTORY                                   │    │
+│  │                     (GatewayGrpcClients)                                    │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │  Преобразование: HTTP DTO (JSON) → gRPC Request (Protobuf)          │   │    │
+│  │  │  • GrpcMapping.money()      BigDecimal ↔ string                     │   │    │
+│  │  │  • GrpcMapping.timestamp()  OffsetDateTime ↔ Timestamp              │   │    │
+│  │  │  • actorUserId()            из JWT → gRPC поле                      │   │    │
+│  │  └─────────────────────────────────────────────────────────────────────┘   │    │
+│  └────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+│  ┌────────────────────────────────────────────────────────────────────────────┐    │
+│  │                   4. GLOBAL ERROR HANDLER                                   │    │
+│  │                 (GatewayExceptionHandler)                                   │    │
+│  │                                                                             │    │
+│  │  gRPC Status              →  HTTP Status                                   │    │
+│  │  ─────────────────────────────────────────                                 │    │
+│  │  INVALID_ARGUMENT         →  400 Bad Request                               │    │
+│  │  FAILED_PRECONDITION      →  409 Conflict                                  │    │
+│  │  NOT_FOUND                →  404 Not Found                                 │    │
+│  │  UNAVAILABLE              →  502 Bad Gateway                               │    │
+│  │  DEADLINE_EXCEEDED        →  502 Bad Gateway                               │    │
+│  │  INTERNAL                 →  500 Internal Error                            │    │
+│  └────────────────────────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────┼──────────────────────────────────────────────┘
+                                       │
+                              gRPC (Protobuf)
+                                       │
+         ┌─────────────────────────────┼─────────────────────────────┐
+         │                             │                             │
+         ▼                             ▼                             ▼
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│   AUTH SERVICE  │         │  CLAIM SERVICE  │         │ PENALTY SERVICE │
+│   (port 19082)  │         │   (port 19081)  │         │   (port 19084)  │
+│                 │         │                 │         │                 │
+│ • login         │         │ • createClaim   │         │ • listOperations│
+│ • listUsers     │         │ • getClaim      │         │ • retryOperation│
+│ • deactivateUser│         │ • getTimeline   │         │                 │
+└─────────────────┘         └─────────────────┘         └─────────────────┘
+
+         ┌─────────────────┐         ┌─────────────────┐
+         │ STORAGE SERVICE │         │  AUDIT SERVICE  │
+         │  (port 19087)   │         │   (port 19086)  │
+         │                 │         │                 │
+         │ • initAttachment│         │ • getClaimEvents│
+         │ • confirmAttach │         │                 │
+         │ • getAttachment │         │                 │
+         │ • listAttach    │         │                 │
+         └─────────────────┘         └─────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Клиент                Gateway                    Claim Service              Kafka
+   │                      │                            │                      │
+   │  POST /api/claims    │                            │                      │
+   │  Authorization: JWT  │                            │                      │
+   │  Body: JSON          │                            │                      │
+   │─────────────────────>│                            │                      │
+   │                      │                            │                      │
+   │                      │  1. GatewayAuthFilter      │                      │
+   │                      │     • Проверяет JWT        │                      │
+   │                      │     • Извлекает userId=123 │                      │
+   │                      │                            │                      │
+   │                      │  2. Controller             │                      │
+   │                      │     • JSON → gRPC Request  │                      │
+   │                      │     • Добавляет actorId    │                      │
+   │                      │                            │                      │
+   │                      │  3. gRPC Call              │                      │
+   │                      │  CreateClaimRequest        │                      │
+   │                      │────────────────────────────>│                      │
+   │                      │                            │                      │
+   │                      │                            │  4. Бизнес-логика   │
+   │                      │                            │     • Сохраняет в БД │
+   │                      │                            │     • OutboxService  │
+   │                      │                            │                      │
+   │                      │  5. gRPC Response          │  5a. Kafka Event     │
+   │                      │  ClaimDto                  │  (асинхронно)        │
+   │                      │<────────────────────────────│─────────────────────>│
+   │                      │                            │                      │
+   │  6. HTTP Response    │                            │                      │
+   │  JSON (ClaimDto)     │                            │                      │
+   │<─────────────────────│                            │                      │
+   │                      │                            │                      │
+
+
+
+
+
+
+
+
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         TRANSLATION LAYER (GatewayExceptionHandler)             │
+│                                                                                  │
+│  gRPC Error                          HTTP Response                               │
+│  ─────────────────────────────────────────────────────────────────────────────  │
+│                                                                                  │
+│  StatusRuntimeException              {                                           │
+│    status = INVALID_ARGUMENT    →      "error": "User id must be positive"      │
+│    description = "User id            }                                           │
+│    must be positive"                  Status: 400 BAD REQUEST                    │
+│                                                                                  │
+│  ─────────────────────────────────────────────────────────────────────────────  │
+│                                                                                  │
+│  StatusRuntimeException              {                                           │
+│    status = NOT_FOUND           →      "error": "Claim 123 not found"           │
+│    description = "Claim              }                                           │
+│    123 not found"                     Status: 404 NOT FOUND                      │
+│                                                                                  │
+│  ─────────────────────────────────────────────────────────────────────────────  │
+│                                                                                  │
+│  StatusRuntimeException              {                                           │
+│    status = FAILED_PRECONDITION →      "error": "Cannot close already closed    │
+│    description = "Cannot close          claim"                                  │
+│    already closed claim"              }                                           │
+│                                      Status: 409 CONFLICT                        │
+│                                                                                  │
+│  ─────────────────────────────────────────────────────────────────────────────  │
+│                                                                                  │
+│  StatusRuntimeException              {                                           │
+│    status = UNAVAILABLE         →      "error": "claim-service:8081             │
+│    description = "connection           connection refused"                      │
+│    refused"                           }                                           │
+│                                      Status: 502 BAD GATEWAY                     │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           GATEWAY ARCHITECTURE                                   │
+│                                                                                  │
+│  ┌─────────────────┐                                                            │
+│  │  Main App       │  ApiGatewayApplication                                     │
+│  │  (exclude DB)   │  • Отключает DataSource (нет своей БД)                     │
+│  └────────┬────────┘                                                            │
+│           │                                                                      │
+│           ▼                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                         SECURITY LAYER                                   │   │
+│  │  ┌──────────────────────────────────────────────────────────────────┐   │   │
+│  │  │ GatewayAuthFilter                                                │   │   │
+│  │  │ • JWT validation (DemoJwtService)                                │   │   │
+│  │  │ • Correlation ID propagation                                     │   │   │
+│  │  │ • User context (userId, role)                                    │   │   │
+│  │  └──────────────────────────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                          │
+│                                      ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                          CONTROLLER LAYER                                │   │
+│  │  ┌────────────┬────────────┬────────────┬────────────┬────────────┐    │   │
+│  │  │ Auth       │ Claim      │ Penalty    │ Storage    │ Audit      │    │   │
+│  │  │ Endpoints  │ Endpoints  │ Endpoints  │ Endpoints  │ Endpoints  │    │   │
+│  │  └────────────┴────────────┴────────────┴────────────┴────────────┘    │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                          │
+│                                      ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                          GRPC CLIENT LAYER                               │   │
+│  │  ┌─────────────────────────────────────────────────────────────────┐    │   │
+│  │  │ GatewayGrpcClients                                              │    │   │
+│  │  │ • auth() → AuthRpcServiceGrpc.AuthRpcServiceBlockingStub        │    │   │
+│  │  │ • claim() → ClaimRpcServiceGrpc.ClaimRpcServiceBlockingStub     │    │   │
+│  │  │ • penalty() → PenaltyRpcServiceGrpc.PenaltyRpcServiceBlockingStub│   │   │
+│  │  │ • storage() → StorageRpcServiceGrpc.StorageRpcServiceBlockingStub│   │   │
+│  │  │ • audit() → AuditRpcServiceGrpc.AuditRpcServiceBlockingStub     │    │   │
+│  │  └─────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                          │   │
+│  │  Managed Channels (keep-alive соединения):                              │   │
+│  │  • authChannel      → localhost:19082                                   │   │
+│  │  • claimChannel     → localhost:19081                                   │   │
+│  │  • penaltyChannel   → localhost:19084                                   │   │
+│  │  • storageChannel   → localhost:19087                                   │   │
+│  │  • auditChannel     → localhost:19086                                   │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                          ERROR HANDLING LAYER                            │   │
+│  │  GatewayExceptionHandler: gRPC Status → HTTP Status Code                │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              JWT FLOW                                             │
+│                                                                                  │
+│  [Клиент]                              [Gateway]                    [Auth]       │
+│     │                                      │                          │          │
+│     │  POST /login                        │                          │          │
+│     │  {email, userId?}                   │                          │          │
+│     │─────────────────────────────────────>│                          │          │
+│     │                                      │  LoginRequest           │          │
+│     │                                      │─────────────────────────>│          │
+│     │                                      │                          │          │
+│     │                                      │  LoginResponse {token}   │          │
+│     │                                      │<─────────────────────────│          │
+│     │                                      │                          │          │
+│     │  {token: "eyJhbGc..."}              │                          │          │
+│     │<─────────────────────────────────────│                          │          │
+│     │                                      │                          │          │
+│  ─────────────────────────────────────────────────────────────────────────────  │
+│                                                                                  │
+│  [Клиент]                              [Gateway]                    [Claim]     │
+│     │                                      │                          │          │
+│     │  POST /claims                        │                          │          │
+│     │  Authorization: Bearer <JWT>         │                          │          │
+│     │─────────────────────────────────────>│                          │          │
+│     │                                      │                          │          │
+│     │                                      │  GatewayAuthFilter       │          │
+│     │                                      │  • jwtService.validate() │          │
+│     │                                      │  • Извлекает userId=123  │          │
+│     │                                      │  • Кладет в attributes   │          │
+│     │                                      │                          │          │
+│     │                                      │  gRPC: actorUserId=123   │          │
+│     │                                      │─────────────────────────>│          │
+│     │                                      │                          │          │
+│     │                                      │  gRPC: ClaimDto          │          │
+│     │                                      │<─────────────────────────│          │
+│     │                                      │                          │          │
+│     │  HTTP 200 ClaimDto                   │                          │          │
+│     │<─────────────────────────────────────│                          │          │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
