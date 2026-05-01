@@ -16,6 +16,7 @@ app:
   security:
     jwt-secret: ${JWT_SECRET:lab3-demo-secret}
   grpc:
+    deadline-seconds: ${GRPC_DEADLINE_SECONDS:5}
     clients:
       auth:
         target: ${AUTH_GRPC_TARGET:localhost:19082}

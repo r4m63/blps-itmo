@@ -13,13 +13,14 @@
                                      │
                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                           API GATEWAY (port 8080)                                    │
+│                           API GATEWAY (host port 18080)                              │
 │                                                                                      │
 │  ┌────────────────────────────────────────────────────────────────────────────┐    │
 │  │                        1. HTTP FILTERS                                      │    │
 │  │  ┌─────────────────────────────────────────────────────────────────────┐   │    │
 │  │  │                    GatewayAuthFilter                                 │   │    │
 │  │  │  • Извлекает/генерирует Correlation ID                              │   │    │
+│  │  │  • Пробрасывает Correlation ID в gRPC metadata                      │   │    │
 │  │  │  • Проверяет публичные эндпоинты (/login, /health)                 │   │    │
 │  │  │  • Валидирует JWT (подпись, срок)                                   │   │    │
 │  │  │  • Кладет userId/role в request attributes                         │   │    │
@@ -47,6 +48,7 @@
 │  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │    │
 │  │                                                                             │    │
 │  │  /api/audit/* → getClaimEvents                                             │    │
+│  │  /api/notifications/* → listMyNotifications                                │    │
 │  └────────────────────────────────────────────────────────────────────────────┘    │
 │                                         │                                           │
 │                                         ▼                                           │
@@ -59,6 +61,7 @@
 │  │  │  • GrpcMapping.money()      BigDecimal ↔ string                     │   │    │
 │  │  │  • GrpcMapping.timestamp()  OffsetDateTime ↔ Timestamp              │   │    │
 │  │  │  • actorUserId()            из JWT → gRPC поле                      │   │    │
+│  │  │  • x-correlation-id         HTTP header → gRPC metadata             │   │    │
 │  │  └─────────────────────────────────────────────────────────────────────┘   │    │
 │  └────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                      │
@@ -91,15 +94,15 @@
 │ • deactivateUser│         │ • getTimeline   │         │                 │
 └─────────────────┘         └─────────────────┘         └─────────────────┘
 
-         ┌─────────────────┐         ┌─────────────────┐
-         │ STORAGE SERVICE │         │  AUDIT SERVICE  │
-         │  (port 19087)   │         │   (port 19086)  │
-         │                 │         │                 │
-         │ • initAttachment│         │ • getClaimEvents│
-         │ • confirmAttach │         │                 │
-         │ • getAttachment │         │                 │
-         │ • listAttach    │         │                 │
-         └─────────────────┘         └─────────────────┘
+         ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+         │ STORAGE SERVICE │         │  AUDIT SERVICE  │         │ NOTIFICATION    │
+         │  (port 19087)   │         │   (port 19086)  │         │ SERVICE (19085) │
+         │                 │         │                 │         │                 │
+         │ • initAttachment│         │ • getClaimEvents│         │ • listMy        │
+         │ • confirmAttach │         │                 │         │   Notifications │
+         │ • getAttachment │         │                 │         │                 │
+         │ • listAttach    │         │                 │         │                 │
+         └─────────────────┘         └─────────────────┘         └─────────────────┘
 
 
 
@@ -218,7 +221,7 @@
 │  │  ┌──────────────────────────────────────────────────────────────────┐   │   │
 │  │  │ GatewayAuthFilter                                                │   │   │
 │  │  │ • JWT validation (DemoJwtService)                                │   │   │
-│  │  │ • Correlation ID propagation                                     │   │   │
+│  │  │ • Correlation ID propagation via gRPC metadata                   │   │   │
 │  │  │ • User context (userId, role)                                    │   │   │
 │  │  └──────────────────────────────────────────────────────────────────┘   │   │
 │  └─────────────────────────────────────────────────────────────────────────┘   │
@@ -242,6 +245,7 @@
 │  │  │ • penalty() → PenaltyRpcServiceGrpc.PenaltyRpcServiceBlockingStub│   │   │
 │  │  │ • storage() → StorageRpcServiceGrpc.StorageRpcServiceBlockingStub│   │   │
 │  │  │ • audit() → AuditRpcServiceGrpc.AuditRpcServiceBlockingStub     │    │   │
+│  │  │ • notification() → NotificationRpcServiceGrpc.BlockingStub      │    │   │
 │  │  └─────────────────────────────────────────────────────────────────┘    │   │
 │  │                                                                          │   │
 │  │  Managed Channels (keep-alive соединения):                              │   │
@@ -250,6 +254,7 @@
 │  │  • penaltyChannel   → localhost:19084                                   │   │
 │  │  • storageChannel   → localhost:19087                                   │   │
 │  │  • auditChannel     → localhost:19086                                   │   │
+│  │  • notificationChannel → localhost:19085                                │   │
 │  └─────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                  │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │

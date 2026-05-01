@@ -1,9 +1,11 @@
-package blps.itmo.gateway;
+package blps.itmo.gateway.infrastructure.exception;
 
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -49,5 +51,22 @@ public class GatewayExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException exception) {
         return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException exception) {
+        List<Map<String, String>> fields = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> Map.of(
+                        "field", error.getField(),
+                        "message", error.getDefaultMessage() == null ? "Invalid value" : error.getDefaultMessage()))
+                .toList();
+        return ResponseEntity.badRequest().body(Map.of(
+                "error", "Validation failed",
+                "fields", fields));
+    }
+
+    @ExceptionHandler(GatewayForbiddenException.class)
+    public ResponseEntity<Map<String, String>> handleForbidden(GatewayForbiddenException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", exception.getMessage()));
     }
 }

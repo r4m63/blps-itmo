@@ -1,5 +1,6 @@
 package blps.itmo.platform.grpc;
 
+import io.grpc.ClientInterceptor;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 
@@ -18,5 +19,12 @@ public final class GrpcClientFactory {
      */
     public static ManagedChannel plaintextChannel(String target) {
         return ManagedChannelBuilder.forTarget(target).usePlaintext().build();
+    }
+
+    public static ManagedChannel plaintextChannel(String target, ClientInterceptor interceptor) {
+        return ManagedChannelBuilder.forTarget(target)
+                .usePlaintext()
+                .intercept(interceptor)
+                .build();
     }
 }

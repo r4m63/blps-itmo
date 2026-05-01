@@ -68,8 +68,9 @@ public class GrpcServerLifecycle implements SmartLifecycle {
             return;  // не запускаем
         }
 
-        // Создаем gRPC сервер на указанном порту
-        ServerBuilder<?> builder = ServerBuilder.forPort(port);
+        // Создаем gRPC сервер на указанном порту и принимаем correlation id из metadata.
+        ServerBuilder<?> builder = ServerBuilder.forPort(port)
+                .intercept(CorrelationIdGrpcInterceptors.server());
 
         // Регистрируем все gRPC сервисы (LoginGrpcService, ClaimGrpcService и т.д.)
         services.forEach(builder::addService);

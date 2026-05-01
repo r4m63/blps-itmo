@@ -1,6 +1,7 @@
-package blps.itmo.gateway;
+package blps.itmo.gateway.infrastructure.grpc;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,7 @@ import blps.itmo.grpc.ClaimRpcServiceGrpc;
 import blps.itmo.grpc.NotificationRpcServiceGrpc;
 import blps.itmo.grpc.PenaltyRpcServiceGrpc;
 import blps.itmo.grpc.StorageRpcServiceGrpc;
+import blps.itmo.platform.grpc.CorrelationIdGrpcInterceptors;
 import blps.itmo.platform.grpc.GrpcClientFactory;
 import io.grpc.ManagedChannel;
 import jakarta.annotation.PreDestroy;
@@ -47,6 +49,7 @@ public class GatewayGrpcClients {
     private final ManagedChannel storageChannel;
     private final ManagedChannel auditChannel;
     private final ManagedChannel notificationChannel;
+    private final long deadlineSeconds;
 
     public GatewayGrpcClients(
             @Value("${app.grpc.clients.auth.target:localhost:19082}") String authTarget,
@@ -54,37 +57,46 @@ public class GatewayGrpcClients {
             @Value("${app.grpc.clients.penalty.target:localhost:19084}") String penaltyTarget,
             @Value("${app.grpc.clients.storage.target:localhost:19087}") String storageTarget,
             @Value("${app.grpc.clients.audit.target:localhost:19086}") String auditTarget,
-            @Value("${app.grpc.clients.notification.target:localhost:19085}") String notificationTarget) {
-        this.authChannel = GrpcClientFactory.plaintextChannel(authTarget);
-        this.claimChannel = GrpcClientFactory.plaintextChannel(claimTarget);
-        this.penaltyChannel = GrpcClientFactory.plaintextChannel(penaltyTarget);
-        this.storageChannel = GrpcClientFactory.plaintextChannel(storageTarget);
-        this.auditChannel = GrpcClientFactory.plaintextChannel(auditTarget);
-        this.notificationChannel = GrpcClientFactory.plaintextChannel(notificationTarget);
+            @Value("${app.grpc.clients.notification.target:localhost:19085}") String notificationTarget,
+            @Value("${app.grpc.deadline-seconds:5}") long deadlineSeconds) {
+        this.authChannel = GrpcClientFactory.plaintextChannel(authTarget, CorrelationIdGrpcInterceptors.client());
+        this.claimChannel = GrpcClientFactory.plaintextChannel(claimTarget, CorrelationIdGrpcInterceptors.client());
+        this.penaltyChannel = GrpcClientFactory.plaintextChannel(penaltyTarget, CorrelationIdGrpcInterceptors.client());
+        this.storageChannel = GrpcClientFactory.plaintextChannel(storageTarget, CorrelationIdGrpcInterceptors.client());
+        this.auditChannel = GrpcClientFactory.plaintextChannel(auditTarget, CorrelationIdGrpcInterceptors.client());
+        this.notificationChannel = GrpcClientFactory.plaintextChannel(notificationTarget,
+                CorrelationIdGrpcInterceptors.client());
+        this.deadlineSeconds = deadlineSeconds;
     }
 
     public AuthRpcServiceGrpc.AuthRpcServiceBlockingStub auth() {
-        return AuthRpcServiceGrpc.newBlockingStub(authChannel);
+        return AuthRpcServiceGrpc.newBlockingStub(authChannel)
+                .withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS);
     }
 
     public ClaimRpcServiceGrpc.ClaimRpcServiceBlockingStub claim() {
-        return ClaimRpcServiceGrpc.newBlockingStub(claimChannel);
+        return ClaimRpcServiceGrpc.newBlockingStub(claimChannel)
+                .withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS);
     }
 
     public PenaltyRpcServiceGrpc.PenaltyRpcServiceBlockingStub penalty() {
-        return PenaltyRpcServiceGrpc.newBlockingStub(penaltyChannel);
+        return PenaltyRpcServiceGrpc.newBlockingStub(penaltyChannel)
+                .withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS);
     }
 
     public StorageRpcServiceGrpc.StorageRpcServiceBlockingStub storage() {
-        return StorageRpcServiceGrpc.newBlockingStub(storageChannel);
+        return StorageRpcServiceGrpc.newBlockingStub(storageChannel)
+                .withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS);
     }
 
     public AuditRpcServiceGrpc.AuditRpcServiceBlockingStub audit() {
-        return AuditRpcServiceGrpc.newBlockingStub(auditChannel);
+        return AuditRpcServiceGrpc.newBlockingStub(auditChannel)
+                .withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS);
     }
 
     public NotificationRpcServiceGrpc.NotificationRpcServiceBlockingStub notification() {
-        return NotificationRpcServiceGrpc.newBlockingStub(notificationChannel);
+        return NotificationRpcServiceGrpc.newBlockingStub(notificationChannel)
+                .withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS);
     }
 
     @PreDestroy
