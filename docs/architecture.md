@@ -77,8 +77,8 @@
 
 **Kafka:**
 
-- publisher: `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `TENANT_RESPONSE_RECEIVED`, `TENANT_RESPONSE_EXPIRED`, `CLAIM_CLOSED_NO_PENALTY`, `PENALTY_APPLICATION_REQUESTED`
-- consumer: `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED`, `USER_DEACTIVATED`, и self-consume `CLAIM_CREATED` / `ADDITIONAL_INFO_PROVIDED` для запуска assessment worker
+- publisher: `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `ASSESSMENT_COMPLETED`, `ASSESSMENT_FAILED`, `TENANT_RESPONSE_RECEIVED`, `TENANT_RESPONSE_EXPIRED`, `CLAIM_CLOSED_NO_PENALTY`, `PENALTY_APPLICATION_REQUESTED`, `ATTACHMENT_INITIALIZED`, `ATTACHMENT_CONFIRMED`, `ATTACHMENT_BOUND`
+- consumer: `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED`, `USER_DEACTIVATED`, self-consume `CLAIM_CREATED` / `ADDITIONAL_INFO_PROVIDED` (для assessment worker), `ASSESSMENT_COMPLETED` / `ASSESSMENT_FAILED` (для status transition)
 
 ### `penalty-service`
 
@@ -136,7 +136,7 @@ REST-контроллеры в `claim-service` / `penalty-service` могут с
 | Сервис | Владеет данными | Pub в Kafka | Sub из Kafka | Внешний доступ |
 |---|---|---|---|---|
 | `edge-service` | `users` | `USER_DEACTIVATED` | `PENALTY_APPLIED` | HTTP edge + gRPC `IdentityRpcService` |
-| `claim-service` | `claims`, `claim_timeline`, `attachments`, `assessment_jobs`, `notifications` | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `TENANT_RESPONSE_*`, `CLAIM_CLOSED_NO_PENALTY`, `PENALTY_APPLICATION_REQUESTED` | `PENALTY_APPLIED/FAILED`, `USER_DEACTIVATED`, self-loop `CLAIM_CREATED`/`ADDITIONAL_INFO_PROVIDED` | gRPC `ClaimRpcService` |
+| `claim-service` | `claims`, `claim_timeline`, `attachments`, `assessment_jobs`, `notifications` | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `ASSESSMENT_*`, `TENANT_RESPONSE_*`, `CLAIM_CLOSED_NO_PENALTY`, `PENALTY_APPLICATION_REQUESTED`, `ATTACHMENT_*` | `PENALTY_APPLIED/FAILED`, `USER_DEACTIVATED`, self-loop `CLAIM_CREATED`/`ADDITIONAL_INFO_PROVIDED`/`ASSESSMENT_*` | gRPC `ClaimRpcService` |
 | `penalty-service` | `penalty_operations` | `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED` | `PENALTY_APPLICATION_REQUESTED` | gRPC `PenaltyRpcService` |
 
 ## 7. Топология данных

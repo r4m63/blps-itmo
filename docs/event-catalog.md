@@ -79,7 +79,7 @@
 | `CLAIM_CREATED` | `claim-service` | `claim-service` (self → assessment worker) |
 | `ADDITIONAL_INFO_PROVIDED` | `claim-service` | `claim-service` (self → re-assessment) |
 | `ASSESSMENT_COMPLETED` | `claim-service` | `claim-service` (self → status transition) |
-| `ASSESSMENT_FAILED` | `claim-service` | `claim-service` (self → MANUAL_REVIEW_REQUIRED) |
+| `ASSESSMENT_FAILED` | `claim-service` | `claim-service` (self → timeline entry, claim остаётся в `ASSESSMENT_IN_PROGRESS` до manual `/repair/reassess`) |
 | `TENANT_RESPONSE_RECEIVED` | `claim-service` | `claim-service` (self → notifications log) |
 | `TENANT_RESPONSE_EXPIRED` | `claim-service` | `claim-service` (self → status SUPPORT_REVIEW) |
 | `CLAIM_CLOSED_NO_PENALTY` | `claim-service` | `claim-service` (self → notifications) |
