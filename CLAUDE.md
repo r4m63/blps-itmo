@@ -4,6 +4,25 @@
 
 ---
 
+## ⚠️ ТЕКУЩЕЕ СОСТОЯНИЕ: переход на новую архитектуру
+
+Проект находится в transition-период:
+
+- **`docs/*`** — описывает **целевую (target) 3-сервисную архитектуру**: `edge-service` + `claim-service` + `penalty-service`. Это design spec, по которому ведётся рефакторинг.
+- **`services/*` (текущий код)** — всё ещё **legacy 8-сервисная реализация**: `api-gateway`, `auth-service`, `claim-service`, `assessment-service`, `penalty-service`, `storage-service`, `notification-service`, `audit-service`. Это то что реально запускается сейчас.
+- **`CLAUDE.md` (этот файл)** — описывает **legacy** state, чтобы агенты работали с реальным кодом до окончания миграции.
+
+**Правила работы во время transition:**
+
+1. При **новых задачах** (рефакторинг, новые фичи) — следовать `docs/architecture.md` и Migration plan в нём (Section 10). Цель — двигать систему к 3 сервисам.
+2. При **bug fixes / точечных правках** в существующем коде — работать с текущей 8-сервисной структурой (раздел 4 ниже), потому что это реальное состояние кода.
+3. Не создавать новые сервисы — только сливать существующие согласно target-плану.
+4. Когда миграция завершится — этот CLAUDE.md будет переписан под 3-сервисную модель, баннер уйдёт.
+
+Migration roadmap: [docs/architecture.md § 12 + § 10 миграция](docs/architecture.md).
+
+---
+
 ## 1. Что это за проект (TL;DR)
 
 **BLPS ITMO Lab3** — event-driven микросервисная система на Spring Boot 3.2 / Java 17, демонстрирующая **System Design для распределённых транзакций**: декомпозиция монолита по bounded contexts, отказ от глобального XA/2PC, choreography saga, Transactional Outbox, Inbox/idempotency, eventual consistency, manual recovery.

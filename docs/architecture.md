@@ -1,297 +1,249 @@
-# System Design и Архитектура
+# Architecture
 
-## 1. Цели архитектуры
+## 1. Цели
 
-Архитектура проекта строилась под три цели:
+Архитектура построена под три цели:
 
-1. Разделить систему на независимые bounded contexts с отдельными БД.
-2. Убрать зависимость от глобальных распределённых ACID-транзакций.
-3. Показать практический event-driven flow с асинхронными задачами и явной обработкой частичных отказов.
+1. Декомпозировать домен «заявка на штраф» на bounded contexts с собственными БД.
+2. Отказаться от глобальных распределённых ACID-транзакций (XA/2PC).
+3. Продемонстрировать end-to-end event-driven flow с saga, outbox, inbox и manual recovery.
+
+Это **учебный System Design** для лабораторной работы ИТМО (BLPS), а не production cloud platform. Дизайн ориентирован на **демонстрацию паттернов**, а не на абсолютную HA.
 
 ## 2. Архитектурный стиль
 
-Текущий стиль системы:
+- microservices (3 сервиса)
+- database-per-service
+- HTTP API edge через `edge-service`
+- gRPC для внутренних sync вызовов
+- event-driven integration через Kafka
+- saga choreography (без центрального orchestrator engine)
+- transactional outbox + inbox/processed_messages
+- eventual consistency между сервисами
 
-- `microservices`
-- `database per service`
-- `HTTP API gateway`
-- `gRPC` для синхронных внутренних вызовов
-- `event-driven integration`
-- `saga choreography`
-- `eventual consistency`
-- `read-side projections` для audit/notification
+## 3. Модули проекта
 
-Это не fully isolated cloud-native production platform, а учебная и демонстрационная реализация System Design.
+### Бизнес-сервисы (3)
 
-## 3. Модульная структура репозитория
+| Сервис | Bounded Context | Расположение |
+|---|---|---|
+| `edge-service` | Identity + API edge | `services/edge-service/` |
+| `claim-service` | Claim lifecycle (включая attachments, assessment, notifications, timeline) | `services/claim-service/` |
+| `penalty-service` | Penalty side-effect | `services/penalty-service/` |
 
-### Общий модуль
+### Общие библиотеки
 
-- `platform-core`
-- `grpc-contracts`
-
-Содержит:
-
-- `EventType`
-- `EventEnvelope`
-- `TopicNames`
-- payload classes
-- `OutboxService`
-- `OutboxRelay`
-- `ProcessedMessageService`
-- общий `ApiExceptionHandler`
-- protobuf-контракты и generated gRPC stubs
-- lifecycle для gRPC servers и фабрику gRPC clients
-
-### Бизнес-сервисы
-
-- `auth-service`
-- `claim-service`
-- `assessment-service`
-- `penalty-service`
-- `storage-service`
-- `notification-service`
-- `audit-service`
-
-Физически сервисы лежат в каталоге `services/`, а общие модули вынесены в `lib/`.
+| Модуль | Содержимое | Расположение |
+|---|---|---|
+| `platform-core` | `EventEnvelope`, `EventType`, `TopicNames`, payload-классы, `OutboxService`, `OutboxRelay`, `ProcessedMessageService`, общий `ApiExceptionHandler`, `DemoJwtService`, Kafka config, gRPC lifecycle | `lib/platform-core/` |
+| `grpc-contracts` | protobuf-контракты и generated stubs | `lib/grpc-contracts/` |
 
 ## 4. Bounded Contexts
 
-### `auth-service`
+### `edge-service`
 
-Контекст идентичности и статуса пользователя.
+**Отвечает за:**
 
-Отвечает за:
+- внешний HTTP перимetr (`/api/**`), JWT-аутентификацию, propagation `X-User-Id` / `X-User-Role` / `X-Correlation-Id`
+- пользователей (id, email, role: LANDLORD / TENANT / SUPPORT / ADMIN)
+- penalty count пользователя
+- деактивацию пользователя как бизнес-факт
 
-- список пользователей
-- роль (`LANDLORD`, `TENANT`, `ADMIN`)
-- `enabled/disabled`
-- `penaltyCount`
+**Не отвечает за:**
 
-Не отвечает за:
+- claim, attachment, penalty операции (только проксирование вызовов)
 
-- хранение заявок
-- хранение решений по claim
-- управление статусами заявки
+**Kafka:**
+
+- publisher: `USER_DEACTIVATED`
+- consumer: `PENALTY_APPLIED` → `++penalty_count`
 
 ### `claim-service`
 
-Центральный бизнес-контекст процесса.
+**Отвечает за:**
 
-Отвечает за:
+- claim aggregate и его state machine
+- `claim_timeline` (история переходов и значимых событий)
+- attachments: metadata + saga `INIT → CONFIRM → BIND` с MinIO как non-XA участником
+- assessment: in-process async worker, эвристика оценки
+- tenant response: 3-дневный timeout (BPMN P3D)
+- support decision
+- notifications: write-side log при transition'ах (без отдельного сервиса)
 
-- создание claim
-- claim state machine
-- claim timeline
-- перевод заявки между состояниями
-- реакцию на assessment / penalty / user deactivation events
+**Не отвечает за:**
 
-### `assessment-service`
+- идентичность пользователей (валидация через gRPC в `edge-service`)
+- применение штрафа (только публикует `PENALTY_APPLICATION_REQUESTED`)
 
-Выделенный async worker-контекст.
+**Kafka:**
 
-Отвечает за:
-
-- создание assessment job
-- асинхронную обработку заявки
-- публикацию результата оценки
-
-### `storage-service`
-
-Контекст attachment metadata и MinIO object-key lifecycle.
-
-Отвечает за:
-
-- инициализацию attachment metadata
-- подтверждение загрузки объекта
-- привязку attachments к claim через saga
-- публикацию storage events
+- publisher: `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `TENANT_RESPONSE_RECEIVED`, `TENANT_RESPONSE_EXPIRED`, `CLAIM_CLOSED_NO_PENALTY`, `PENALTY_APPLICATION_REQUESTED`
+- consumer: `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED`, `USER_DEACTIVATED`, и self-consume `CLAIM_CREATED` / `ADDITIONAL_INFO_PROVIDED` для запуска assessment worker
 
 ### `penalty-service`
 
-Контекст применения штрафа.
+**Отвечает за:**
 
-Отвечает за:
+- async применение penalty side-effect (имитация внешнего процессора)
+- `penalty_operations` lifecycle: `PENDING → PROCESSING → APPLIED|FAILED`
+- manual retry FAILED операций
 
-- создание penalty operation
-- имитацию долгого внешнего процессора
-- публикацию `PENALTY_APPLIED` / `PENALTY_APPLICATION_FAILED`
-- ручный retry failed operation
+**Не отвечает за:**
 
-### `notification-service`
+- claim status (только сигналит событие; перевод status делает `claim-service`)
+- penalty count в `users` (это делает `edge-service`)
 
-Read-side контекст уведомлений.
+**Kafka:**
 
-Отвечает за:
+- publisher: `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED`
+- consumer: `PENALTY_APPLICATION_REQUESTED`
 
-- materialized log уведомлений по событиям
-
-### `audit-service`
-
-Read-side контекст трассировки.
-
-Отвечает за:
-
-- персистентный event trail
-- поиск событий по `claimId`
-- демонстрацию end-to-end saga trace
-
-## 5. Коммуникации
+## 5. Communication
 
 ### Внешние HTTP вызовы
 
-Клиенты не ходят напрямую в бизнес-сервисы. Внешняя точка входа:
+Клиенты ходят **только** в `edge-service` на `http://localhost:8080`:
 
-- `api-gateway`
-- HTTP `/api/**`
-- demo JWT в `Authorization: Bearer ...`
-
-Gateway валидирует токен, достаёт actor identity и вызывает backend-сервисы через gRPC.
+- `POST /api/auth/login` → demo JWT
+- `Authorization: Bearer <token>` для всех остальных вызовов
+- `edge-service` проксирует в backend-сервисы через **gRPC**
 
 ### Синхронные внутренние вызовы
 
-Все runtime sync path внутри системы оформляются через gRPC-контракты из `lib/grpc-contracts`.
+gRPC-контракты из `lib/grpc-contracts/src/main/proto/`:
 
-Ключевой service-to-service path:
+| Контракт | Реализуется в | Вызывается из |
+|---|---|---|
+| `IdentityRpcService` | `edge-service` | `claim-service` (валидация actor'а) |
+| `ClaimRpcService` | `claim-service` | `edge-service` (проксирование REST) |
+| `PenaltyRpcService` | `penalty-service` | `edge-service` (проксирование REST) |
 
-- `claim-service -> auth-service` через `AuthRpcService.GetUser`
-
-Он нужен для:
-
-- проверки существования пользователя
-- проверки роли
-- проверки, что пользователь не деактивирован
-
-Gateway также использует gRPC stubs:
-
-- `AuthRpcService`
-- `ClaimRpcService`
-- `PenaltyRpcService`
-- `StorageRpcService`
-- `AuditRpcService`
-
-REST-контроллеры в backend-сервисах могут оставаться для прямого локального debug, но не являются контрактом межсервисной синхронной интеграции.
+REST-контроллеры в `claim-service` / `penalty-service` могут существовать **только** для прямого локального debug, но они **не контракт** межсервисной интеграции.
 
 ### Асинхронные вызовы
 
-Межсервисные бизнес-события идут через Kafka:
+Все межсервисные бизнес-события — через Kafka:
 
-- `claim.events`
-- `assessment.events`
-- `penalty.events`
-- `auth.events`
-- `storage.events`
+| Topic | Описание |
+|---|---|
+| `claim.events` | События lifecycle заявки (включая attachment-стадии) |
+| `penalty.events` | События применения штрафа |
+| `identity.events` | События идентичности (деактивация) |
+| `<topic>.dlt` | Dead Letter Topic для poison messages |
 
-`notification-service` и `audit-service` подписаны на все доменные топики.
+## 6. Матрица ответственности
 
-## 6. Матрица ответственности по сервисам
-
-| Сервис | Владеет данными | Пишет в Kafka | Читает из Kafka | Внешний доступ |
-| --- | --- | --- | --- | --- |
-| `api-gateway` | нет | нет | нет | HTTP edge |
-| `auth-service` | `users` | `USER_DEACTIVATED` | `PENALTY_APPLIED` | через gateway/gRPC |
-| `claim-service` | `claims`, `claim_timeline`, attachment refs | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `TENANT_RESPONSE_RECEIVED`, `TENANT_RESPONSE_EXPIRED`, `CLAIM_CLOSED_NO_PENALTY`, `PENALTY_APPLICATION_REQUESTED`, `ATTACHMENT_BINDING_REQUESTED` | `ASSESSMENT_COMPLETED`, `ASSESSMENT_FAILED`, `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED`, `USER_DEACTIVATED`, `ATTACHMENT_BOUND`, `ATTACHMENT_BINDING_FAILED` | через gateway/gRPC |
-| `assessment-service` | `assessment_jobs` | `ASSESSMENT_COMPLETED`, `ASSESSMENT_FAILED` | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED` | нет |
-| `penalty-service` | `penalty_operations` | `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED` | `PENALTY_APPLICATION_REQUESTED` | через gateway/gRPC |
-| `storage-service` | `attachments` | `ATTACHMENT_INITIALIZED`, `ATTACHMENT_CONFIRMED`, `ATTACHMENT_BOUND`, `ATTACHMENT_BINDING_FAILED` | `ATTACHMENT_BINDING_REQUESTED` | через gateway/gRPC |
-| `notification-service` | `notification_log` | нет | все доменные события | нет |
-| `audit-service` | `audit_records` | нет | все доменные события | через gateway/gRPC |
+| Сервис | Владеет данными | Pub в Kafka | Sub из Kafka | Внешний доступ |
+|---|---|---|---|---|
+| `edge-service` | `users` | `USER_DEACTIVATED` | `PENALTY_APPLIED` | HTTP edge + gRPC `IdentityRpcService` |
+| `claim-service` | `claims`, `claim_timeline`, `attachments`, `assessment_jobs`, `notifications` | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `TENANT_RESPONSE_*`, `CLAIM_CLOSED_NO_PENALTY`, `PENALTY_APPLICATION_REQUESTED` | `PENALTY_APPLIED/FAILED`, `USER_DEACTIVATED`, self-loop `CLAIM_CREATED`/`ADDITIONAL_INFO_PROVIDED` | gRPC `ClaimRpcService` |
+| `penalty-service` | `penalty_operations` | `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED` | `PENALTY_APPLICATION_REQUESTED` | gRPC `PenaltyRpcService` |
 
 ## 7. Топология данных
 
-У каждого сервиса своя физическая БД:
+Три физических Postgres базы:
 
-- `blps_auth`
-- `blps_claim`
-- `blps_assessment`
-- `blps_penalty`
-- `blps_storage`
-- `blps_notification`
-- `blps_audit`
+- `blps_identity` (edge-service)
+- `blps_claim` (claim-service)
+- `blps_penalty` (penalty-service)
 
-Инварианты:
+**Инварианты:**
 
-- прямые cross-DB join запрещены
-- foreign key между сервисами отсутствуют
-- идентификаторы пользователей в `claim-service` хранятся как обычные `Long`, а не как ORM relation
-- межсервисная связность достигается через `userId`, `claimId`, `correlationId`, `sagaId`
+- cross-DB joins **запрещены**
+- foreign keys между схемами разных сервисов **запрещены**
+- идентификаторы из чужого сервиса хранятся как обычные `Long` (например, `claims.landlord_id`)
+- межсервисная связность — через `userId`, `claimId`, `correlationId`, `sagaId`
 
-## 8. Консистентность
+Каждая БД содержит две системные таблицы (`platform-core` контракт):
 
-Модель консистентности:
+- `outbox_events` — исходящие события для relay'а
+- `processed_messages` — Inbox дедупликация входящих событий
 
-- локально внутри сервиса: сильная консистентность
-- между сервисами: eventual consistency
+## 8. Consistency модель
 
-Примеры окон неконсистентности:
+| Граница | Гарантия |
+|---|---|
+| Внутри одного сервиса | strong consistency (ACID Postgres + `@Transactional`) |
+| Между сервисами | **eventual consistency** через async Kafka |
+| Outbox + Kafka publish | at-least-once (дубликаты возможны) |
+| Inbox dedup | at-most-once side effect (атомарно с бизнес-update) |
 
-- claim уже создан, но assessment ещё не завершён
-- penalty уже запрошен, но claim ещё не финализирован
-- user уже деактивирован, но claim-service ещё не обработал это событие
+**Окна неконсистентности — спроектированы явно** через intermediate-статусы:
 
-Это не race-condition в понимании ошибки. Это ожидаемая часть distributed design.
+- `ASSESSMENT_IN_PROGRESS` — claim создан, assessment ещё не завершён
+- `PENALTY_PROCESSING` — admin принял решение, penalty ещё применяется
+- `PENALTY_PROCESSING_FAILED` — penalty упал, ждёт manual retry
 
-## 9. Масштабирование
+Long-running операции через API возвращают **HTTP 202** + `processingStatus` + `correlationId`. Клиент опрашивает `GET /api/claims/{id}/process-status`.
 
-### Горизонтально масштабируются хорошо
+## 9. Saga choreography
 
-- `claim-service`
-- `auth-service`
-- `storage-service`
-- `notification-service`
-- `audit-service`
+Нет центрального orchestrator engine. Каждый сервис:
 
-Почему:
+1. реагирует на доменное событие
+2. выполняет локальную транзакцию
+3. публикует следующее доменное событие через outbox
 
-- состояние хранится в БД
-- сервисы stateless на уровне HTTP/gRPC API
-- dedup идёт через таблицы, а не через memory
+Идентификация саг через `sagaId`:
 
-### Масштабируются как async worker’ы
+| sagaId | Участники | Что демонстрирует |
+|---|---|---|
+| `claim-lifecycle-{claimId}` | claim-service (self) | local saga, intermediate states |
+| `penalty-application-{claimId}` | claim-service → penalty-service → claim-service + edge-service | межсервисная saga с non-rollbackable step |
+| `user-deactivation-{userId}` | edge-service → claim-service | distributed reaction на бизнес-факт |
+| `attachment-binding-{claimId}` | claim-service ↔ MinIO | non-XA участник во внешнем хранилище |
 
-- `assessment-service`
-- `penalty-service`
+Состояние саги отражено в **бизнес-статусах** aggregate (`claims.status`, `penalty_operations.status`) и в `claim_timeline`. Отдельной таблицы `saga_state` нет.
 
-Почему:
+## 10. Масштабирование
 
-- они читают сообщения из Kafka
-- выполняют фоновую обработку
-- используют consumer group semantics
+### Горизонтально масштабируется
 
-Практический эффект:
+| Сервис | Условия |
+|---|---|
+| `edge-service` | stateless, JWT валидируется по shared secret; БД shared между репликами |
+| `claim-service` | stateless application layer; конкурентные update'ы защищены `@Version` (optimistic locking); event-обработка через Kafka consumer group |
+| `penalty-service` | worker через Kafka consumer group, sharding по `claimId` partition key |
 
-- увеличение числа реплик даёт рост throughput, если хватает Kafka partitions и БД
+### Bottlenecks текущего demo
 
-## 10. Текущие ограничения дизайна
+- один Kafka broker (no replication factor > 1)
+- один ZooKeeper
+- одна Postgres на сервис без HA / read replicas
+- сервисы запускаются вне контейнеров (`./gradlew :…:bootRun`)
 
-### Уже реализовано
+Масштабирование **архитектурно заложено**, но production-hardening не сделан и не входит в scope лабы.
 
-- API gateway
-- internal gRPC contracts and servers
-- demo JWT/login/security perimeter
-- outbox
-- inbox/idempotency
-- choreography saga
-- manual retry для penalty flow
-- DLT publishing through shared Kafka error handler
-- timeout/reconciliation jobs for core async flows
-- storage-service attachment saga
-- read-side audit trail
+## 11. Что НЕ входит в архитектуру (явно)
 
-### Пока не реализовано
+Чтобы не плодить ложных ожиданий:
 
-- distributed tracing stack
-- metrics/Prometheus/Grafana
-- schema registry / contract evolution policy
-- compensating workers общего назначения
-- production-grade OAuth2/service-to-service auth
+- distributed tracing stack (OpenTelemetry / Jaeger) — только `correlationId` в MDC + logs
+- metrics stack (Prometheus / Grafana)
+- centralized logs (ELK / Loki)
+- schema registry (Avro / Protobuf for Kafka)
+- DLT monitoring UI / alerting
+- production OAuth2 / service-to-service mTLS — demo JWT (HS256)
+- service mesh (Istio / Linkerd)
+- Kubernetes / GitOps
+- multi-region HA
 
-## 11. Почему это хороший учебный System Design
+Эти штуки — **future work**, не сегодняшний scope.
 
-Проект наглядно показывает:
+## 12. Почему именно 3 сервиса (а не больше и не меньше)
 
-- как декомпозировать процесс по владельцам данных
-- почему XA между микросервисами плохо масштабируется
-- как решать `DB + message broker` dual write problem
-- как организовать бизнес-процесс без централизованного workflow engine
-- как проектировать явные промежуточные состояния вместо "магического мгновенного commit everywhere"
+**Почему не 1 (монолит):** требование лабы — продемонстрировать distributed transactions, что невозможно в одной БД.
+
+**Почему не 8 (как раньше):** `assessment`, `notification`, `audit`, `storage` — это не bounded contexts, а слои/реакции внутри claim-контекста. Их выделение в отдельные сервисы создавало over-decomposition: лишние процессы, сети, БД без реальной разницы в data ownership.
+
+**Почему именно эти 3:**
+
+- `edge-service` отделён по causa-`identity` — он source of truth для users и контролирует периметр. Не может быть слит с `claim-service` без нарушения single-responsibility.
+- `claim-service` — центральный domain-сервис, владеет всем что про конкретную заявку.
+- `penalty-service` — единственный контекст с **необратимым внешним side effect**. Обязан быть отдельным процессом, чтобы продемонстрировать saga с non-rollbackable шагом, manual recovery и компенсацию-как-бизнес-действие.
+
+Это минимальная декомпозиция, при которой:
+
+- сохраняется database-per-service
+- все ключевые distributed patterns (Outbox, Inbox, Saga, Idempotency, Eventual Consistency, MinIO outside XA, manual recovery) — реально нужны и работают на этих границах
+- ничего не выделено искусственно

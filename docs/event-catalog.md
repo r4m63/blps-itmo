@@ -1,233 +1,268 @@
 # Event Catalog
 
-## 1. Event Envelope
+## 1. EventEnvelope
 
-Все события в Kafka публикуются как `EventEnvelope`.
+Все события в Kafka публикуются как универсальный envelope:
 
-Поля envelope:
+```json
+{
+  "eventId": "uuid",
+  "eventType": "CLAIM_CREATED",
+  "eventVersion": 1,
+  "occurredAt": "2026-05-11T10:23:45.123Z",
+  "producerService": "claim-service",
+  "correlationId": "uuid",
+  "sagaId": "claim-lifecycle-42",
+  "aggregateType": "CLAIM",
+  "aggregateId": "42",
+  "actorId": 1,
+  "payload": { ... type-specific JSON ... }
+}
+```
 
 | Поле | Тип | Назначение |
-| --- | --- | --- |
-| `eventId` | `String` | уникальный id события |
-| `eventType` | `EventType` | тип доменного события |
-| `eventVersion` | `int` | версия схемы события, сейчас `1` |
-| `occurredAt` | `Instant` | время создания outbox record |
-| `producerService` | `String` | сервис-источник события |
-| `correlationId` | `String` | сквозной id процесса |
-| `sagaId` | `String` | id конкретной саги |
-| `aggregateType` | `String` | тип aggregate, например `CLAIM` или `USER` |
-| `aggregateId` | `String` | id aggregate |
-| `actorId` | `Long` | пользователь/актер, связанный с действием |
-| `payload` | `JsonNode` | конкретная бизнес-нагрузка |
+|---|---|---|
+| `eventId` | String (UUID) | Уникальный id события, используется для dedup в Inbox |
+| `eventType` | enum `EventType` | Тип доменного события |
+| `eventVersion` | int | Версия схемы payload. Сейчас всегда `1` |
+| `occurredAt` | Instant | Момент создания outbox row |
+| `producerService` | String | `edge-service` / `claim-service` / `penalty-service` |
+| `correlationId` | String | Сквозной id бизнес-процесса (передаётся через HTTP `X-Correlation-Id`, gRPC metadata, EventEnvelope) |
+| `sagaId` | String | Id конкретной саги (см. шаблоны ниже) |
+| `aggregateType` | String | `CLAIM` / `USER` / `PENALTY` / `ATTACHMENT` |
+| `aggregateId` | String | id aggregate |
+| `actorId` | Long | Пользователь, инициировавший действие |
+| `payload` | JsonNode | Бизнес-нагрузка, специфичная для `eventType` |
 
-## 2. Список событий
+## 2. Kafka топики
 
-Текущий `EventType`:
+| Topic | Producer | Назначение |
+|---|---|---|
+| `claim.events` | `claim-service` | Все события lifecycle заявки (включая attachment-стадии) |
+| `penalty.events` | `claim-service`, `penalty-service` | Запрос на penalty (от claim) + результат (от penalty) |
+| `identity.events` | `edge-service` | События идентичности |
+| `claim.events.dlt` | shared error handler | Dead Letter Topic для `claim.events` |
+| `penalty.events.dlt` | shared error handler | DLT для `penalty.events` |
+| `identity.events.dlt` | shared error handler | DLT для `identity.events` |
 
-- `CLAIM_CREATED`
-- `ADDITIONAL_INFO_PROVIDED`
-- `ASSESSMENT_COMPLETED`
-- `ASSESSMENT_FAILED`
-- `TENANT_RESPONSE_RECEIVED`
-- `TENANT_RESPONSE_EXPIRED`
-- `CLAIM_CLOSED_NO_PENALTY`
-- `PENALTY_APPLICATION_REQUESTED`
-- `PENALTY_APPLIED`
-- `PENALTY_APPLICATION_FAILED`
-- `USER_DEACTIVATED`
-- `ATTACHMENT_INITIALIZED`
-- `ATTACHMENT_CONFIRMED`
-- `ATTACHMENT_BINDING_REQUESTED`
-- `ATTACHMENT_BOUND`
-- `ATTACHMENT_BINDING_FAILED`
+**Partition key:** `eventKey = aggregateId`.
 
-## 3. Топики
+- claim chain → `claimId`
+- penalty chain → `claimId` (привязка к одному claim, чтобы ordering сохранялся)
+- identity chain → `userId`
 
-| Topic | Типы событий |
-| --- | --- |
-| `claim.events` | `CLAIM_CREATED`, `ADDITIONAL_INFO_PROVIDED`, `TENANT_RESPONSE_RECEIVED`, `TENANT_RESPONSE_EXPIRED`, `CLAIM_CLOSED_NO_PENALTY`, `ATTACHMENT_BINDING_REQUESTED` |
-| `assessment.events` | `ASSESSMENT_COMPLETED`, `ASSESSMENT_FAILED` |
-| `penalty.events` | `PENALTY_APPLICATION_REQUESTED`, `PENALTY_APPLIED`, `PENALTY_APPLICATION_FAILED` |
-| `auth.events` | `USER_DEACTIVATED` |
-| `storage.events` | `ATTACHMENT_INITIALIZED`, `ATTACHMENT_CONFIRMED`, `ATTACHMENT_BOUND`, `ATTACHMENT_BINDING_FAILED` |
+## 3. EventType enum (полный список)
 
-Ключ сообщения в текущей реализации:
+| EventType | Topic | Payload class | Aggregate |
+|---|---|---|---|
+| `CLAIM_CREATED` | `claim.events` | `ClaimCreatedPayload` | CLAIM |
+| `ADDITIONAL_INFO_PROVIDED` | `claim.events` | `AdditionalInfoProvidedPayload` | CLAIM |
+| `ASSESSMENT_COMPLETED` | `claim.events` | `AssessmentCompletedPayload` | CLAIM |
+| `ASSESSMENT_FAILED` | `claim.events` | `AssessmentFailedPayload` | CLAIM |
+| `TENANT_RESPONSE_RECEIVED` | `claim.events` | `TenantResponseReceivedPayload` | CLAIM |
+| `TENANT_RESPONSE_EXPIRED` | `claim.events` | `TenantResponseExpiredPayload` | CLAIM |
+| `CLAIM_CLOSED_NO_PENALTY` | `claim.events` | `ClaimClosedNoPenaltyPayload` | CLAIM |
+| `ATTACHMENT_INITIALIZED` | `claim.events` | `AttachmentInitializedPayload` | ATTACHMENT |
+| `ATTACHMENT_CONFIRMED` | `claim.events` | `AttachmentConfirmedPayload` | ATTACHMENT |
+| `ATTACHMENT_BOUND` | `claim.events` | `AttachmentBoundPayload` | ATTACHMENT |
+| `PENALTY_APPLICATION_REQUESTED` | `penalty.events` | `PenaltyApplicationRequestedPayload` | CLAIM |
+| `PENALTY_APPLIED` | `penalty.events` | `PenaltyAppliedPayload` | CLAIM |
+| `PENALTY_APPLICATION_FAILED` | `penalty.events` | `PenaltyApplicationFailedPayload` | CLAIM |
+| `USER_DEACTIVATED` | `identity.events` | `UserDeactivatedPayload` | USER |
 
-- `eventKey = aggregateId`
-
-То есть:
-
-- для claim-based событий ключом становится `claimId`
-- для user-based событий ключом становится `userId`
+> **Замечание:** `ASSESSMENT_*` события идут в `claim.events`, а не в отдельный `assessment.events`, потому что assessment больше не отдельный сервис — это in-process worker внутри claim-service. Event Type'ы оставлены для семантики.
 
 ## 4. Producer / Consumer Matrix
 
 | Event | Producer | Consumers |
-| --- | --- | --- |
-| `CLAIM_CREATED` | `claim-service` | `assessment-service`, `notification-service`, `audit-service` |
-| `ADDITIONAL_INFO_PROVIDED` | `claim-service` | `assessment-service`, `notification-service`, `audit-service` |
-| `ASSESSMENT_COMPLETED` | `assessment-service` | `claim-service`, `notification-service`, `audit-service` |
-| `ASSESSMENT_FAILED` | `assessment-service` | `claim-service`, `notification-service`, `audit-service` |
-| `TENANT_RESPONSE_RECEIVED` | `claim-service` | `notification-service`, `audit-service` |
-| `TENANT_RESPONSE_EXPIRED` | `claim-service` | `notification-service`, `audit-service` |
-| `CLAIM_CLOSED_NO_PENALTY` | `claim-service` | `notification-service`, `audit-service` |
-| `PENALTY_APPLICATION_REQUESTED` | `claim-service` | `penalty-service`, `notification-service`, `audit-service` |
-| `PENALTY_APPLIED` | `penalty-service` | `claim-service`, `auth-service`, `notification-service`, `audit-service` |
-| `PENALTY_APPLICATION_FAILED` | `penalty-service` | `claim-service`, `notification-service`, `audit-service` |
-| `USER_DEACTIVATED` | `auth-service` | `claim-service`, `notification-service`, `audit-service` |
-| `ATTACHMENT_INITIALIZED` | `storage-service` | `notification-service`, `audit-service` |
-| `ATTACHMENT_CONFIRMED` | `storage-service` | `notification-service`, `audit-service` |
-| `ATTACHMENT_BINDING_REQUESTED` | `claim-service` | `storage-service`, `notification-service`, `audit-service` |
-| `ATTACHMENT_BOUND` | `storage-service` | `claim-service`, `notification-service`, `audit-service` |
-| `ATTACHMENT_BINDING_FAILED` | `storage-service` | `claim-service`, `notification-service`, `audit-service` |
+|---|---|---|
+| `CLAIM_CREATED` | `claim-service` | `claim-service` (self → assessment worker) |
+| `ADDITIONAL_INFO_PROVIDED` | `claim-service` | `claim-service` (self → re-assessment) |
+| `ASSESSMENT_COMPLETED` | `claim-service` | `claim-service` (self → status transition) |
+| `ASSESSMENT_FAILED` | `claim-service` | `claim-service` (self → MANUAL_REVIEW_REQUIRED) |
+| `TENANT_RESPONSE_RECEIVED` | `claim-service` | `claim-service` (self → notifications log) |
+| `TENANT_RESPONSE_EXPIRED` | `claim-service` | `claim-service` (self → status SUPPORT_REVIEW) |
+| `CLAIM_CLOSED_NO_PENALTY` | `claim-service` | `claim-service` (self → notifications) |
+| `ATTACHMENT_INITIALIZED` | `claim-service` | (read-side, audit-only) |
+| `ATTACHMENT_CONFIRMED` | `claim-service` | (read-side, audit-only) |
+| `ATTACHMENT_BOUND` | `claim-service` | (read-side, audit-only) |
+| `PENALTY_APPLICATION_REQUESTED` | `claim-service` | `penalty-service` |
+| `PENALTY_APPLIED` | `penalty-service` | `claim-service`, `edge-service` |
+| `PENALTY_APPLICATION_FAILED` | `penalty-service` | `claim-service` |
+| `USER_DEACTIVATED` | `edge-service` | `claim-service` |
 
-## 5. Payload Contracts
+> **Self-consume в claim-service** — намеренное архитектурное решение: даже async обработка assessment проходит через outbox + Kafka + inbox, чтобы продемонстрировать паттерн end-to-end (а не делать прямой in-process method call).
+
+## 5. Payload контракты
+
+Все payload-классы лежат в `lib/platform-core/src/main/java/blps/itmo/platform/events/payload/`. Все поля иммутабельны (`record` или final fields).
 
 ### `ClaimCreatedPayload`
 
-| Поле | Тип |
-| --- | --- |
-| `claimId` | `Long` |
-| `landlordId` | `Long` |
-| `tenantId` | `Long` |
-| `title` | `String` |
-| `description` | `String` |
-| `claimedAmount` | `BigDecimal` |
-| `currency` | `String` |
+| Поле | Тип | Описание |
+|---|---|---|
+| `claimId` | Long | id новой claim |
+| `landlordId` | Long | id арендодателя |
+| `tenantId` | Long | id арендатора |
+| `title` | String | заголовок |
+| `description` | String | текст |
+| `claimedAmount` | BigDecimal | заявленная сумма ущерба |
+| `currency` | String | ISO-4217 |
+| `attachmentIds` | List<Long> | id прикреплённых attachment'ов (могут быть пустыми) |
 
 ### `AdditionalInfoProvidedPayload`
 
 | Поле | Тип |
-| --- | --- |
-| `claimId` | `Long` |
-| `landlordId` | `Long` |
-| `comment` | `String` |
-| `claimedAmount` | `BigDecimal` |
-| `currency` | `String` |
+|---|---|
+| `claimId` | Long |
+| `landlordId` | Long |
+| `comment` | String |
+| `claimedAmount` | BigDecimal |
+| `currency` | String |
+| `attemptNo` | int |
 
 ### `AssessmentCompletedPayload`
 
-| Поле | Тип |
-| --- | --- |
-| `claimId` | `Long` |
-| `assessmentAmount` | `BigDecimal` |
-| `assessmentNotes` | `String` |
-| `penaltyGrounds` | `boolean` |
-| `requiresAdditionalInfo` | `boolean` |
+| Поле | Тип | Описание |
+|---|---|---|
+| `claimId` | Long | |
+| `assessmentAmount` | BigDecimal NULL | сумма оценки (null если нет grounds) |
+| `assessmentNotes` | String | пояснение |
+| `penaltyGrounds` | boolean | есть основания для штрафа |
+| `requiresAdditionalInfo` | boolean | требуется ли доп. инфа |
 
 ### `AssessmentFailedPayload`
 
 | Поле | Тип |
-| --- | --- |
-| `claimId` | `Long` |
-| `reason` | `String` |
+|---|---|
+| `claimId` | Long |
+| `reason` | String |
 
-### `TenantResponsePayload`
+### `TenantResponseReceivedPayload`
 
 | Поле | Тип |
-| --- | --- |
-| `claimId` | `Long` |
-| `tenantId` | `Long` |
-| `agree` | `boolean` |
-| `comment` | `String` |
+|---|---|
+| `claimId` | Long |
+| `tenantId` | Long |
+| `agree` | boolean |
+| `comment` | String |
 
 ### `TenantResponseExpiredPayload`
 
-Текущая реализация публикует expiry как доменный факт claim lifecycle.
+| Поле | Тип |
+|---|---|
+| `claimId` | Long |
+| `reason` | String (например `"P3D timeout exceeded"`) |
+
+### `ClaimClosedNoPenaltyPayload`
 
 | Поле | Тип |
-| --- | --- |
-| `claimId` | `Long` |
-| `reason` | `String` |
+|---|---|
+| `claimId` | Long |
+| `reason` | String |
+| `closedByActor` | Long NULL |
 
 ### `PenaltyApplicationRequestedPayload`
 
 | Поле | Тип |
-| --- | --- |
-| `claimId` | `Long` |
-| `tenantId` | `Long` |
-| `penaltyAmount` | `BigDecimal` |
-| `penaltyCurrency` | `String` |
-| `note` | `String` |
-| `simulateFailure` | `boolean` |
+|---|---|
+| `claimId` | Long |
+| `tenantId` | Long |
+| `penaltyAmount` | BigDecimal |
+| `penaltyCurrency` | String |
+| `note` | String |
+| `simulateFailure` | boolean |
 
 ### `PenaltyAppliedPayload`
 
 | Поле | Тип |
-| --- | --- |
-| `claimId` | `Long` |
-| `tenantId` | `Long` |
-| `penaltyAmount` | `BigDecimal` |
-| `penaltyCurrency` | `String` |
-| `operationId` | `Long` |
+|---|---|
+| `claimId` | Long |
+| `tenantId` | Long |
+| `penaltyAmount` | BigDecimal |
+| `penaltyCurrency` | String |
+| `operationId` | Long |
 
 ### `PenaltyApplicationFailedPayload`
 
 | Поле | Тип |
-| --- | --- |
-| `claimId` | `Long` |
-| `tenantId` | `Long` |
-| `operationId` | `Long` |
-| `reason` | `String` |
+|---|---|
+| `claimId` | Long |
+| `tenantId` | Long |
+| `operationId` | Long |
+| `reason` | String |
 
 ### `UserDeactivatedPayload`
 
 | Поле | Тип |
-| --- | --- |
-| `userId` | `Long` |
-| `reason` | `String` |
+|---|---|
+| `userId` | Long |
+| `reason` | String |
 
-### Attachment payloads
-
-Attachment saga использует четыре storage-owned события и один claim-owned command event:
-
-- `AttachmentInitializedPayload`
-- `AttachmentConfirmedPayload`
-- `AttachmentBindingRequestedPayload`
-- `AttachmentBoundPayload`
-- `AttachmentBindingFailedPayload`
-
-Ключевые поля:
+### `AttachmentInitializedPayload` / `AttachmentConfirmedPayload` / `AttachmentBoundPayload`
 
 | Поле | Тип |
-| --- | --- |
-| `attachmentId` | `Long` |
-| `attachmentIds` | `List<Long>` |
-| `claimId` | `Long` |
-| `landlordId` | `Long` |
-| `ownerUserId` | `Long` |
-| `objectKey` | `String` |
-| `originalFilename` | `String` |
-| `reason` | `String` |
+|---|---|
+| `attachmentId` | Long |
+| `ownerUserId` | Long |
+| `objectKey` | String |
+| `originalFilename` | String |
+| `claimId` | Long NULL (для `BOUND` обязательно) |
 
-## 6. `correlationId` и `sagaId`
+## 6. correlationId и sagaId
 
-### `correlationId`
+### correlationId
 
-Используется для сквозной связи событий одного бизнес-процесса.
+Сквозной id одного бизнес-процесса. Генерируется в `edge-service` при первом HTTP-вызове (или принимается из заголовка `X-Correlation-Id`, если клиент его прислал).
 
-Примеры:
+Передаётся:
 
-- claim lifecycle после `POST /api/claims`
-- цепочка от penalty request до финального penalty result
+- HTTP → header `X-Correlation-Id`
+- gRPC → metadata `x-correlation-id`
+- Kafka → поле в `EventEnvelope`
+- MDC → во всех structured-логах
 
-### `sagaId`
+### sagaId
 
-Используется для маркировки конкретной distributed saga.
+Шаблоны:
 
-Текущие шаблоны:
+- `claim-lifecycle-{claimId}` — для self-обработки одной claim (assessment, status transitions)
+- `penalty-application-{claimId}` — для penalty саги
+- `user-deactivation-{userId}` — для каскадного закрытия claims
+- `attachment-binding-{claimId}` — для MinIO saga
 
-- `claim-lifecycle-{claimId}`
-- `penalty-application-{claimId}`
-- `user-deactivation-{userId}`
-- `attachment-binding-{claimId}`
+`sagaId` создаётся **producer'ом** инициирующего события и пробрасывается всеми участниками саги.
 
 ## 7. Версионирование
 
-Сейчас в `EventEnvelope` поле `eventVersion` всегда равно `1`.
+Сейчас `eventVersion = 1` для всех событий.
 
-Практический вывод:
+### Когда придётся вводить эволюцию
 
-- контракт версии фиксирован
-- schema evolution пока не внедрена
-- при появлении несовместимых изменений нужно будет ввести policy версионирования и совместимости consumer’ов
+- Добавление **опционального** поля в payload — совместимо backward, version не меняется. Consumer'ы должны игнорировать неизвестные поля (Jackson default).
+- **Удаление** поля или **переименование** — несовместимо. Нужно:
+  1. Завести новый payload class (например `ClaimCreatedPayloadV2`)
+  2. Поднять `eventVersion=2` для нового producer'а
+  3. Consumer должен уметь обрабатывать оба `eventVersion` параллельно в течение transition периода
+
+### Что НЕ реализовано (явно)
+
+- Schema registry (Confluent, Apicurio) — payload'ы валидируются only через Java типы при десериализации
+- Backward/forward compatibility checks в CI — добавляются позже
+
+## 8. Семантика at-least-once
+
+Outbox + Kafka publish — **at-least-once**. Это значит:
+
+- одно и то же событие может быть доставлено consumer'у **несколько раз**
+- caller обязан быть идемпотентным (см. processed_messages)
+
+**At-most-once** для side-effect достигается inbox-паттерном на стороне consumer'а — это контракт, который должен соблюдать каждый `@KafkaListener`.
+
+## 9. Запрещено
+
+- ❌ Публиковать в Kafka напрямую через `kafkaTemplate.send(...)`. Только через outbox.
+- ❌ Делать payload mutable / разделять между нитями.
+- ❌ Включать в payload **owned data чужого сервиса** (например в `PenaltyAppliedPayload` НЕ кладём `tenant.email` — penalty-service это не владеет).
+- ❌ Менять схему payload без поднятия `eventVersion` если изменение несовместимо.
+- ❌ Использовать random/timestamp как `eventKey` — теряется ordering.

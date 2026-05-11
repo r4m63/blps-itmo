@@ -1,161 +1,197 @@
-# Бизнес-процесс и Claim Lifecycle
+# Business Process and Claim Lifecycle
 
-## 1. Роль BPMN
+## 1. Бизнес-домен
 
-Файл [bpmn/blps1.bpmn](bpmn/blps1.bpmn) остаётся бизнес-референсом процесса, но не исполняется workflow engine’ом.
+Сервис обрабатывает **заявки на штраф** (claim) между арендодателем (LANDLORD), арендатором (TENANT) и платформой (SUPPORT). Арендодатель жалуется на ущерб от арендатора и просит платформу применить санкцию. Платформа проверяет основания, запрашивает позицию арендатора и принимает решение.
 
-Реальная исполняемая логика находится в:
+Бизнес-модель этого процесса описана в [bpmn/blps1.bpmn](bpmn/blps1.bpmn) и является **reference model**, а не исполняемой спецификацией. Реальная исполняемая логика — в коде `claim-service` (`ClaimProcessService`, `ClaimStatus`).
 
-- `claim-service`
-- `assessment-service`
-- `penalty-service`
-- `auth-service`
+## 2. Акторы
 
-То есть BPMN в проекте — это **reference model**, а не runtime engine definition.
+| Актор | Роль в системе | Чем занимается |
+|---|---|---|
+| `LANDLORD` | Заявитель | Создаёт заявку, прикладывает доказательства, отправляет доп. материалы по запросу |
+| `TENANT` | Ответчик | Отвечает на претензию (агрее/disagree + комментарий); может проигнорировать |
+| `SUPPORT` | Платформа (Airbnb Support) | Принимает финальное решение по claim в `SUPPORT_REVIEW` |
+| `ADMIN` | Администратор системы | Деактивирует пользователей, manual recovery penalty failure |
+| `SYSTEM` | Async-логика | Assessment по правилам, tenant-response timeout, penalty side-effect |
 
-## 2. Акторы процесса
+## 3. Связь BPMN ↔ реализация
 
-- `LANDLORD` — создаёт заявку и при необходимости отправляет дополнительные материалы
-- `TENANT` — отвечает на претензию, если дошло до этой стадии
-- `ADMIN` — принимает финальное решение по claim
-- `SYSTEM` — асинхронно выполняет assessment и penalty application
+| BPMN элемент | Реализация |
+|---|---|
+| `UserTask_CreateClaim` | `POST /api/claims` → `claim-service.createClaim()` |
+| `Activity_1p30r0x` (проверка полноты данных) | внутри `AssessmentWorkflowService` |
+| `ExclusiveGateway_EnoughData` | эвристика: `claimedAmount >= 200 && attempt == 1` → требуется доп. инфа |
+| `UserTask_ProvideDocs` | `POST /api/claims/{id}/additional-info` |
+| `Activity_0gw4i7b` (правила + оценка) | `AssessmentWorkflowService` async worker |
+| `ExclusiveGateway_RulesViolated` | эвристика: `claimedAmount >= 50` → есть основания |
+| `UserTask_RespondComment` | `POST /api/claims/{id}/tenant-response` |
+| `BoundaryTimer_ResponseTimeout` (P3D) | `@Scheduled` job в `claim-service` |
+| `UserTask_SupportReview` | manual: `POST /api/claims/{id}/support-decision` |
+| `ServiceTask_ApplyPenalty` | async: claim-service → Kafka → penalty-service worker |
+| `ServiceTask_CloseWithoutPenalty` | locally в claim-service @Transactional |
+| `IntermediateThrowEvent_NotifyDecision` | запись в локальную таблицу `notifications` |
 
-## 3. Жизненный цикл заявки
+## 4. Жизненный цикл заявки (Claim Status)
 
-Источник истины:
+Источник истины: `ClaimStatus.java` в `claim-service`.
 
-- `ClaimStatus.java`
-- `ClaimProcessService`
-- `sql/init_claim_service.sql`
+| Статус | Смысл | Терминальный |
+|---|---|---|
+| `ASSESSMENT_IN_PROGRESS` | Claim создан, async assessment работает | ❌ |
+| `NEED_ADDITIONAL_INFO` | Assessment запросил доп. материалы у landlord | ❌ |
+| `AWAITING_TENANT_RESPONSE` | Есть основания, ждём ответ tenant | ❌ |
+| `SUPPORT_REVIEW` | Tenant ответил или истёк timeout, ждём решение support | ❌ |
+| `PENALTY_PROCESSING` | Support одобрил штраф, penalty-service применяет | ❌ |
+| `PENALTY_APPLIED` | Штраф успешно применён | ✅ |
+| `PENALTY_PROCESSING_FAILED` | Penalty упал, ждёт manual retry | ❌ (но требует вмешательства) |
+| `CLOSED_NO_PENALTY` | Заявка закрыта без штрафа | ✅ |
 
-Текущие статусы:
+## 5. Таблица переходов
 
-- `ASSESSMENT_IN_PROGRESS`
-- `NEED_ADDITIONAL_INFO`
-- `AWAITING_TENANT_RESPONSE`
-- `SUPPORT_REVIEW`
-- `PENALTY_PROCESSING`
-- `PENALTY_APPLIED`
-- `PENALTY_PROCESSING_FAILED`
-- `CLOSED_NO_PENALTY`
+| Триггер | Откуда | Куда | Кто инициирует |
+|---|---|---|---|
+| `POST /api/claims` | — | `ASSESSMENT_IN_PROGRESS` | LANDLORD |
+| Assessment: `requiresAdditionalInfo=true` | `ASSESSMENT_IN_PROGRESS` | `NEED_ADDITIONAL_INFO` | SYSTEM (assessment worker) |
+| Assessment: `penaltyGrounds=true` | `ASSESSMENT_IN_PROGRESS` | `AWAITING_TENANT_RESPONSE` | SYSTEM |
+| Assessment: нет оснований | `ASSESSMENT_IN_PROGRESS` | `CLOSED_NO_PENALTY` | SYSTEM |
+| `POST /additional-info` | `NEED_ADDITIONAL_INFO` | `ASSESSMENT_IN_PROGRESS` | LANDLORD |
+| `POST /tenant-response` | `AWAITING_TENANT_RESPONSE` | `SUPPORT_REVIEW` | TENANT |
+| Tenant timeout (P3D) | `AWAITING_TENANT_RESPONSE` | `SUPPORT_REVIEW` | SYSTEM (scheduled) |
+| `POST /support-decision applyPenalty=false` | `SUPPORT_REVIEW` | `CLOSED_NO_PENALTY` | SUPPORT |
+| `POST /support-decision applyPenalty=true` | `SUPPORT_REVIEW` | `PENALTY_PROCESSING` | SUPPORT |
+| `PENALTY_APPLIED` event | `PENALTY_PROCESSING` | `PENALTY_APPLIED` | SYSTEM (via penalty-service) |
+| `PENALTY_APPLICATION_FAILED` event | `PENALTY_PROCESSING` | `PENALTY_PROCESSING_FAILED` | SYSTEM |
+| Manual retry penalty success | `PENALTY_PROCESSING_FAILED` | `PENALTY_PROCESSING` → `PENALTY_APPLIED` | ADMIN |
+| `USER_DEACTIVATED` event | любой нетерминальный | `CLOSED_NO_PENALTY` | SYSTEM (via edge-service) |
 
-## 4. Таблица переходов
+## 6. Эвристика assessment (демо-логика)
 
-| Действие | Откуда | Куда | Кто инициирует |
-| --- | --- | --- | --- |
-| `POST /api/claims` | нет | `ASSESSMENT_IN_PROGRESS` | `LANDLORD` |
-| `ASSESSMENT_COMPLETED` с `requiresAdditionalInfo=true` | `ASSESSMENT_IN_PROGRESS` | `NEED_ADDITIONAL_INFO` | `assessment-service` |
-| `ASSESSMENT_COMPLETED` с `penaltyGrounds=true` | `ASSESSMENT_IN_PROGRESS` | `AWAITING_TENANT_RESPONSE` | `assessment-service` |
-| `ASSESSMENT_COMPLETED` без grounds | `ASSESSMENT_IN_PROGRESS` | `CLOSED_NO_PENALTY` | `assessment-service` |
-| `POST /additional-info` | `NEED_ADDITIONAL_INFO` | `ASSESSMENT_IN_PROGRESS` | `LANDLORD` |
-| `POST /tenant-response` | `AWAITING_TENANT_RESPONSE` | `SUPPORT_REVIEW` | `TENANT` |
-| `POST /support-decision` без штрафа | `SUPPORT_REVIEW` | `CLOSED_NO_PENALTY` | `ADMIN` |
-| `POST /support-decision` со штрафом | `SUPPORT_REVIEW` | `PENALTY_PROCESSING` | `ADMIN` |
-| `PENALTY_APPLIED` | `PENALTY_PROCESSING` | `PENALTY_APPLIED` | `penalty-service` |
-| `PENALTY_APPLICATION_FAILED` | `PENALTY_PROCESSING` | `PENALTY_PROCESSING_FAILED` | `penalty-service` |
-| `USER_DEACTIVATED` | любой незакрытый статус | `CLOSED_NO_PENALTY` | `auth-service` |
+Реализована в `AssessmentWorkflowService`:
 
-## 5. Бизнес-эвристика оценки
+1. Если `attempt_no == 1 && claimedAmount >= 200` → `requiresAdditionalInfo=true`, claim уходит в `NEED_ADDITIONAL_INFO`.
+2. Иначе если `claimedAmount >= 50` → `penaltyGrounds=true`, `assessmentAmount = claimedAmount * 0.70`, claim уходит в `AWAITING_TENANT_RESPONSE`.
+3. Иначе → `penaltyGrounds=false`, claim уходит в `CLOSED_NO_PENALTY`.
 
-В текущей реализации assessment является не экспертной системой, а демонстрационным async worker’ом.
+Это **намеренно простая** демо-эвристика, не экспертная система. В прод-варианте здесь был бы внешний rules engine или ML-модель.
 
-Текущие правила:
+## 7. Tenant response (P3D timeout)
 
-- если это первая попытка и `claimedAmount >= 200`, то система требует дополнительные материалы
-- если `claimedAmount >= 50` и дополнительных материалов больше не требуется, то есть основания для штрафа
-- если оснований нет, claim закрывается без штрафа
-- при наличии оснований `assessmentAmount = claimedAmount * 0.70`
+Из BPMN: `<bpmn:timeDuration>P3D</bpmn:timeDuration>` — 3 дня на ответ ответчика.
 
-Это зашито в `AssessmentWorkflowService`.
+Реализация:
 
-## 6. Роль tenant response
+- claim переходит в `AWAITING_TENANT_RESPONSE` при заявленных основаниях для штрафа
+- `claim-service` имеет `@Scheduled` job (раз в минуту), который ищет:
+  ```sql
+  SELECT id FROM claims
+  WHERE status = 'AWAITING_TENANT_RESPONSE'
+    AND now() - updated_at > interval '3 days'
+  FOR UPDATE SKIP LOCKED LIMIT 50
+  ```
+- для каждой такой claim: @Transactional перевод в `SUPPORT_REVIEW` + timeline + outbox `TENANT_RESPONSE_EXPIRED`
 
-Если claim дошёл до `AWAITING_TENANT_RESPONSE`, арендатор отправляет ответ:
+Если tenant успел ответить — claim переходит в `SUPPORT_REVIEW` сразу через REST endpoint, timeout не срабатывает.
 
-- endpoint: `POST /api/claims/{id}/tenant-response`
-- результат: claim переводится в `SUPPORT_REVIEW`
+## 8. Support decision
 
-Замечание:
+Endpoint: `POST /api/claims/{id}/support-decision`
 
-- поле `agree` в текущей реализации сохраняется в event payload, но не меняет state machine напрямую
+Тело:
 
-## 7. Роль support decision
-
-Endpoint:
-
-- `POST /api/claims/{id}/support-decision`
+```json
+{
+  "applyPenalty": true,
+  "penaltyAmount": 175.00,
+  "penaltyCurrency": "USD",
+  "note": "Confirmed: damage evidence sufficient",
+  "simulateFailure": false
+}
+```
 
 Ветки:
 
-- `applyPenalty=false`:
-  claim закрывается сразу как `CLOSED_NO_PENALTY`
-- `applyPenalty=true`:
-  claim уходит в `PENALTY_PROCESSING`, а дальше судьба заявки зависит от `penalty-service`
+- `applyPenalty=false` → claim в `CLOSED_NO_PENALTY`, локальный @Transactional + outbox `CLAIM_CLOSED_NO_PENALTY`
+- `applyPenalty=true && penaltyAmount > 0` → claim в `PENALTY_PROCESSING` + outbox `PENALTY_APPLICATION_REQUESTED`
+- `simulateFailure=true` — флаг для demo, заставляет `penalty-service` имитировать сбой
 
-## 8. Failure path
+## 9. Penalty failure path (manual recovery)
 
-Penalty flow умеет демонстрировать частичный сбой:
+Демонстрирует saga с non-rollbackable step:
 
-- администратор отправляет `simulateFailure=true`
-- `penalty-service` создаёт failed operation
-- claim уходит в `PENALTY_PROCESSING_FAILED`
-- оператор повторяет операцию через `/api/penalties/operations/{id}/retry`
-- после повторной обработки claim доходит до `PENALTY_APPLIED`
+1. SUPPORT отправляет `support-decision` с `simulateFailure=true`
+2. `claim-service` → `PENALTY_PROCESSING` + outbox event
+3. `penalty-service` создаёт `penalty_operations(status=PENDING)`
+4. Worker → `PROCESSING` → имитирует ошибку → `FAILED`
+5. `penalty-service` publishes `PENALTY_APPLICATION_FAILED`
+6. `claim-service` → `PENALTY_PROCESSING_FAILED` (intermediate state, требует вмешательства)
+7. ADMIN: `POST /api/penalties/operations/{id}/retry`
+8. `penalty-service` возвращает operation в `PENDING`, worker обработает заново
+9. Успех → `PENALTY_APPLIED` → claim в `PENALTY_APPLIED`
 
-## 9. User deactivation как бизнес-событие
+**Компенсация ≠ rollback БД.** Это бизнес-действие: retry или manual close.
 
-User deactivation — это не просто изменение строки в `users`.
+## 10. User deactivation как distributed reaction
 
-Фактический бизнес-эффект:
+Один бизнес-факт в `edge-service` запускает реакцию в `claim-service`:
 
-1. `auth-service` деактивирует пользователя
-2. публикует `USER_DEACTIVATED`
-3. `claim-service` находит все открытые claim этого пользователя
-4. закрывает их как `CLOSED_NO_PENALTY`
-5. записывает timeline
+1. ADMIN: `POST /api/auth/users/{id}/deactivate`
+2. `edge-service` @Transactional: `users.enabled=false` + outbox `USER_DEACTIVATED`
+3. relay → Kafka `identity.events`
+4. `claim-service` consumer:
+   - dedup через `processed_messages`
+   - находит все нетерминальные claims, где user — landlord или tenant
+   - переводит их в `CLOSED_NO_PENALTY` с note `"closed due to user deactivation"`
+   - пишет timeline + outbox `CLAIM_CLOSED_NO_PENALTY` на каждую
 
-Это отдельная кросс-контекстная saga.
+Между состояниями user.enabled=false и claims.status=CLOSED — короткое окно eventual consistency. Это нормально.
 
-## 10. Mapping на текущие demo-сценарии
+## 11. Attachment lifecycle (MinIO saga)
 
-### `30-lab3-async-penalty.http`
+В `claim-service`, но MinIO — non-XA участник:
 
-Покрывает:
+| Статус attachment | Откуда | Куда | Действие |
+|---|---|---|---|
+| `INITIALIZED` | — | `INITIALIZED` | `POST /api/attachments/init` создаёт metadata row + presigned PUT URL |
+| (вне системы) | `INITIALIZED` | `INITIALIZED` | клиент делает `PUT` напрямую в MinIO |
+| `CONFIRMED` | `INITIALIZED` | `CONFIRMED` | `POST /api/attachments/{id}/confirm` делает HEAD-check в MinIO **до** открытия БД-TX, потом @Transactional UPDATE |
+| `BOUND` | `CONFIRMED` | `BOUND` | `POST /api/claims` с `attachmentIds[]` — внутри одной @Transactional UPDATE attachments SET claim_id=?, status=BOUND |
+| `ORPHANED` | `INITIALIZED`/`CONFIRMED` | `ORPHANED` | reconciliation job убирает attachments > 24h без claim |
 
-- create claim
-- initial async assessment
-- additional info
-- reassessment
-- tenant response
-- support decision
-- penalty application success
+## 12. Notification flow (write-side log)
 
-### `31-lab3-penalty-failure-recovery.http`
+Когда происходит значимое событие lifecycle (transition, успех/ошибка penalty, deactivation, и т.д.):
 
-Покрывает:
+1. `claim-service` @KafkaListener / @Transactional делает бизнес-update
+2. В **той же транзакции** — INSERT в локальную таблицу `notifications`
+3. Никакой отдельный сервис не нужен — это локальный read-side log
 
-- create claim
-- async assessment без additional info
-- tenant response
-- penalty failure
-- manual retry
-- final success
+`GET /api/claims/{id}/notifications` возвращает свежие записи.
 
-### `32-lab3-user-deactivation.http`
+Реальная отправка email/push в demo не реализована — это product feature, не архитектурный паттерн.
 
-Покрывает:
+## 13. Что отличается от BPMN
 
-- create active claim
-- user deactivation
-- asynchronous closure of claims
+BPMN — бизнес-референс, реализация имеет осознанные упрощения:
 
-## 11. Отличия от "идеального" BPMN
+| BPMN | Реализация | Почему |
+|---|---|---|
+| `Activity_1p30r0x` (проверка полноты) и `Activity_0gw4i7b` (оценка ущерба) — два разных user task | Один `AssessmentWorkflowService` async worker | Это **системные** задачи, не human task. BPMN ошибочно положил их в Lane заявителя. |
+| Уведомление как `IntermediateThrowEvent_NotifyDecision` | Локальный `notifications` лог | Реальная отправка вне scope demo |
+| `BoundaryTimer_ResponseTimeout = P3D` | `@Scheduled` job каждую минуту, выбирает претеренные | Имитация workflow engine timer |
+| Workflow engine исполняет BPMN | Не исполняет; реализация в Java коде | Camunda/Temporal — overkill для лабы |
 
-Сейчас в проекте отсутствуют:
+Не нужно ставить BPMN и код в противоречие. **BPMN — это бизнес-договорённость. Код — её исполняемая интерпретация.**
 
-- timeout path для tenant response
-- dedicated notification task в основном бизнес-процессе
-- отдельный orchestration engine
-- attachment/storage subprocess
+## 14. Demo-сценарии
 
-Это важно: документация проекта должна различать **бизнес-модель** и **текущую реализованную исполняемую модель**.
+| Файл | Демонстрирует |
+|---|---|
+| `rest-client/scenarios/01-create-claim-async-penalty.http` | Happy path: создание → assessment → tenant response → support → penalty applied |
+| `rest-client/scenarios/02-penalty-failure-recovery.http` | Penalty failure → `PENALTY_PROCESSING_FAILED` → manual retry → `PENALTY_APPLIED` |
+| `rest-client/scenarios/03-user-deactivation.http` | Деактивация → distributed reaction в claim-service |
+| `rest-client/scenarios/04-attachment-saga.http` | Init → MinIO upload → confirm → bind в claim |
+| `rest-client/scenarios/05-tenant-timeout.http` | `AWAITING_TENANT_RESPONSE` → P3D timeout → `SUPPORT_REVIEW` |
+
+См. [runbook.md](runbook.md) для команд запуска.

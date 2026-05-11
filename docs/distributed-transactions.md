@@ -1,243 +1,361 @@
 # Distributed Transactions Design
 
-## 1. Проблема, которую решает проект
+## 1. Проблема, которую решает архитектура
 
-Проект показывает, как строить межсервисный бизнес-процесс без глобального transaction manager.
+Система обрабатывает межсервисный бизнес-процесс **без глобального transaction manager**. Основные риски, которые нужно митигировать:
 
-Основные риски распределённых транзакций здесь такие:
+1. **Dual write problem.** Бизнес-данные записались в БД, но событие в Kafka не ушло (или наоборот) — данные и события расходятся.
+2. **Duplicate delivery.** Сообщение пришло consumer'у несколько раз — нельзя дважды списать penalty, увеличить penalty_count, и т.д.
+3. **Partial failure в середине саги.** Один сервис уже закоммитил локально, а другой не смог продолжить.
+4. **Невозможность XA over external systems.** MinIO, внешний penalty processor, Kafka — нельзя включить в один глобальный commit.
+5. **Stale reads.** Клиент только что создал claim, но `GET` ещё не показывает финальный статус.
+6. **Зависшие процессы.** Worker не дотянул шаг до конца, claim застрял в intermediate state.
 
-1. Бизнес-данные записались, а событие в Kafka не ушло.
-2. Событие дошло до consumer’а несколько раз.
-3. Один сервис уже закоммитил локальное состояние, а другой ещё нет.
-4. В середине саги произошёл частичный отказ.
+## 2. Почему XA / 2PC не используется
 
-## 2. Почему здесь нет XA
+Решение **отказаться** от глобального XA взято осознанно:
 
-В микросервисной версии проекта глобальный `XA/2PC` намеренно не используется.
+- **Микросервисы владеют разными БД.** Глобальный XA-coordinator нужен только если все ресурсы XA-aware и сидят в одной координационной зоне. Это противоречит database-per-service.
+- **Kafka не должна быть XA-участником вместе с бизнес-БД.** Это резко ухудшает throughput и доступность.
+- **Coordinator становится SPOF.** При его падении все участники зависают с открытыми prepared транзакциями.
+- **Внешние side-effects вне XA.** Применение штрафа, отправка в MinIO, отправка email — это **необратимые** действия. Их нельзя откатить generic rollback'ом.
+- **2PC блокирующий протокол.** Latency повышается, availability падает.
 
-Причины:
+В коде остаётся **исторический артефакт** Narayana/JTA из старой архитектуры lab1/lab2 (два datasource в одном Spring Boot процессе). Этот код **не используется** в lab3 и оставлен только как контраст для объяснения, почему XA не масштабируется.
 
-- микросервисы владеют разными БД
-- Kafka не должна участвовать в распределённом commit с бизнес-БД
-- глобальный coordinator ухудшает масштабирование и отказоустойчивость
-- внешние side effects вроде penalty processing плохо ложатся в модель rollback
+## 3. Применяемые паттерны (сводка)
 
-Итоговая стратегия:
+| Паттерн | Где применяется | Что решает |
+|---|---|---|
+| **Local transaction** | каждый write use case в каждом сервисе | базовая ACID на одну БД |
+| **Transactional Outbox** | все 3 сервиса | dual write problem |
+| **Inbox / processed_messages** | все consumer'ы | duplicate delivery, idempotency |
+| **Saga choreography** | penalty flow, user deactivation, attachment binding | межсервисный процесс без XA |
+| **Compensating actions** | penalty failure → manual retry / close | non-rollbackable side-effect |
+| **Eventual consistency** | межсервисные транзакции | отказ от мгновенной глобальной согласованности |
+| **Optimistic locking** (`@Version`) | claim updates | конкурентный update aggregate |
+| **Idempotency keys** | retry-чувствительные операции | повторные вызовы не дублируют эффект |
+| **DLT (Dead Letter Topic)** | shared Kafka error handler | poison messages |
+| **Timeout handling** | tenant response (P3D), penalty processing | зависшие шаги |
+| **Manual recovery** | `POST /penalties/operations/{id}/retry` + `/claims/{id}/repair/*` | failure при исчерпанных авто-ретраях |
+| **Partition keys** (Kafka) | `claimId` / `userId` как event key | локальный порядок по aggregate |
 
-- локальная транзакция на сервис
-- gRPC для синхронной валидации и query/command вызовов без общей транзакции
-- outbox для публикации
-- inbox для дедупликации
-- choreography saga
+## 4. Transactional Outbox
 
-## 3. Текущие паттерны
+### Правило
 
-## 3.1. Local Transaction
+Бизнес-изменение и запись события — **в одной локальной транзакции**:
 
-Каждый write use case меняет только свою локальную БД.
+```text
+@Transactional {
+  1. UPDATE/INSERT business state
+  2. INSERT outbox_events (event_type, payload_json, ...)
+  COMMIT
+}
+3. OutboxRelay (отдельный @Scheduled поток, 1000ms poll) → Kafka
+4. UPDATE outbox_events SET status='PUBLISHED', published_at=now() WHERE id=?
+```
 
-Примеры:
+Если Kafka недоступна, бизнес-данные **уже** записаны. Событие лежит в outbox со status=`NEW`, relay попробует снова. Это решает **dual write problem**.
 
-- `claim-service.createClaim()`
-- `assessment-service.handleClaimCreated()`
-- `penalty-service.handlePenaltyRequested()`
-- `auth-service.deactivateUser()`
+### Таблица `outbox_events`
 
-## 3.2. Transactional Outbox
+| Поле | Тип | Назначение |
+|---|---|---|
+| `id` | BIGSERIAL | первичный ключ |
+| `event_id` | UUID UNIQUE | сквозной id события (попадает в EventEnvelope) |
+| `event_type` | VARCHAR | `EventType` enum |
+| `topic_name` | VARCHAR | Kafka topic (`claim.events`, `penalty.events`, `identity.events`) |
+| `event_key` | VARCHAR | partition key (обычно = `aggregate_id`) |
+| `aggregate_type` | VARCHAR | `CLAIM` / `USER` / `PENALTY` |
+| `aggregate_id` | VARCHAR | id aggregate, к которому относится событие |
+| `correlation_id` | VARCHAR | сквозной id бизнес-процесса |
+| `saga_id` | VARCHAR | id конкретной саги |
+| `actor_id` | BIGINT | пользователь, инициировавший действие |
+| `payload_json` | JSONB | сериализованный payload |
+| `status` | VARCHAR | `NEW` / `PUBLISHED` / `FAILED` |
+| `retry_count` | INT | количество попыток relay |
+| `error_message` | TEXT | последняя ошибка relay |
+| `created_at` | TIMESTAMPTZ | момент создания |
+| `published_at` | TIMESTAMPTZ NULL | момент публикации |
 
-Событие не публикуется напрямую из бизнес-кода как единственный источник истины.
+Эта таблица **есть в каждой service-БД** (`blps_identity`, `blps_claim`, `blps_penalty`).
 
-Правильная последовательность:
+### Запрещено
 
-1. изменить business state
-2. вставить запись в `outbox_events`
-3. закоммитить транзакцию
-4. `OutboxRelay` публикует событие в Kafka
+- Прямой `kafkaTemplate.send(...)` из бизнес-кода — нарушает атомарность с БД.
+- Запись в outbox из gRPC handler'а в чужой БД — пишем только в свою.
 
-Что это даёт:
+### Реализация
 
-- если Kafka временно недоступна, бизнес-операция не теряется
-- событие остаётся в БД как `NEW` или `FAILED`
-- relay попробует отправить его снова
+- `OutboxService.append(...)` (в `platform-core`) — единственный способ добавить событие в outbox.
+- `OutboxRelay` (в `platform-core`) — `@Scheduled(fixedDelay=1000)` поллит NEW events, публикует в Kafka, помечает PUBLISHED. При ошибке — `retry_count++`, status=`FAILED`.
+- После 5 неудач — алёрт через `/actuator/health` indicator (custom). Дальше — ручной разбор.
 
-## 3.3. Inbox / `processed_messages`
+## 5. Inbox / processed_messages
 
-Каждый consumer обязан быть идемпотентным.
+### Правило
 
-Правильная последовательность:
+Дедупликация и бизнес-эффект — **в одной локальной транзакции**:
 
-1. прочитать событие
-2. проверить `(event_id, consumer_name)` в `processed_messages`
-3. если уже обработано, выйти без side effect
-4. если нет, выполнить локальное изменение
-5. записать `processed_messages`
+```text
+@Transactional {
+  1. SELECT processed_messages WHERE event_id=? AND consumer_name=?
+  2. if exists → COMMIT, выйти без side-effect (duplicate)
+  3. if not exists → выполнить бизнес-изменение
+  4. INSERT processed_messages (event_id, consumer_name, ...)
+  COMMIT
+}
+```
 
 Это защищает от:
 
-- повторной доставки
-- повторного poll/consume
-- повторного запуска consumer после сбоя
+- повторной доставки Kafka (at-least-once semantics)
+- повторного запуска consumer после сбоя до commit'а offset'а
+- consumer rebalance'а в момент обработки
 
-## 3.4. Saga Choreography
+### Таблица `processed_messages`
 
-Сага в проекте не централизована отдельным orchestrator’ом.
+| Поле | Тип | Назначение |
+|---|---|---|
+| `id` | BIGSERIAL | первичный ключ |
+| `event_id` | UUID | id события (из EventEnvelope) |
+| `consumer_name` | VARCHAR | имя consumer'а (например `claim-service:PenaltyAppliedHandler`) |
+| `correlation_id` | VARCHAR | для трассировки |
+| `processed_at` | TIMESTAMPTZ DEFAULT now() | момент обработки |
 
-Модель:
+`UNIQUE (event_id, consumer_name)` — гарантирует идемпотентность даже при race condition.
 
-- один сервис публикует доменное событие
-- другой сервис реагирует на него
-- делает локальный commit
-- публикует следующее событие
+### Реализация
 
-То есть координация распределена между участниками процесса.
+`ProcessedMessageService.handleIfNew(eventId, consumerName, () -> businessAction)` — обёртка, которая делает SELECT, в случае duplicate возвращает молча, иначе вызывает action и пишет processed row. Всё внутри одной `@Transactional`.
 
-## 4. Flow 1: Claim creation -> async assessment
+## 6. Saga Choreography
 
-### Шаги
+### Принцип
 
-1. `POST /api/claims`
-2. `claim-service`:
-   - валидирует пользователей через `AuthRpcService.GetUser`
-   - создаёт запись в `claims`
-   - пишет timeline
-   - пишет `CLAIM_CREATED` в `outbox_events`
-3. `OutboxRelay` публикует `CLAIM_CREATED`
-4. `assessment-service` получает событие:
-   - dedup через `processed_messages`
-   - создаёт `assessment_job`
-5. `assessment-service` worker позже берёт `PENDING` job:
-   - считает результат
-   - пишет `ASSESSMENT_COMPLETED` в outbox
-6. `claim-service` получает результат и переводит заявку:
-   - в `NEED_ADDITIONAL_INFO`
-   - или в `AWAITING_TENANT_RESPONSE`
-   - или в `CLOSED_NO_PENALTY`
+Нет central orchestrator. Каждый сервис:
 
-### Что здесь важно
+1. реагирует на доменное событие (`@KafkaListener`)
+2. в локальной @Transactional выполняет:
+   - dedup через processed_messages
+   - бизнес-update своего aggregate
+   - INSERT outbox_events со следующим событием
+3. relay публикует — следующий участник реагирует
 
-- claim уже существует до завершения assessment
-- это нормальное окно eventual consistency
-- ни один глобальный rollback здесь не нужен
+Состояние саги отражено в **бизнес-статусах** aggregate (например, `claims.status`, `penalty_operations.status`). Отдельной таблицы `saga_state` нет.
 
-## 5. Flow 2: Penalty application success saga
+### Активные саги
 
-### Шаги
+#### Saga 1: `claim-lifecycle-{claimId}`
 
-1. `POST /api/claims/{id}/support-decision` с `applyPenalty=true`
-2. `claim-service`:
-   - ставит `PENALTY_PROCESSING`
-   - пишет `PENALTY_APPLICATION_REQUESTED` в outbox
-3. `penalty-service`:
-   - создаёт `penalty_operation` со статусом `PENDING`
-4. worker `penalty-service`:
-   - переводит operation в `PROCESSING`
-   - симулирует внешний процессор
-   - при успехе переводит operation в `APPLIED`
-   - пишет `PENALTY_APPLIED`
-5. `claim-service`:
-   - переводит claim в `PENALTY_APPLIED`
-6. `auth-service`:
-   - увеличивает `penaltyCount`
-7. `notification-service` и `audit-service`:
-   - записывают проекции
+В пределах одного claim-service (self-loop через Kafka):
 
-### Почему это сага
+```
+CLAIM_CREATED → assessment job → ASSESSMENT_COMPLETED (locally) → claim.status update
+```
 
-Потому что:
+Технически self-saga, но через Kafka, чтобы продемонстрировать outbox/inbox даже в локальном async flow.
 
-- claim finalization
-- penalty execution
-- user penalty counter update
+#### Saga 2: `penalty-application-{claimId}`
 
-находятся в разных bounded contexts и коммитятся независимо.
+Межсервисная:
 
-## 6. Flow 3: Penalty failure and manual recovery
+```
+[claim-service]   support-decision → PENALTY_APPLICATION_REQUESTED   (claim status: PENALTY_PROCESSING)
+                                          ↓ Kafka
+[penalty-service] penalty_operation PENDING → PROCESSING → APPLIED   PENALTY_APPLIED
+                                          ↓ Kafka
+[claim-service]   claim.status = PENALTY_APPLIED                     (final)
+[edge-service]    users.penalty_count++                              (parallel reaction)
+```
 
-### Шаги
+#### Saga 3: `user-deactivation-{userId}`
 
-1. Админ отправляет `support-decision` c `simulateFailure=true`
-2. `claim-service` переводит claim в `PENALTY_PROCESSING`
-3. `penalty-service` создаёт `penalty_operation`
-4. worker переводит её в `FAILED`
-5. `penalty-service` публикует `PENALTY_APPLICATION_FAILED`
-6. `claim-service` переводит claim в `PENALTY_PROCESSING_FAILED`
-7. Оператор вызывает `POST /api/penalties/operations/{id}/retry`
-8. `penalty-service` возвращает operation в `PENDING`
-9. следующий worker pass публикует `PENALTY_APPLIED`
-10. claim и auth-service доходят до согласованного финала
+```
+[edge-service]  users.enabled=false → USER_DEACTIVATED
+                                          ↓ Kafka
+[claim-service] find open claims for user → close each as CLOSED_NO_PENALTY
+```
 
-### Это демонстрирует
+#### Saga 4: `attachment-binding-{claimId}`
 
-- partial failure
-- отсутствие глобального rollback
-- recovery through explicit business action
+Локальная (в claim-service) с **внешним** non-XA участником MinIO:
 
-## 7. Flow 4: User deactivation saga
+```
+[claim-service] init → metadata row INITIALIZED  +  presigned PUT URL
+[client]        upload directly to MinIO         ←  out of band
+[claim-service] confirm → HEAD-check MinIO       →  metadata CONFIRMED
+[claim-service] createClaim with attachment refs →  metadata BOUND, claim.attachments populated
+```
 
-### Шаги
+MinIO **не участвует в транзакции БД**. Если client загрузил в MinIO но не вызвал confirm — reconciliation job помечает attachment как ORPHANED через 24h.
 
-1. `auth-service` деактивирует пользователя локально
-2. пишет `USER_DEACTIVATED` в outbox
-3. `claim-service` получает событие
-4. находит незакрытые claims пользователя
-5. закрывает их как `CLOSED_NO_PENALTY`
-6. пишет timeline
+## 7. Compensating Actions
 
-### Это демонстрирует
+Компенсация — это **бизнес-действие**, не rollback БД.
 
-- distributed reaction на бизнес-факт
-- отсутствие общей транзакции между user state и claim state
+### Penalty failure
 
-## 8. Failure Handling Matrix
+| Шаг исходный | Компенсирующее действие |
+|---|---|
+| `PENALTY_APPLICATION_REQUESTED` → `PENALTY_PROCESSING` | claim переводится в `PENALTY_PROCESSING_FAILED`, ждёт ADMIN'а |
+| `penalty_operation.status = FAILED` | `POST /penalties/operations/{id}/retry` возвращает в `PENDING`, worker обрабатывает заново |
 
-| Проблема | Как решается сейчас |
-| --- | --- |
-| DB commit прошёл, Kafka недоступна | событие остаётся в `outbox_events`, relay перепубликует позже |
-| Kafka доставила событие дважды | consumer проверяет `processed_messages` |
-| assessment ещё не успел обработать заявку | claim остаётся в `ASSESSMENT_IN_PROGRESS` |
-| penalty processor упал | claim уходит в `PENALTY_PROCESSING_FAILED` |
-| нужен recovery после penalty failure | есть manual retry endpoint |
-| attachment привязан неатомарно с MinIO | `storage-service` ведёт `init -> confirm -> bind` saga |
-| consumer не может обработать poison message | shared Kafka error handler отправляет запись в `<topic>.dlt` |
-| долгий async шаг завис | scheduled timeout/reconciliation jobs переводят процесс в repair/failure state |
-| нужна трассировка всей саги | использовать `audit-service` и `correlationId`/`sagaId` |
+Компенсация **идемпотентна**: retry можно вызывать несколько раз, эффект тот же.
 
-## 9. Что пока не реализовано
+### Claim manual repair
 
-Для честности:
+| Endpoint | Действие |
+|---|---|
+| `POST /api/claims/{id}/repair/reassess` | сбросить status в `ASSESSMENT_IN_PROGRESS`, создать новый assessment_job |
+| `POST /api/claims/{id}/repair/close` | принудительно закрыть как `CLOSED_NO_PENALTY` с note |
 
-- нет schema registry
-- нет отдельного monitoring UI для DLT/stuck saga
-- нет production-grade distributed tracing stack
+Используется когда автоматические механизмы (retry, timeout) исчерпаны или дают непредсказуемое поведение.
 
-Но базовый каркас distributed transaction handling уже есть:
+## 8. Eventual Consistency
 
-- outbox
-- inbox
-- explicit intermediate states
-- manual recovery
-- DLT publishing
-- timeout/reconciliation jobs
-- attachment saga
+### Контракт с клиентом API
 
-## 10. Что показывать на защите
+Long-running операции возвращают:
 
-### Сценарий 1
+- **HTTP 202 Accepted**
+- `claimId`, `correlationId`, `processingStatus` (например `ASSESSMENT_IN_PROGRESS`)
+- НЕ обещают финальный статус сразу
 
-`ClaimCreated` сначала попадает в локальную БД, а потом уходит через outbox relay.
+Клиент опрашивает:
 
-### Сценарий 2
+- `GET /api/claims/{id}/process-status` — текущий бизнес-статус + флаг `terminal: true/false`
+- `GET /api/claims/{id}/timeline` — история переходов с timestamp'ами
 
-После создания claim пользователь видит не финальный статус, а промежуточный `ASSESSMENT_IN_PROGRESS`.
+### Intermediate-статусы как часть архитектуры
 
-### Сценарий 3
+| Статус | Назначение |
+|---|---|
+| `ASSESSMENT_IN_PROGRESS` | claim создан, assessment ещё работает |
+| `PENALTY_PROCESSING` | support решил применить штраф, penalty-service применяет |
+| `PENALTY_PROCESSING_FAILED` | penalty упал, ждёт ADMIN |
+| `NEED_ADDITIONAL_INFO` | landlord должен дослать материалы |
+| `AWAITING_TENANT_RESPONSE` | ждём ответ tenant (timeout P3D) |
+| `SUPPORT_REVIEW` | ждём решения support |
 
-Penalty flow показывает `PENALTY_PROCESSING` и потом финализируется отдельным сервисом.
+**Нельзя обещать клиенту read-your-own-writes для async flow.** Это намеренный выбор, не баг.
 
-### Сценарий 4
+## 9. Idempotency
 
-Penalty failure переводит claim в `PENALTY_PROCESSING_FAILED`, после чего оператор восстанавливает процесс.
+### Где обязательна
 
-### Сценарий 5
+- **Все Kafka consumers** — через `processed_messages`
+- **`POST /penalties/operations/{id}/retry`** — повторный retry FAILED операции не создаёт дубликат
+- **Outbox events** — `event_id` unique, повторная публикация не создаёт два события
 
-`auth-service` деактивирует пользователя, а `claim-service` реагирует асинхронно и закрывает открытые claims.
+### Не реализовано (явно)
+
+`POST /api/claims` **не** имеет `Idempotency-Key` header'а. Клиент при retry может создать дубликат. Это осознанный недостаток demo-уровня — для production нужно добавить middleware на edge-service, который проверяет header против таблицы `processed_requests`.
+
+## 10. Retry policy + DLT
+
+### Kafka consumers
+
+В `PlatformKafkaConfig` (в `platform-core`) настроен shared error handler:
+
+- `DefaultErrorHandler` с `ExponentialBackOff` (initial=1s, multiplier=2.0, maxInterval=30s, maxRetries=5)
+- non-retryable exceptions (`IllegalArgumentException`, validation errors) — сразу в DLT без retry
+- после исчерпания попыток — событие публикуется в `<topic>.dlt` с заголовками о причине
+
+### Топики DLT
+
+- `claim.events.dlt`
+- `penalty.events.dlt`
+- `identity.events.dlt`
+
+### Что НЕ делается
+
+- Бесконечный retry — никогда. После N попыток событие в DLT, оператор разбирается.
+- Retry на неидемпотентной операции — каждое retry-чувствительное место защищено через `processed_messages`.
+
+## 11. Timeout handling
+
+### Tenant response (P3D)
+
+`@Scheduled(fixedDelay=60000)` в claim-service:
+
+```sql
+SELECT id FROM claims
+WHERE status = 'AWAITING_TENANT_RESPONSE'
+  AND now() - updated_at > interval '3 days'
+FOR UPDATE SKIP LOCKED LIMIT 50;
+```
+
+Для каждой claim: @Transactional → `SUPPORT_REVIEW` + timeline + outbox `TENANT_RESPONSE_EXPIRED`.
+
+`FOR UPDATE SKIP LOCKED` гарантирует, что параллельные реплики claim-service не возьмут одну и ту же claim.
+
+### Penalty processing
+
+Если `penalty_operations.status` остался в `PROCESSING` дольше 10 минут — reconciliation job помечает как FAILED. Worker может вызвать `POST /retry`.
+
+### Outbox publish
+
+Если outbox event остался `NEW` дольше 5 минут — алёрт через actuator. Это сигнал, что relay сломался или Kafka недоступна.
+
+## 12. Partition keys
+
+Стандарт: `eventKey = aggregateId`.
+
+| Поток | Aggregate | Key |
+|---|---|---|
+| claim lifecycle | claim | `claimId` |
+| penalty saga | claim | `claimId` |
+| user deactivation | user | `userId` |
+
+Это даёт **локальный порядок** событий по одному aggregate. Глобального порядка нет и не требуется.
+
+## 13. correlationId, sagaId, eventId
+
+### Семантика
+
+| ID | Смысл | Жизнь |
+|---|---|---|
+| `eventId` | unique id одного события | живёт в outbox/inbox/audit |
+| `correlationId` | сквозной id одного бизнес-процесса | передаётся через HTTP header `X-Correlation-Id`, через EventEnvelope, через gRPC metadata |
+| `sagaId` | id конкретной саги | формируется по шаблону, см. ниже |
+
+### Шаблоны sagaId
+
+- `claim-lifecycle-{claimId}` — для async-обработки одной claim
+- `penalty-application-{claimId}` — для penalty-saga
+- `user-deactivation-{userId}` — для каскадного закрытия claims
+- `attachment-binding-{claimId}` — для MinIO saga
+
+### MDC и logs
+
+`correlationId` кладётся в MDC при входе в HTTP / gRPC / Kafka handler. Все structured-логи содержат это поле, что позволяет восстановить цепочку через `grep`/Loki.
+
+## 14. Failure handling matrix
+
+| Сценарий | Решение |
+|---|---|
+| Postgres commit OK, Kafka unavailable | outbox → relay retry |
+| Kafka delivered twice | processed_messages dedup |
+| Consumer crashes mid-handler | offset не закоммичен → перечитается → dedup |
+| `@Transactional` rollback в consumer | processed_messages не записан → переобработка |
+| External penalty processor down | `penalty_operation.status=FAILED` → claim в `PENALTY_PROCESSING_FAILED` → manual retry |
+| Tenant не отвечает 3+ дня | scheduled timeout → `SUPPORT_REVIEW` |
+| Concurrent update одного claim | optimistic lock `@Version` → второй commit получает `OptimisticLockException` → retry или fail |
+| Poison message в Kafka | shared error handler → DLT после N retries |
+| MinIO upload оборвался до confirm | reconciliation job помечает ORPHANED через 24h |
+| Long-running saga застряла | `claim_timeline` + `audit_events` view + manual repair endpoint |
+
+## 15. Что показывать на защите лабы
+
+Минимальный набор demo для зачёта (см. [runbook.md](runbook.md)):
+
+1. **Dual-write resilience.** Kafka down → claim создан, событие лежит в outbox → Kafka up → relay допубликовал.
+2. **Eventual consistency.** Создал claim → `GET` показывает `ASSESSMENT_IN_PROGRESS` → через несколько секунд догоняется до финального.
+3. **Duplicate event handling.** Послать `PENALTY_APPLIED` дважды (через kafka-console-producer) → claim перешёл ровно один раз, в `processed_messages` ровно одна запись.
+4. **Penalty failure + manual recovery.** support-decision с `simulateFailure=true` → `PENALTY_PROCESSING_FAILED` → retry → `PENALTY_APPLIED`.
+5. **User deactivation.** Деактивировать LANDLORD → его открытые claims закрылись через несколько секунд.
+6. **MinIO outside XA.** init → upload → confirm → bind → orphan reconciliation на брошенном attachment.
+
+Если хотя бы один из 6 ломается — это **BLOCKER** для PR.
