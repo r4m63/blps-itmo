@@ -2,43 +2,15 @@ spring:
   application:
     name: claim-service
   datasource:
-    url: jdbc:postgresql://${CLAIM_DB_HOST:localhost}:${CLAIM_DB_PORT:5434}/${CLAIM_DB_NAME:blps_claim}
-    username: ${CLAIM_DB_USERNAME:blps_claim_user}
-    password: ${CLAIM_DB_PASSWORD:blps_claim_password}
+    url: jdbc:postgresql://localhost:5434/blps_claim
+    username: postgres
+    password: postgres
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
-        format_sql: true
-    show-sql: false
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      auto-offset-reset: earliest
-      properties:
-        spring.json.trusted.packages: "*"
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
 server:
-  port: ${CLAIM_SERVICE_PORT:8081}
-
-app:
-  service-name: claim-service
-  grpc:
-    server:
-      port: ${CLAIM_GRPC_PORT:19081}
-    clients:
-      auth:
-        target: ${AUTH_GRPC_TARGET:localhost:19082}
-  outbox:
-    poll-interval-ms: 1000
-    max-retry-count: 10
-  kafka:
-    retry:
-      backoff-ms: 1000
-      max-attempts: 3
-  claim:
-    tenant-response-timeout-minutes: 60
-    timeout-poll-interval-ms: 60000
-    support-review-timeout-minutes: 120
-    support-review-poll-interval-ms: 60000
+  port: 8081

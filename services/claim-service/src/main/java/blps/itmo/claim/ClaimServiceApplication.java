@@ -2,31 +2,8 @@ package blps.itmo.claim;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
-import blps.itmo.claim.domain.Claim;
-import blps.itmo.claim.domain.ClaimAttachment;
-import blps.itmo.claim.domain.ClaimTimelineEntry;
-import blps.itmo.claim.repository.ClaimAttachmentRepository;
-import blps.itmo.claim.repository.ClaimRepository;
-import blps.itmo.claim.repository.ClaimTimelineRepository;
-import blps.itmo.platform.outbox.domain.OutboxEvent;
-import blps.itmo.platform.outbox.domain.OutboxEventRepository;
-import blps.itmo.platform.outbox.domain.ProcessedMessage;
-import blps.itmo.platform.outbox.domain.ProcessedMessageRepository;
-
-@SpringBootApplication(scanBasePackages = {"blps.itmo.claim", "blps.itmo.platform"})
-@EnableScheduling
-@EntityScan(basePackageClasses = {Claim.class, ClaimAttachment.class, ClaimTimelineEntry.class, OutboxEvent.class, ProcessedMessage.class})
-@EnableJpaRepositories(basePackageClasses = {
-        ClaimAttachmentRepository.class,
-        ClaimRepository.class,
-        ClaimTimelineRepository.class,
-        OutboxEventRepository.class,
-        ProcessedMessageRepository.class
-})
+@SpringBootApplication
 public class ClaimServiceApplication {
 
     public static void main(String[] args) {

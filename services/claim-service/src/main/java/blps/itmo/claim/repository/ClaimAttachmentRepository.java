@@ -1,14 +1,18 @@
 package blps.itmo.claim.repository;
 
-import java.util.Collection;
-import java.util.List;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import blps.itmo.claim.domain.ClaimAttachment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-public interface ClaimAttachmentRepository extends JpaRepository<ClaimAttachment, Long> {
-    List<ClaimAttachment> findByClaimIdOrderByCreatedAtAsc(Long claimId);
+import java.util.List;
+import java.util.Optional;
 
-    List<ClaimAttachment> findByClaimIdAndAttachmentIdIn(Long claimId, Collection<Long> attachmentIds);
+@Repository
+public interface ClaimAttachmentRepository extends JpaRepository<ClaimAttachment, Integer> {
+
+    List<ClaimAttachment> findByClaimId(Integer claimId);
+
+    List<ClaimAttachment> findByMessageId(Integer messageId);
+
+    Optional<ClaimAttachment> findByObjectKey(String objectKey);
 }

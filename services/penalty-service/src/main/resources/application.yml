@@ -2,39 +2,15 @@ spring:
   application:
     name: penalty-service
   datasource:
-    url: jdbc:postgresql://${PENALTY_DB_HOST:localhost}:${PENALTY_DB_PORT:5436}/${PENALTY_DB_NAME:blps_penalty}
-    username: ${PENALTY_DB_USERNAME:blps_penalty_user}
-    password: ${PENALTY_DB_PASSWORD:blps_penalty_password}
+    url: jdbc:postgresql://localhost:5435/blps_penalty
+    username: postgres
+    password: postgres
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
-        format_sql: true
-    show-sql: false
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      auto-offset-reset: earliest
-      properties:
-        spring.json.trusted.packages: "*"
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
 server:
-  port: ${PENALTY_SERVICE_PORT:8084}
-
-app:
-  service-name: penalty-service
-  grpc:
-    server:
-      port: ${PENALTY_GRPC_PORT:19084}
-  outbox:
-    poll-interval-ms: 1000
-    max-retry-count: 10
-  kafka:
-    retry:
-      backoff-ms: 1000
-      max-attempts: 3
-  penalty:
-    poll-interval-ms: 2000
-    timeout-minutes: 30
-    timeout-poll-interval-ms: 60000
+  port: 8084

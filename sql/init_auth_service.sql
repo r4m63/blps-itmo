@@ -1,51 +1,115 @@
 BEGIN;
 
 -- =====================================================================
--- AUTH SERVICE DB
--- Users owned by auth-service + shared distributed-transaction tables.
--- Intended for database: blps_auth
+-- AUTH-SERVICE DATABASE
+-- Владеет пользователями, ролями и привилегиями (RBAC).
+-- Cross-service FK на users отсутствуют: в других сервисах user_id
+-- хранится как обычный INT.
 -- =====================================================================
 
+CREATE TYPE userrole AS ENUM ('TENANT', 'LANDLORD', 'ADMIN');
+
 CREATE TABLE users (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
-    role VARCHAR(20) NOT NULL,
+    password_hash TEXT NOT NULL,
+    role userrole NOT NULL DEFAULT 'TENANT',
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    penalty_count INT NOT NULL DEFAULT 0 CHECK (penalty_count >= 0),
+    penalty_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE outbox_events (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    event_id TEXT NOT NULL UNIQUE,
-    event_type TEXT NOT NULL,
-    topic_name TEXT NOT NULL,
-    event_key TEXT NOT NULL,
-    aggregate_type TEXT NOT NULL,
-    aggregate_id TEXT NOT NULL,
-    correlation_id TEXT NOT NULL,
-    saga_id TEXT NOT NULL,
-    actor_id BIGINT,
-    payload_json TEXT NOT NULL,
-    status VARCHAR(10) NOT NULL DEFAULT 'NEW',
-    retry_count INT NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
-    error_message TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    published_at TIMESTAMPTZ
+CREATE TABLE privileges (
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL
 );
 
-CREATE TABLE processed_messages (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    event_id TEXT NOT NULL,
-    consumer_name TEXT NOT NULL,
-    correlation_id TEXT NOT NULL,
-    processed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uk_processed_message_auth UNIQUE (event_id, consumer_name)
+CREATE TABLE role_privileges (
+    role userrole NOT NULL,
+    privilege_id INT NOT NULL REFERENCES privileges (id) ON DELETE CASCADE,
+    PRIMARY KEY (role, privilege_id)
 );
 
-CREATE INDEX idx_auth_users_enabled ON users (enabled);
-CREATE INDEX idx_auth_outbox_status_created_at ON outbox_events (status, created_at);
-CREATE INDEX idx_auth_processed_correlation_id ON processed_messages (correlation_id);
+INSERT INTO
+    privileges (code, description)
+VALUES (
+        'CLAIM_CREATE',
+        'Создание заявки на штрафные санкции'
+    ),
+    (
+        'CLAIM_READ_OWN',
+        'Просмотр заявок, в которых пользователь является стороной (арендодатель/арендатор)'
+    ),
+    (
+        'CLAIM_READ_ANY',
+        'Просмотр любой заявки в системе (административный доступ)'
+    ),
+    (
+        'CLAIM_INTAKE_DECISION',
+        'Первичная проверка заявки администратором: полнота данных, запрос доп. материалов'
+    ),
+    (
+        'CLAIM_PROVIDE_ADDITIONAL_INFO',
+        'Предоставление арендодателем дополнительных материалов по запросу администратора'
+    ),
+    (
+        'CLAIM_ASSESS',
+        'Оценка ущерба и определение оснований для штрафа администратором'
+    ),
+    (
+        'CLAIM_TENANT_RESPOND',
+        'Ответ/возражение арендатора на претензию в рамках заявки'
+    ),
+    (
+        'CLAIM_SUPPORT_DECISION',
+        'Финальное решение поддержки: применить штраф либо закрыть без штрафа'
+    ),
+    (
+        'STORAGE_UPLOAD',
+        'Инициация и подтверждение загрузки файлов-доказательств в объектное хранилище'
+    ),
+    (
+        'USER_DEACTIVATE',
+        'Деактивация пользователя с закрытием всех его открытых заявок'
+    );
+
+INSERT INTO
+    role_privileges (role, privilege_id)
+SELECT 'LANDLORD'::userrole, id
+FROM privileges
+WHERE
+    code IN (
+        'CLAIM_CREATE',
+        'CLAIM_READ_OWN',
+        'CLAIM_PROVIDE_ADDITIONAL_INFO',
+        'STORAGE_UPLOAD'
+    );
+
+INSERT INTO
+    role_privileges (role, privilege_id)
+SELECT 'TENANT'::userrole, id
+FROM privileges
+WHERE
+    code IN (
+        'CLAIM_READ_OWN',
+        'CLAIM_TENANT_RESPOND',
+        'STORAGE_UPLOAD'
+    );
+
+INSERT INTO
+    role_privileges (role, privilege_id)
+SELECT 'ADMIN'::userrole, id
+FROM privileges
+WHERE
+    code IN (
+        'CLAIM_READ_ANY',
+        'CLAIM_INTAKE_DECISION',
+        'CLAIM_ASSESS',
+        'CLAIM_SUPPORT_DECISION',
+        'STORAGE_UPLOAD',
+        'USER_DEACTIVATE'
+    );
 
 COMMIT;

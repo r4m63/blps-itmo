@@ -1,13 +1,12 @@
 BEGIN;
 
-DROP TABLE IF EXISTS processed_messages;
-DROP TABLE IF EXISTS outbox_events;
 DROP TABLE IF EXISTS claim_attachments;
-DROP TABLE IF EXISTS claim_timeline;
+DROP TABLE IF EXISTS claim_status_history;
+DROP TABLE IF EXISTS claim_messages;
 DROP TABLE IF EXISTS claims;
 
-DROP TYPE IF EXISTS outbox_status;
-DROP TYPE IF EXISTS outbox_event_type;
-DROP TYPE IF EXISTS claim_status;
+DROP TYPE IF EXISTS attachmentpurpose;
+DROP TYPE IF EXISTS commenttype;
+DROP TYPE IF EXISTS claimstatus;
 
 COMMIT;

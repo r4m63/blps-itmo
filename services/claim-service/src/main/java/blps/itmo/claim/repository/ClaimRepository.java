@@ -1,19 +1,20 @@
 package blps.itmo.claim.repository;
 
-import java.util.List;
-import java.time.OffsetDateTime;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import blps.itmo.claim.domain.Claim;
 import blps.itmo.claim.domain.ClaimStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-public interface ClaimRepository extends JpaRepository<Claim, Long> {
-    List<Claim> findByLandlordIdOrTenantId(Long landlordId, Long tenantId);
+import java.util.List;
 
-    List<Claim> findByLandlordIdOrTenantIdOrderByCreatedAtDesc(Long landlordId, Long tenantId);
+@Repository
+public interface ClaimRepository extends JpaRepository<Claim, Integer> {
 
-    List<Claim> findByStatusNotIn(List<ClaimStatus> statuses);
+    List<Claim> findByLandlordId(Integer landlordId);
 
-    List<Claim> findByStatusAndUpdatedAtBefore(ClaimStatus status, OffsetDateTime updatedAt);
+    List<Claim> findByTenantId(Integer tenantId);
+
+    List<Claim> findByStatus(ClaimStatus status);
+
+    List<Claim> findByLandlordIdOrTenantId(Integer landlordId, Integer tenantId);
 }
