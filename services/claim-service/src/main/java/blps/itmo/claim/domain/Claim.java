@@ -50,7 +50,7 @@ public class Claim {
     @Column(name = "claimed_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal claimedAmount = BigDecimal.ZERO;
 
-    @Column(nullable = false, length = 3, columnDefinition = "CHAR(3)")
+    @Column(nullable = false, length = 3, columnDefinition = "VARCHAR(3)")
     private String currency = "USD";
 
     @Column(name = "assessment_amount", precision = 12, scale = 2)

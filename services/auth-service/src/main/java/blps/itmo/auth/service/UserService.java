@@ -4,6 +4,10 @@ import blps.itmo.auth.api.dto.CreateUserRequest;
 import blps.itmo.auth.api.dto.RegisterRequest;
 import blps.itmo.auth.domain.User;
 import blps.itmo.auth.domain.UserRole;
+import blps.itmo.auth.messaging.EventType;
+import blps.itmo.auth.messaging.OutboxService;
+import blps.itmo.auth.messaging.TopicNames;
+import blps.itmo.auth.messaging.payload.UserDeactivatedPayload;
 import blps.itmo.auth.repository.PrivilegeRepository;
 import blps.itmo.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +27,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PrivilegeRepository privilegeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final OutboxService outboxService;
 
     public User getById(Integer id) {
         return userRepository.findById(id)
@@ -57,7 +62,15 @@ public class UserService {
             return user;
         }
         user.setEnabled(false);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        outboxService.enqueue(
+                "user",
+                saved.getId().toString(),
+                EventType.USER_DEACTIVATED,
+                TopicNames.IDENTITY_EVENTS,
+                new UserDeactivatedPayload(saved.getId(), "deactivated by admin")
+        );
+        return saved;
     }
 
     @Transactional

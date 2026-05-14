@@ -1,12 +1,11 @@
 # BLPS ITMO Lab3
 
-`BLPS ITMO Lab3` — это event-driven микросервисная система на `Spring Boot 3.2`, `Java 17`, `PostgreSQL`, `Kafka`, `gRPC` и `ZooKeeper`, построенная вокруг обработки заявок на штраф между арендодателем, арендатором и администратором.
+`BLPS ITMO Lab3` — это event-driven микросервисная система на `Spring Boot 3.2`, `Java 17`, `PostgreSQL`, `Kafka`, `Quartz`, `MinIO`, `JCA` и `ZooKeeper`, построенная вокруг обработки заявок на штраф между арендодателем, арендатором и администратором.
 
 Проект демонстрирует не просто декомпозицию монолита на сервисы, а именно **System Design для распределённых транзакций**:
 
 - `database per service`
 - `HTTP API Gateway` для входных клиентских запросов
-- `gRPC` для синхронных внутренних вызовов
 - `Transactional Outbox`
 - `processed_messages` как inbox/idempotency layer
 - `Saga choreography`
@@ -18,21 +17,12 @@
 
 Текущая кодовая база состоит из следующих модулей:
 
-- `platform-core` — общие event contracts, outbox/inbox, relay, exception mapping
-- `grpc-contracts` — protobuf-контракты внутренних синхронных API
-- `api-gateway` — внешний HTTP edge service для `/api/**`
-- `auth-service` — пользователи, роли, деактивация, счётчик штрафов
-- `claim-service` — жизненный цикл заявки и timeline
-- `assessment-service` — асинхронная оценка заявки
-- `penalty-service` — асинхронное применение штрафа и retry failed operation
-- `storage-service` — metadata attachments и saga `init -> confirm -> bind`
-- `notification-service` — consumer-проекция уведомлений
-- `audit-service` — аудит и event trail
+- `auth-service` — edge gateway + пользователи, роли, деактивация, счётчик штрафов
+- `claim-service` — жизненный цикл заявки, MinIO attachments, Quartz таймер, JCA Jira
+- `penalty-service` — async применение штрафа и retry failed operation
 
 Физическая структура репозитория:
 
-- `lib/platform-core/` — общая инфраструктура Outbox/Kafka/gRPC/security
-- `lib/grpc-contracts/` — protobuf и generated gRPC stubs
 - `services/*` — все микросервисы
 
 Инфраструктура:
@@ -41,7 +31,7 @@
 - `ZooKeeper`
 - `MinIO`
 - отдельная `PostgreSQL` для каждого сервиса
-- `Kafka UI` для демонстрации event backbone
+- `Jira` как внешняя EIS (через JCA-адаптер)
 
 ## Архитектурные принципы
 
@@ -69,14 +59,9 @@
 
 | Сервис | Ответственность | Своя БД | Синхронный API | Kafka |
 | --- | --- | --- | --- | --- |
-| `api-gateway` | внешний HTTP API, JWT perimeter, HTTP-to-gRPC mapping | нет | HTTP external / gRPC clients | нет |
-| `auth-service` | пользователи, роли, деактивация, `penaltyCount` | `blps_auth` | gRPC | consume `PENALTY_APPLIED`, produce `USER_DEACTIVATED` |
-| `claim-service` | заявки, статусы, timeline, центральная бизнес-логика | `blps_claim` | gRPC | produce claim events, consume assessment/penalty/auth/storage events |
-| `assessment-service` | async assessment jobs | `blps_assessment` | нет | consume claim events, produce `ASSESSMENT_COMPLETED` / `ASSESSMENT_FAILED` |
-| `penalty-service` | async penalty operations | `blps_penalty` | gRPC для query/retry | consume `PENALTY_APPLICATION_REQUESTED`, produce penalty result events |
-| `storage-service` | attachment metadata и MinIO object-key lifecycle | `blps_storage` | gRPC | consume `ATTACHMENT_BINDING_REQUESTED`, produce storage events |
-| `notification-service` | notification log | `blps_notification` | нет | consume all domain topics |
-| `audit-service` | audit trail и трассировка саг | `blps_audit` | gRPC | consume all domain topics |
+| `auth-service` | edge gateway + users/roles, деактивация, `penaltyCount` | `blps_auth` | HTTP (edge) | consume `PENALTY_APPLIED`, produce `USER_DEACTIVATED` |
+| `claim-service` | заявки, статусы, attachments (MinIO), Jira (JCA), Quartz таймер | `blps_claim` | HTTP | produce claim events, consume penalty/identity events |
+| `penalty-service` | async penalty operations, retry | `blps_penalty` | HTTP | consume `PENALTY_APPLICATION_REQUESTED`, produce penalty result events |
 
 ## Ключевые паттерны распределённых транзакций
 
@@ -109,7 +94,7 @@
 
 ### 1. Создание заявки и асинхронная оценка
 
-`claim-service` сохраняет заявку, пишет `CLAIM_CREATED` в outbox, `assessment-service` асинхронно создаёт job и позже публикует `ASSESSMENT_COMPLETED`.
+`claim-service` сохраняет заявку, пишет `CLAIM_CREATED` в outbox и создаёт задачу в Jira через JCA.
 
 ### 2. Финальное решение и применение штрафа
 
@@ -135,14 +120,9 @@ docker compose up -d
 3. Запустить сервисы:
 
 ```bash
-./gradlew :api-gateway:bootRun
 ./gradlew :auth-service:bootRun
 ./gradlew :claim-service:bootRun
-./gradlew :assessment-service:bootRun
 ./gradlew :penalty-service:bootRun
-./gradlew :storage-service:bootRun
-./gradlew :notification-service:bootRun
-./gradlew :audit-service:bootRun
 ```
 
 4. Прогнать HTTP-сценарии через `api-gateway` из `rest-client/scenarios`
@@ -181,13 +161,12 @@ PlantUML-источники лежат в `docs/uml/`:
 - `Spring Web`
 - `Spring Data JPA`
 - `Spring Kafka`
-- `gRPC`
-- `Protocol Buffers`
+- `Quartz`
+- `JCA`
 - `PostgreSQL 16`
 - `Kafka 3.7`
 - `ZooKeeper 3.9`
 - `API Gateway`
-- `JWT demo auth`
 - `MinIO`
 - `Gradle multi-module`
 

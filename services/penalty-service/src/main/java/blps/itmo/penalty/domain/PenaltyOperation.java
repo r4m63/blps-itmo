@@ -45,13 +45,13 @@ public class PenaltyOperation {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
-    @Column(nullable = false, length = 3, columnDefinition = "CHAR(3)")
+    @Column(nullable = false, length = 3, columnDefinition = "VARCHAR(3)")
     private String currency = "USD";
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false, columnDefinition = "penaltystatus")
-    private PenaltyStatus status = PenaltyStatus.REQUESTED;
+    private PenaltyStatus status = PenaltyStatus.PENDING;
 
     @Column(name = "failure_reason")
     private String failureReason;

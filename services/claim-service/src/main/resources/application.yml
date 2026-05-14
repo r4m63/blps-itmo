@@ -11,6 +11,29 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: claim-service
+  quartz:
+    job-store-type: memory
+
+minio:
+  url: ${MINIO_URL:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket: ${MINIO_BUCKET:claim-attachments}
+
+jira:
+  url: ${JIRA_URL:https://jira.example.com}
+  user: ${JIRA_USER:demo}
+  token: ${JIRA_TOKEN:demo}
+  project-key: ${JIRA_PROJECT_KEY:BLPS}
 
 server:
   port: 8081

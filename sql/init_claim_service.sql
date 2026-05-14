@@ -18,7 +18,9 @@ CREATE TYPE claimstatus AS ENUM (
     'UNDER_ASSESSMENT',
     'AWAITING_TENANT_RESPONSE',
     'SUPPORT_REVIEW',
+    'PENALTY_PROCESSING',
     'PENALTY_APPLIED',
+    'PENALTY_PROCESSING_FAILED',
     'CLOSED_NO_PENALTY'
 );
 
@@ -30,7 +32,7 @@ CREATE TABLE claims (
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     claimed_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (claimed_amount >= 0),
-    currency CHAR(3) NOT NULL DEFAULT 'USD',
+    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
     assessment_amount NUMERIC(12, 2) CHECK (assessment_amount >= 0),
     assessment_notes TEXT,
     admin_reviewer_id INT,
@@ -43,6 +45,7 @@ CREATE TABLE claims (
     CONSTRAINT chk_terminal_requires_admin CHECK (
         status NOT IN (
             'PENALTY_APPLIED',
+            'PENALTY_PROCESSING_FAILED',
             'CLOSED_NO_PENALTY'
         )
         OR admin_reviewer_id IS NOT NULL
@@ -50,6 +53,7 @@ CREATE TABLE claims (
     CONSTRAINT chk_decision_presence CHECK (
         status NOT IN (
             'PENALTY_APPLIED',
+            'PENALTY_PROCESSING_FAILED',
             'CLOSED_NO_PENALTY'
         )
         OR (
@@ -105,6 +109,27 @@ CREATE TABLE claim_attachments (
     uploaded BOOLEAN NOT NULL DEFAULT FALSE,
     confirmed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE outbox_events (
+    id UUID PRIMARY KEY,
+    aggregate_type TEXT NOT NULL,
+    aggregate_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    status TEXT NOT NULL DEFAULT 'NEW',
+    retry_count INT NOT NULL DEFAULT 0,
+    last_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    published_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_outbox_events_status_created ON outbox_events (status, created_at);
+
+CREATE TABLE processed_messages (
+    event_id UUID PRIMARY KEY,
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 COMMIT;

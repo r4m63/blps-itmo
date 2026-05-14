@@ -4,6 +4,12 @@ import blps.itmo.penalty.api.dto.CreatePenaltyRequest;
 import blps.itmo.penalty.api.dto.FailPenaltyRequest;
 import blps.itmo.penalty.domain.PenaltyOperation;
 import blps.itmo.penalty.domain.PenaltyStatus;
+import blps.itmo.penalty.messaging.EventType;
+import blps.itmo.penalty.messaging.OutboxService;
+import blps.itmo.penalty.messaging.TopicNames;
+import blps.itmo.penalty.messaging.payload.PenaltyAppliedPayload;
+import blps.itmo.penalty.messaging.payload.PenaltyApplicationFailedPayload;
+import blps.itmo.penalty.messaging.payload.PenaltyApplicationRequestedPayload;
 import blps.itmo.penalty.repository.PenaltyOperationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +26,7 @@ import java.util.List;
 public class PenaltyService {
 
     private final PenaltyOperationRepository repository;
+    private final OutboxService outboxService;
 
     public PenaltyOperation getById(Integer id) {
         return repository.findById(id)
@@ -58,26 +65,43 @@ public class PenaltyService {
         if (req.currency() != null && !req.currency().isBlank()) {
             op.setCurrency(req.currency());
         }
-        op.setStatus(PenaltyStatus.REQUESTED);
+        op.setStatus(PenaltyStatus.PENDING);
         return repository.save(op);
+    }
+
+    @Transactional
+    public PenaltyOperation handlePenaltyRequested(PenaltyApplicationRequestedPayload payload) {
+        PenaltyOperation op = repository.findByClaimId(payload.claimId()).orElseGet(() -> {
+            PenaltyOperation created = new PenaltyOperation();
+            created.setClaimId(payload.claimId());
+            created.setTenantId(payload.tenantId());
+            created.setLandlordId(payload.landlordId());
+            created.setRequestedBy(payload.requestedBy());
+            created.setAmount(payload.amount());
+            if (payload.currency() != null && !payload.currency().isBlank()) {
+                created.setCurrency(payload.currency());
+            }
+            created.setStatus(PenaltyStatus.PENDING);
+            return repository.save(created);
+        });
+        if (op.getStatus() == PenaltyStatus.PENDING) {
+            return processPending(op, payload.simulateFailure());
+        }
+        return op;
     }
 
     @Transactional
     public PenaltyOperation apply(Integer id) {
         PenaltyOperation op = getById(id);
-        ensureStatus(op, PenaltyStatus.REQUESTED);
-        op.setStatus(PenaltyStatus.APPLIED);
-        op.setAppliedAt(Instant.now());
-        return repository.save(op);
+        ensureStatus(op, PenaltyStatus.PENDING);
+        return applyInternal(op);
     }
 
     @Transactional
     public PenaltyOperation fail(Integer id, FailPenaltyRequest req) {
         PenaltyOperation op = getById(id);
-        ensureStatus(op, PenaltyStatus.REQUESTED);
-        op.setStatus(PenaltyStatus.FAILED);
-        op.setFailureReason(req.reason());
-        return repository.save(op);
+        ensureStatus(op, PenaltyStatus.PENDING);
+        return failInternal(op, req.reason());
     }
 
     @Transactional
@@ -87,9 +111,64 @@ public class PenaltyService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "only FAILED operations can be retried (current: %s)".formatted(op.getStatus()));
         }
-        op.setStatus(PenaltyStatus.REQUESTED);
+        op.setStatus(PenaltyStatus.PENDING);
         op.setFailureReason(null);
         return repository.save(op);
+    }
+
+    @Transactional
+    public int retryFailedBatch(int limit) {
+        List<PenaltyOperation> failed = repository.findTop50ByStatus(PenaltyStatus.FAILED);
+        int count = 0;
+        for (PenaltyOperation op : failed) {
+            if (count >= limit) {
+                break;
+            }
+            op.setStatus(PenaltyStatus.PENDING);
+            op.setFailureReason(null);
+            repository.save(op);
+            count++;
+        }
+        return count;
+    }
+
+    @Transactional
+    public PenaltyOperation processPending(PenaltyOperation op, boolean simulateFailure) {
+        ensureStatus(op, PenaltyStatus.PENDING);
+        op.setStatus(PenaltyStatus.PROCESSING);
+        repository.save(op);
+        if (simulateFailure) {
+            return failInternal(op, "simulated failure");
+        }
+        return applyInternal(op);
+    }
+
+    private PenaltyOperation applyInternal(PenaltyOperation op) {
+        op.setStatus(PenaltyStatus.APPLIED);
+        op.setAppliedAt(Instant.now());
+        PenaltyOperation saved = repository.save(op);
+        outboxService.enqueue(
+                "penalty",
+                saved.getId().toString(),
+                EventType.PENALTY_APPLIED,
+                TopicNames.PENALTY_EVENTS,
+                new PenaltyAppliedPayload(saved.getClaimId(), saved.getId(), saved.getTenantId())
+        );
+        return saved;
+    }
+
+    private PenaltyOperation failInternal(PenaltyOperation op, String reason) {
+        op.setStatus(PenaltyStatus.FAILED);
+        op.setFailureReason(reason);
+        PenaltyOperation saved = repository.save(op);
+        outboxService.enqueue(
+                "penalty",
+                saved.getId().toString(),
+                EventType.PENALTY_APPLICATION_FAILED,
+                TopicNames.PENALTY_EVENTS,
+                new PenaltyApplicationFailedPayload(saved.getClaimId(), saved.getId(), reason)
+        );
+        return saved;
     }
 
     private void ensureStatus(PenaltyOperation op, PenaltyStatus expected) {

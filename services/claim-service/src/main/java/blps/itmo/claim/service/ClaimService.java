@@ -12,6 +12,11 @@ import blps.itmo.claim.domain.ClaimMessage;
 import blps.itmo.claim.domain.ClaimStatus;
 import blps.itmo.claim.domain.ClaimStatusHistory;
 import blps.itmo.claim.domain.CommentType;
+import blps.itmo.claim.messaging.EventType;
+import blps.itmo.claim.messaging.OutboxService;
+import blps.itmo.claim.messaging.TopicNames;
+import blps.itmo.claim.messaging.payload.ClaimCreatedPayload;
+import blps.itmo.claim.messaging.payload.PenaltyApplicationRequestedPayload;
 import blps.itmo.claim.repository.ClaimMessageRepository;
 import blps.itmo.claim.repository.ClaimRepository;
 import blps.itmo.claim.repository.ClaimStatusHistoryRepository;
@@ -32,6 +37,7 @@ public class ClaimService {
     private final ClaimRepository claimRepository;
     private final ClaimMessageRepository messageRepository;
     private final ClaimStatusHistoryRepository historyRepository;
+    private final OutboxService outboxService;
 
     public Claim getById(Integer id) {
         return claimRepository.findById(id)
@@ -73,6 +79,21 @@ public class ClaimService {
         claim.setStatus(ClaimStatus.SUBMITTED);
         Claim saved = claimRepository.save(claim);
         recordHistory(saved.getId(), null, ClaimStatus.SUBMITTED, landlordId, "claim submitted");
+        outboxService.enqueue(
+            "claim",
+            saved.getId().toString(),
+            EventType.CLAIM_CREATED,
+            TopicNames.CLAIM_EVENTS,
+            new ClaimCreatedPayload(
+                saved.getId(),
+                saved.getLandlordId(),
+                saved.getTenantId(),
+                saved.getTitle(),
+                saved.getDescription(),
+                saved.getClaimedAmount(),
+                saved.getCurrency()
+            )
+        );
         return saved;
     }
 
@@ -153,15 +174,40 @@ public class ClaimService {
     public Claim supportDecision(Integer claimId, Integer adminId, SupportDecisionRequest req) {
         Claim claim = getById(claimId);
         ensureStatus(claim, ClaimStatus.SUPPORT_REVIEW);
+        if (req.applyPenalty() && req.penaltyAmount() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "penaltyAmount is required when applyPenalty=true");
+        }
         claim.setAdminReviewerId(adminId);
         claim.setResolutionNote(req.resolutionNote());
         Instant now = Instant.now();
         claim.setDecidedAt(now);
-        claim.setClosedAt(now);
-
-        ClaimStatus target = req.applyPenalty() ? ClaimStatus.PENALTY_APPLIED : ClaimStatus.CLOSED_NO_PENALTY;
-        transition(claim, ClaimStatus.SUPPORT_REVIEW, target, adminId, req.resolutionNote());
+        if (req.applyPenalty()) {
+            claim.setClosedAt(null);
+            transition(claim, ClaimStatus.SUPPORT_REVIEW, ClaimStatus.PENALTY_PROCESSING, adminId, req.resolutionNote());
+        } else {
+            claim.setClosedAt(now);
+            transition(claim, ClaimStatus.SUPPORT_REVIEW, ClaimStatus.CLOSED_NO_PENALTY, adminId, req.resolutionNote());
+        }
         Claim saved = claimRepository.save(claim);
+        if (req.applyPenalty()) {
+            outboxService.enqueue(
+                    "claim",
+                    saved.getId().toString(),
+                    EventType.PENALTY_APPLICATION_REQUESTED,
+                    TopicNames.PENALTY_EVENTS,
+                    new PenaltyApplicationRequestedPayload(
+                            saved.getId(),
+                            saved.getTenantId(),
+                            saved.getLandlordId(),
+                            adminId,
+                    req.penaltyAmount(),
+                    req.penaltyCurrency() == null || req.penaltyCurrency().isBlank()
+                        ? saved.getCurrency()
+                        : req.penaltyCurrency(),
+                            req.simulateFailure()
+                    )
+            );
+        }
         if (req.resolutionNote() != null && !req.resolutionNote().isBlank()) {
             saveMessage(saved.getId(), adminId, CommentType.ADMIN_NOTE, req.resolutionNote());
         }
@@ -172,6 +218,66 @@ public class ClaimService {
     public ClaimMessage addMessage(Integer claimId, Integer userId, CreateMessageRequest req) {
         getById(claimId);
         return saveMessage(claimId, userId, req.messageType(), req.body());
+    }
+
+    @Transactional
+    public void markPenaltyApplied(Integer claimId, Integer actorId) {
+        Claim claim = getById(claimId);
+        if (claim.getStatus() != ClaimStatus.PENALTY_PROCESSING) {
+            return;
+        }
+        claim.setStatus(ClaimStatus.PENALTY_APPLIED);
+        claim.setClosedAt(Instant.now());
+        recordHistory(claim.getId(), ClaimStatus.PENALTY_PROCESSING, ClaimStatus.PENALTY_APPLIED, actorId, "penalty applied");
+        claimRepository.save(claim);
+    }
+
+    @Transactional
+    public void markPenaltyFailed(Integer claimId, String reason) {
+        Claim claim = getById(claimId);
+        if (claim.getStatus() != ClaimStatus.PENALTY_PROCESSING) {
+            return;
+        }
+        claim.setStatus(ClaimStatus.PENALTY_PROCESSING_FAILED);
+        claim.setClosedAt(null);
+        recordHistory(claim.getId(), ClaimStatus.PENALTY_PROCESSING, ClaimStatus.PENALTY_PROCESSING_FAILED, null, reason);
+        claimRepository.save(claim);
+    }
+
+    @Transactional
+    public void closeClaimsForDeactivatedUser(Integer userId, String reason) {
+        List<Claim> claims = claimRepository.findByStatusNotInAndLandlordIdOrTenantId(
+                List.of(ClaimStatus.PENALTY_APPLIED, ClaimStatus.CLOSED_NO_PENALTY),
+                userId,
+                userId
+        );
+        for (Claim claim : claims) {
+            ClaimStatus from = claim.getStatus();
+            claim.setStatus(ClaimStatus.CLOSED_NO_PENALTY);
+            claim.setClosedAt(Instant.now());
+            recordHistory(claim.getId(), from, ClaimStatus.CLOSED_NO_PENALTY, null, reason);
+            claimRepository.save(claim);
+        }
+    }
+
+    @Transactional
+    public int expireTenantResponses(Instant threshold) {
+        List<Claim> claims = claimRepository.findTop50ByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
+            ClaimStatus.AWAITING_TENANT_RESPONSE,
+            threshold
+        );
+        for (Claim claim : claims) {
+            transition(claim, ClaimStatus.AWAITING_TENANT_RESPONSE, ClaimStatus.SUPPORT_REVIEW, null, "tenant response expired");
+            claimRepository.save(claim);
+            outboxService.enqueue(
+                    "claim",
+                    claim.getId().toString(),
+                    EventType.TENANT_RESPONSE_EXPIRED,
+                    TopicNames.CLAIM_EVENTS,
+                    new blps.itmo.claim.messaging.payload.TenantResponseExpiredPayload(claim.getId())
+            );
+        }
+        return claims.size();
     }
 
     private void ensureStatus(Claim claim, ClaimStatus expected) {

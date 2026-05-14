@@ -83,7 +83,7 @@
 Реализация:
 
 - claim переходит в `AWAITING_TENANT_RESPONSE` при заявленных основаниях для штрафа
-- `claim-service` имеет `@Scheduled` job (раз в минуту), который ищет:
+- `claim-service` использует Quartz job `TenantResponseTimeoutJob` (cron раз в минуту), который ищет:
   ```sql
   SELECT id FROM claims
   WHERE status = 'AWAITING_TENANT_RESPONSE'

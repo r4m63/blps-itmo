@@ -1,7 +1,8 @@
 package blps.itmo.penalty.domain;
 
 public enum PenaltyStatus {
-    REQUESTED,
+    PENDING,
+    PROCESSING,
     APPLIED,
     FAILED
 }
