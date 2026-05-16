@@ -1,10 +1,15 @@
 BEGIN;
 
-DROP TABLE IF EXISTS claim_attachments;
-DROP TABLE IF EXISTS claim_status_history;
-DROP TABLE IF EXISTS claim_messages;
-DROP TABLE IF EXISTS claims;
+DROP TABLE IF EXISTS saga_instances CASCADE;
+DROP TABLE IF EXISTS claim_attachments CASCADE;
+DROP TABLE IF EXISTS claim_status_history CASCADE;
+DROP TABLE IF EXISTS claim_messages CASCADE;
+DROP TABLE IF EXISTS claims CASCADE;
+DROP TABLE IF EXISTS outbox_events CASCADE;
+DROP TABLE IF EXISTS processed_messages CASCADE;
 
+DROP TYPE IF EXISTS sagastate;
+DROP TYPE IF EXISTS sagatype;
 DROP TYPE IF EXISTS attachmentpurpose;
 DROP TYPE IF EXISTS commenttype;
 DROP TYPE IF EXISTS claimstatus;

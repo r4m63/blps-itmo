@@ -12,14 +12,16 @@ import blps.itmo.claim.domain.ClaimMessage;
 import blps.itmo.claim.domain.ClaimStatus;
 import blps.itmo.claim.domain.ClaimStatusHistory;
 import blps.itmo.claim.domain.CommentType;
-import blps.itmo.claim.messaging.EventType;
-import blps.itmo.claim.messaging.OutboxService;
-import blps.itmo.claim.messaging.TopicNames;
-import blps.itmo.claim.messaging.payload.ClaimCreatedPayload;
-import blps.itmo.claim.messaging.payload.PenaltyApplicationRequestedPayload;
+import blps.itmo.claim.kafka.EventType;
+import blps.itmo.claim.kafka.outboxevent.OutboxService;
+import blps.itmo.claim.kafka.config.TopicNames;
+import blps.itmo.claim.kafka.payload.ClaimCreatedPayload;
+import blps.itmo.claim.kafka.payload.PenaltyApplicationRequestedPayload;
 import blps.itmo.claim.repository.ClaimMessageRepository;
 import blps.itmo.claim.repository.ClaimRepository;
 import blps.itmo.claim.repository.ClaimStatusHistoryRepository;
+import blps.itmo.claim.saga.PenaltyApplicationSaga;
+import blps.itmo.claim.saga.SagaInstance;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -38,6 +40,7 @@ public class ClaimService {
     private final ClaimMessageRepository messageRepository;
     private final ClaimStatusHistoryRepository historyRepository;
     private final OutboxService outboxService;
+    private final PenaltyApplicationSaga penaltyApplicationSaga;
 
     public Claim getById(Integer id) {
         return claimRepository.findById(id)
@@ -190,6 +193,9 @@ public class ClaimService {
         }
         Claim saved = claimRepository.save(claim);
         if (req.applyPenalty()) {
+            SagaInstance saga = penaltyApplicationSaga.start(saved.getId());
+            saved.setCurrentSagaId(saga.getSagaId());
+            saved = claimRepository.save(saved);
             outboxService.enqueue(
                     "claim",
                     saved.getId().toString(),
@@ -205,7 +211,8 @@ public class ClaimService {
                         ? saved.getCurrency()
                         : req.penaltyCurrency(),
                             req.simulateFailure()
-                    )
+                    ),
+                    saga.getSagaId()
             );
         }
         if (req.resolutionNote() != null && !req.resolutionNote().isBlank()) {
@@ -274,7 +281,7 @@ public class ClaimService {
                     claim.getId().toString(),
                     EventType.TENANT_RESPONSE_EXPIRED,
                     TopicNames.CLAIM_EVENTS,
-                    new blps.itmo.claim.messaging.payload.TenantResponseExpiredPayload(claim.getId())
+                    new blps.itmo.claim.kafka.payload.TenantResponseExpiredPayload(claim.getId())
             );
         }
         return claims.size();

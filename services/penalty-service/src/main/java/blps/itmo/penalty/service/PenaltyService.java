@@ -4,14 +4,18 @@ import blps.itmo.penalty.api.dto.CreatePenaltyRequest;
 import blps.itmo.penalty.api.dto.FailPenaltyRequest;
 import blps.itmo.penalty.domain.PenaltyOperation;
 import blps.itmo.penalty.domain.PenaltyStatus;
-import blps.itmo.penalty.messaging.EventType;
-import blps.itmo.penalty.messaging.OutboxService;
-import blps.itmo.penalty.messaging.TopicNames;
-import blps.itmo.penalty.messaging.payload.PenaltyAppliedPayload;
-import blps.itmo.penalty.messaging.payload.PenaltyApplicationFailedPayload;
-import blps.itmo.penalty.messaging.payload.PenaltyApplicationRequestedPayload;
+import blps.itmo.penalty.kafka.EventType;
+import blps.itmo.penalty.kafka.outboxevent.OutboxService;
+import blps.itmo.penalty.kafka.config.TopicNames;
+import blps.itmo.penalty.kafka.payload.PenaltyAppliedPayload;
+import blps.itmo.penalty.kafka.payload.PenaltyApplicationFailedPayload;
+import blps.itmo.penalty.kafka.payload.PenaltyApplicationRequestedPayload;
+import blps.itmo.penalty.kafka.payload.PenaltyRevokeCommandPayload;
+import blps.itmo.penalty.kafka.payload.PenaltyRevokeFailedPayload;
+import blps.itmo.penalty.kafka.payload.PenaltyRevokedPayload;
 import blps.itmo.penalty.repository.PenaltyOperationRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,9 +23,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class PenaltyService {
 
@@ -70,7 +76,7 @@ public class PenaltyService {
     }
 
     @Transactional
-    public PenaltyOperation handlePenaltyRequested(PenaltyApplicationRequestedPayload payload) {
+    public PenaltyOperation handlePenaltyRequested(PenaltyApplicationRequestedPayload payload, UUID sagaId) {
         PenaltyOperation op = repository.findByClaimId(payload.claimId()).orElseGet(() -> {
             PenaltyOperation created = new PenaltyOperation();
             created.setClaimId(payload.claimId());
@@ -84,8 +90,12 @@ public class PenaltyService {
             created.setStatus(PenaltyStatus.PENDING);
             return repository.save(created);
         });
+        if (sagaId != null) {
+            op.setLastSagaId(sagaId);
+            op = repository.save(op);
+        }
         if (op.getStatus() == PenaltyStatus.PENDING) {
-            return processPending(op, payload.simulateFailure());
+            return processPending(op, payload.simulateFailure(), sagaId);
         }
         return op;
     }
@@ -94,14 +104,14 @@ public class PenaltyService {
     public PenaltyOperation apply(Integer id) {
         PenaltyOperation op = getById(id);
         ensureStatus(op, PenaltyStatus.PENDING);
-        return applyInternal(op);
+        return applyInternal(op, op.getLastSagaId());
     }
 
     @Transactional
     public PenaltyOperation fail(Integer id, FailPenaltyRequest req) {
         PenaltyOperation op = getById(id);
         ensureStatus(op, PenaltyStatus.PENDING);
-        return failInternal(op, req.reason());
+        return failInternal(op, req.reason(), op.getLastSagaId());
     }
 
     @Transactional
@@ -133,40 +143,110 @@ public class PenaltyService {
     }
 
     @Transactional
-    public PenaltyOperation processPending(PenaltyOperation op, boolean simulateFailure) {
+    public PenaltyOperation revoke(PenaltyRevokeCommandPayload payload, UUID sagaId) {
+        PenaltyOperation op = repository.findByClaimId(payload.claimId()).orElse(null);
+
+        // Idempotent: already revoked with this saga — re-emit success
+        if (op != null && op.getStatus() == PenaltyStatus.REVOKED
+                && sagaId != null && sagaId.equals(op.getLastSagaId())) {
+            outboxService.enqueue(
+                    "penalty",
+                    op.getId().toString(),
+                    EventType.PENALTY_REVOKED,
+                    TopicNames.PENALTY_EVENTS,
+                    new PenaltyRevokedPayload(op.getClaimId(), op.getId(), op.getTenantId(), false),
+                    sagaId
+            );
+            return op;
+        }
+
+        // Vacuous success: nothing to revoke
+        if (op == null) {
+            outboxService.enqueue(
+                    "penalty",
+                    payload.claimId().toString(),
+                    EventType.PENALTY_REVOKED,
+                    TopicNames.PENALTY_EVENTS,
+                    new PenaltyRevokedPayload(payload.claimId(), null, null, false),
+                    sagaId
+            );
+            return null;
+        }
+
+        try {
+            boolean wasApplied = op.getStatus() == PenaltyStatus.APPLIED;
+            op.setStatus(PenaltyStatus.REVOKED);
+            op.setRevokedAt(Instant.now());
+            op.setRevokeReason(payload.reason());
+            if (sagaId != null) {
+                op.setLastSagaId(sagaId);
+            }
+            PenaltyOperation saved = repository.save(op);
+            outboxService.enqueue(
+                    "penalty",
+                    saved.getId().toString(),
+                    EventType.PENALTY_REVOKED,
+                    TopicNames.PENALTY_EVENTS,
+                    new PenaltyRevokedPayload(saved.getClaimId(), saved.getId(), saved.getTenantId(), wasApplied),
+                    sagaId
+            );
+            return saved;
+        } catch (RuntimeException ex) {
+            outboxService.enqueue(
+                    "penalty",
+                    op.getId().toString(),
+                    EventType.PENALTY_REVOKE_FAILED,
+                    TopicNames.PENALTY_EVENTS,
+                    new PenaltyRevokeFailedPayload(op.getClaimId(), op.getId(), ex.getMessage()),
+                    sagaId
+            );
+            throw ex;
+        }
+    }
+
+    @Transactional
+    public PenaltyOperation processPending(PenaltyOperation op, boolean simulateFailure, UUID sagaId) {
         ensureStatus(op, PenaltyStatus.PENDING);
         op.setStatus(PenaltyStatus.PROCESSING);
         repository.save(op);
         if (simulateFailure) {
-            return failInternal(op, "simulated failure");
+            return failInternal(op, "simulated failure", sagaId);
         }
-        return applyInternal(op);
+        return applyInternal(op, sagaId);
     }
 
-    private PenaltyOperation applyInternal(PenaltyOperation op) {
+    private PenaltyOperation applyInternal(PenaltyOperation op, UUID sagaId) {
         op.setStatus(PenaltyStatus.APPLIED);
         op.setAppliedAt(Instant.now());
+        if (sagaId != null) {
+            op.setLastSagaId(sagaId);
+        }
         PenaltyOperation saved = repository.save(op);
         outboxService.enqueue(
                 "penalty",
                 saved.getId().toString(),
                 EventType.PENALTY_APPLIED,
                 TopicNames.PENALTY_EVENTS,
-                new PenaltyAppliedPayload(saved.getClaimId(), saved.getId(), saved.getTenantId())
+                new PenaltyAppliedPayload(saved.getClaimId(), saved.getId(), saved.getTenantId()),
+                sagaId
         );
         return saved;
     }
 
-    private PenaltyOperation failInternal(PenaltyOperation op, String reason) {
+    private PenaltyOperation failInternal(PenaltyOperation op, String reason, UUID sagaId) {
         op.setStatus(PenaltyStatus.FAILED);
         op.setFailureReason(reason);
+        if (sagaId != null) {
+            op.setLastSagaId(sagaId);
+        }
         PenaltyOperation saved = repository.save(op);
         outboxService.enqueue(
                 "penalty",
                 saved.getId().toString(),
                 EventType.PENALTY_APPLICATION_FAILED,
                 TopicNames.PENALTY_EVENTS,
-                new PenaltyApplicationFailedPayload(saved.getClaimId(), saved.getId(), reason)
+                new PenaltyApplicationFailedPayload(saved.getClaimId(), saved.getId(), reason),
+                sagaId
         );
         return saved;
     }

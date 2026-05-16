@@ -18,6 +18,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "claims")
@@ -78,4 +79,7 @@ public class Claim {
 
     @Column(name = "closed_at")
     private Instant closedAt;
+
+    @Column(name = "current_saga_id")
+    private UUID currentSagaId;
 }

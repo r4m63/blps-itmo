@@ -7,12 +7,12 @@ spring:
     password: postgres
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -24,16 +24,23 @@ spring:
     job-store-type: memory
 
 minio:
-  url: ${MINIO_URL:http://localhost:9000}
-  access-key: ${MINIO_ACCESS_KEY:minioadmin}
-  secret-key: ${MINIO_SECRET_KEY:minioadmin}
-  bucket: ${MINIO_BUCKET:claim-attachments}
+  url: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket: claim-attachments
 
 jira:
-  url: ${JIRA_URL:https://jira.example.com}
-  user: ${JIRA_USER:demo}
-  token: ${JIRA_TOKEN:demo}
-  project-key: ${JIRA_PROJECT_KEY:BLPS}
+  url: https://jira.example.com
+  user: demo
+  token: demo
+  project-key: BLPS
+
+saga:
+  timeout-watcher-delay-ms: 5000
+  timeout-seconds:
+    awaiting-penalty-applied: 60
+    awaiting-penalty-counted: 60
+    compensating-retry: 30
 
 server:
   port: 8081

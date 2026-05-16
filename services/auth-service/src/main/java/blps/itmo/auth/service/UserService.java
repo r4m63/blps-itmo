@@ -4,10 +4,10 @@ import blps.itmo.auth.api.dto.CreateUserRequest;
 import blps.itmo.auth.api.dto.RegisterRequest;
 import blps.itmo.auth.domain.User;
 import blps.itmo.auth.domain.UserRole;
-import blps.itmo.auth.messaging.EventType;
-import blps.itmo.auth.messaging.OutboxService;
-import blps.itmo.auth.messaging.TopicNames;
-import blps.itmo.auth.messaging.payload.UserDeactivatedPayload;
+import blps.itmo.auth.kafka.EventType;
+import blps.itmo.auth.kafka.outboxevent.OutboxService;
+import blps.itmo.auth.kafka.config.TopicNames;
+import blps.itmo.auth.kafka.payload.UserDeactivatedPayload;
 import blps.itmo.auth.repository.PrivilegeRepository;
 import blps.itmo.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -77,6 +77,14 @@ public class UserService {
     public User incrementPenaltyCount(Integer id) {
         User user = getById(id);
         user.setPenaltyCount(user.getPenaltyCount() + 1);
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public User decrementPenaltyCount(Integer id) {
+        User user = getById(id);
+        int next = Math.max(0, user.getPenaltyCount() - 1);
+        user.setPenaltyCount(next);
         return userRepository.save(user);
     }
 

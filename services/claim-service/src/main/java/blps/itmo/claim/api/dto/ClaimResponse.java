@@ -5,6 +5,7 @@ import blps.itmo.claim.domain.ClaimStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 public record ClaimResponse(
         Integer id,
@@ -22,7 +23,8 @@ public record ClaimResponse(
         Instant decidedAt,
         Instant createdAt,
         Instant updatedAt,
-        Instant closedAt
+        Instant closedAt,
+        UUID currentSagaId
 ) {
     public static ClaimResponse from(Claim c) {
         return new ClaimResponse(
@@ -41,7 +43,8 @@ public record ClaimResponse(
                 c.getDecidedAt(),
                 c.getCreatedAt(),
                 c.getUpdatedAt(),
-                c.getClosedAt()
+                c.getClosedAt(),
+                c.getCurrentSagaId()
         );
     }
 }

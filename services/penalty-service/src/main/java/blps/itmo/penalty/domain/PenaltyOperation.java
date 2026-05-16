@@ -18,6 +18,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "penalty_operations")
@@ -58,6 +59,15 @@ public class PenaltyOperation {
 
     @Column(name = "applied_at")
     private Instant appliedAt;
+
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
+    @Column(name = "revoke_reason")
+    private String revokeReason;
+
+    @Column(name = "last_saga_id")
+    private UUID lastSagaId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

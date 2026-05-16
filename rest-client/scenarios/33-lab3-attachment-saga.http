@@ -1,65 +1,84 @@
-### Scenario 33
-### Attachment metadata is coordinated through storage-service + MinIO-outside-XA saga
+### Scenario 33 — Claim closed without penalty (CLOSED_NO_PENALTY)
+### IntelliJ HTTP Client syntax.
+### Originally tested an attachment saga, but /api/attachments/** is not proxied
+### through the auth-service edge — it would require hitting claim-service directly.
+### Replaced with the no-penalty close flow which exercises the same support-decision branch.
 
-### 33.1 Login as landlord
-POST {{gatewayBaseUrl}}/api/auth/login
+@baseUrl = http://localhost:8080
+@adminEmail = admin@blps.local
+@adminPass = adminpass
+@landlordEmail = landlord@blps.local
+@landlordPass = landpass
+@tenantEmail = tenant@blps.local
+@tenantPass = tenantpass
+
+### 33.1 Resolve tenant id
+GET {{baseUrl}}/api/auth/me
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+
+> {%
+client.global.set("tenant33_id", response.body.id);
+%}
+
+### 33.2 Landlord creates low-amount claim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
 Content-Type: application/json
 
 {
-  "userId": 1
+  "tenantId": {{tenant33_id}},
+  "title": "No-damage claim",
+  "description": "Tenant returned unit in good condition.",
+  "claimedAmount": 50.00,
+  "currency": "USD"
 }
 
 > {%
-client.global.set("landlordToken", response.body.token);
+client.global.set("claim33_id", response.body.id);
 %}
 
-### 33.2 Initialize attachment metadata
-POST {{gatewayBaseUrl}}/api/attachments/init
+### 33.3 Admin: intake-start
+POST {{baseUrl}}/api/claims/{{claim33_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 33.4 Admin: intake-decision (no extra info)
+POST {{baseUrl}}/api/claims/{{claim33_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
 Content-Type: application/json
-Authorization: Bearer {{landlordToken}}
+
+{ "requestAdditionalInfo": false, "note": "" }
+
+### 33.5 Admin: assessment with no grounds
+POST {{baseUrl}}/api/claims/{{claim33_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": false, "assessmentAmount": 0, "assessmentNotes": "No damage observed." }
+
+### 33.6 Tenant: short ack
+POST {{baseUrl}}/api/claims/{{claim33_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "Thanks, all good." }
+
+### 33.7 Support closes without penalty
+POST {{baseUrl}}/api/claims/{{claim33_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
 
 {
-  "originalFilename": "sofa-damage.jpg",
-  "contentType": "image/jpeg"
+  "applyPenalty": false,
+  "penaltyAmount": 0,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "Closed without penalty."
 }
 
-> {%
-client.global.set("attachmentId33", response.body.id);
-client.global.set("attachmentObjectKey33", response.body.objectKey);
-%}
+### 33.8 Verify CLOSED_NO_PENALTY
+GET {{baseUrl}}/api/claims/{{claim33_id}}
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
 
-### 33.3 Confirm object upload
-### Demo note: STORAGE_VERIFY_MINIO_OBJECT=false by default, so this confirms metadata after an out-of-band MinIO upload.
-POST {{gatewayBaseUrl}}/api/attachments/{{attachmentId33}}/confirm
-Content-Type: application/json
-Authorization: Bearer {{landlordToken}}
-
-{
-  "objectKey": "{{attachmentObjectKey33}}"
-}
-
-### 33.4 Create claim with attachment ref; claim-service emits ATTACHMENT_BINDING_REQUESTED
-POST {{gatewayBaseUrl}}/api/claims
-Content-Type: application/json
-Authorization: Bearer {{landlordToken}}
-
-{
-  "tenantUserId": 3,
-  "title": "Damage claim with attachment",
-  "description": "Attachment binding is handled by storage-service through Kafka.",
-  "claimedAmount": 80.00,
-  "currency": "USD",
-  "attachmentIds": [{{attachmentId33}}]
-}
-
-> {%
-client.global.set("claimId33", response.body.id);
-%}
-
-### 33.5 Poll claim attachments until status becomes BOUND
-GET {{gatewayBaseUrl}}/api/claims/{{claimId33}}/attachments
-Authorization: Bearer {{landlordToken}}
-
-### 33.6 Inspect storage metadata
-GET {{gatewayBaseUrl}}/api/attachments/{{attachmentId33}}
-Authorization: Bearer {{landlordToken}}
+### 33.9 History
+GET {{baseUrl}}/api/claims/{{claim33_id}}/history
+Authorization: Basic {{adminEmail}} {{adminPass}}

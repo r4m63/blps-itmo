@@ -4,5 +4,6 @@ public enum PenaltyStatus {
     PENDING,
     PROCESSING,
     APPLIED,
-    FAILED
+    FAILED,
+    REVOKED
 }

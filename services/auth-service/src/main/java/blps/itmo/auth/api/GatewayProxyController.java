@@ -8,10 +8,12 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.ResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
@@ -20,7 +22,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class GatewayProxyController {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = buildTransparentRestTemplate();
 
     @Value("${services.claim.base-url}")
     private String claimServiceBaseUrl;
@@ -68,5 +70,20 @@ public class GatewayProxyController {
         return ResponseEntity.status(response.getStatusCode())
                 .headers(response.getHeaders())
                 .body(response.getBody());
+    }
+
+    private static RestTemplate buildTransparentRestTemplate() {
+        RestTemplate rt = new RestTemplate();
+        rt.setErrorHandler(new ResponseErrorHandler() {
+            @Override
+            public boolean hasError(ClientHttpResponse response) {
+                return false;
+            }
+
+            @Override
+            public void handleError(ClientHttpResponse response) {
+            }
+        });
+        return rt;
     }
 }

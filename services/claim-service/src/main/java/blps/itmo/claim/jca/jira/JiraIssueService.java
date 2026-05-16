@@ -1,6 +1,6 @@
 package blps.itmo.claim.jca.jira;
 
-import blps.itmo.claim.messaging.payload.ClaimCreatedPayload;
+import blps.itmo.claim.kafka.payload.ClaimCreatedPayload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
