@@ -13,6 +13,7 @@ public class JiraConnectionFactoryImpl implements JiraConnectionFactory, Referen
 
     private final ConnectionManager connectionManager;
     private final ManagedConnectionFactory managedConnectionFactory;
+    private Reference reference;
 
     public JiraConnectionFactoryImpl(ConnectionManager connectionManager, ManagedConnectionFactory managedConnectionFactory) {
         this.connectionManager = connectionManager;
@@ -20,17 +21,18 @@ public class JiraConnectionFactoryImpl implements JiraConnectionFactory, Referen
     }
 
     @Override
-    public JiraConnection getConnection() throws jakarta.resource.ResourceException {
-        return (JiraConnection) connectionManager.allocateConnection(managedConnectionFactory, null);
+    public JiraConnection getConnection() {
+        try {
+            return (JiraConnection) connectionManager.allocateConnection(managedConnectionFactory, null);
+        } catch (jakarta.resource.ResourceException e) {
+            throw new IllegalStateException("failed to allocate JCA connection to Jira", e);
+        }
     }
 
     @Override
     public Connection getConnection(ConnectionSpec properties) throws jakarta.resource.ResourceException {
         return getConnection();
     }
-
-    @Override
-    private Reference reference;
 
     @Override
     public Reference getReference() {
@@ -40,5 +42,15 @@ public class JiraConnectionFactoryImpl implements JiraConnectionFactory, Referen
     @Override
     public void setReference(Reference reference) {
         this.reference = reference;
+    }
+
+    @Override
+    public jakarta.resource.cci.RecordFactory getRecordFactory() {
+        return null;
+    }
+
+    @Override
+    public jakarta.resource.cci.ResourceAdapterMetaData getMetaData() {
+        return null;
     }
 }

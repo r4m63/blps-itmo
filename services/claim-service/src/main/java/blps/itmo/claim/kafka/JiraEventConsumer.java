@@ -7,11 +7,13 @@ import blps.itmo.claim.kafka.processedmessage.ProcessedMessageService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@ConditionalOnProperty(prefix = "jira", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class JiraEventConsumer {
 

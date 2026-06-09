@@ -116,10 +116,78 @@ services:
     networks:
       - blps-net
 
+  postgres-temporal:
+    image: postgres:16-alpine
+    container_name: blps-postgres-temporal
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: temporal
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-temporal-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - blps-net
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    container_name: blps-temporal
+    restart: unless-stopped
+    depends_on:
+      postgres-temporal:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres-temporal
+    ports:
+      - "7233:7233"
+    networks:
+      - blps-net
+
+  temporal-ui:
+    image: temporalio/ui:2.31.2
+    container_name: blps-temporal-ui
+    restart: unless-stopped
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8086:8080"
+    networks:
+      - blps-net
+
+  jira:
+    image: mockserver/mockserver:5.15.0
+    container_name: blps-jira
+    restart: unless-stopped
+    ports:
+      - "18080:1080"
+    environment:
+      MOCKSERVER_INITIALIZATION_JSON_PATH: /config/jira-init.json
+      MOCKSERVER_WATCH_INITIALIZATION_JSON: "true"
+      MOCKSERVER_LOG_LEVEL: INFO
+    volumes:
+      - ./mock/jira-init.json:/config/jira-init.json:ro
+    networks:
+      - blps-net
+
 volumes:
   postgres-auth-data:
   postgres-claim-data:
   postgres-penalty-data:
+  postgres-temporal-data:
   minio-data:
 
 networks:

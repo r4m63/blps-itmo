@@ -3,9 +3,7 @@ package blps.itmo.claim.api;
 import blps.itmo.claim.api.dto.SagaResponse;
 import blps.itmo.claim.domain.Claim;
 import blps.itmo.claim.repository.ClaimRepository;
-import blps.itmo.claim.saga.SagaInstance;
-import blps.itmo.claim.saga.SagaInstanceRepository;
-import blps.itmo.claim.saga.SagaType;
+import blps.itmo.claim.saga.PenaltyApplicationSaga;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,14 +19,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SagaController {
 
-    private final SagaInstanceRepository sagaRepository;
+    private final PenaltyApplicationSaga penaltyApplicationSaga;
     private final ClaimRepository claimRepository;
 
     @GetMapping("/sagas/{sagaId}")
     public SagaResponse getSaga(@PathVariable UUID sagaId) {
-        SagaInstance saga = sagaRepository.findById(sagaId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Saga not found: " + sagaId));
-        return SagaResponse.from(saga);
+        return SagaResponse.from(penaltyApplicationSaga.describe(sagaId));
     }
 
     @GetMapping("/claims/{claimId}/saga")
@@ -36,14 +32,8 @@ public class SagaController {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Claim not found: " + claimId));
         if (claim.getCurrentSagaId() != null) {
-            return sagaRepository.findById(claim.getCurrentSagaId())
-                    .map(SagaResponse::from)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                            "Saga referenced by claim not found"));
+            return SagaResponse.from(penaltyApplicationSaga.describe(claim.getCurrentSagaId()));
         }
-        SagaInstance saga = sagaRepository.findByClaimIdAndSagaType(claimId, SagaType.PENALTY_APPLICATION)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "No saga for claim: " + claimId));
-        return SagaResponse.from(saga);
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No saga for claim: " + claimId);
     }
 }

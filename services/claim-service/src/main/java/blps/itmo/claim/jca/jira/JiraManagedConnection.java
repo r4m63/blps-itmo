@@ -6,7 +6,7 @@ import jakarta.resource.spi.ConnectionEventListener;
 import jakarta.resource.spi.LocalTransaction;
 import jakarta.resource.spi.ManagedConnection;
 import jakarta.resource.spi.ManagedConnectionMetaData;
-import jakarta.transaction.xa.XAResource;
+import javax.transaction.xa.XAResource;
 
 import javax.security.auth.Subject;
 import java.io.PrintWriter;

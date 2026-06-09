@@ -1,0 +1,56 @@
+[
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["text/html; charset=utf-8"]
+      },
+      "body": "<!doctype html><html><head><title>BLPS Mock Jira</title></head><body style='font-family:sans-serif;padding:32px;max-width:720px;margin:auto'><h1>BLPS Mock Jira</h1><p>This is a <b>mockserver</b> impersonating Jira REST API.</p><ul><li><b>POST /rest/api/2/issue</b> &mdash; returns 201 with <code>BLPS-1</code></li><li><b>GET /rest/api/2/serverInfo</b> &mdash; returns mock server info</li></ul><p>Inspect traffic / expectations at <a href='/mockserver/dashboard'>/mockserver/dashboard</a>.</p></body></html>"
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "POST",
+      "path": "/rest/api/2/issue"
+    },
+    "httpResponse": {
+      "statusCode": 201,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "type": "JSON",
+        "json": {
+          "id": "10001",
+          "key": "BLPS-1",
+          "self": "http://localhost:18080/rest/api/2/issue/10001"
+        }
+      }
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/rest/api/2/serverInfo"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "type": "JSON",
+        "json": {
+          "baseUrl": "http://localhost:18080",
+          "version": "9.0.0-mock",
+          "deploymentType": "Server",
+          "serverTitle": "BLPS Lab Mock Jira"
+        }
+      }
+    }
+  }
+]

@@ -8,15 +8,12 @@ BEGIN;
 -- Script is idempotent: wipes existing objects before recreating.
 -- =====================================================================
 
-DROP TABLE IF EXISTS saga_instances CASCADE;
 DROP TABLE IF EXISTS claim_attachments CASCADE;
 DROP TABLE IF EXISTS claim_status_history CASCADE;
 DROP TABLE IF EXISTS claim_messages CASCADE;
 DROP TABLE IF EXISTS claims CASCADE;
 DROP TABLE IF EXISTS outbox_events CASCADE;
 DROP TABLE IF EXISTS processed_messages CASCADE;
-DROP TYPE  IF EXISTS sagatype;
-DROP TYPE  IF EXISTS sagastate;
 DROP TYPE  IF EXISTS attachmentpurpose;
 DROP TYPE  IF EXISTS commenttype;
 DROP TYPE  IF EXISTS claimstatus;
@@ -46,21 +43,6 @@ CREATE TYPE attachmentpurpose AS ENUM (
     'DAMAGE_EVIDENCE',
     'ADDITIONAL_MATERIAL',
     'SYSTEM'
-);
-
-CREATE TYPE sagatype AS ENUM (
-    'PENALTY_APPLICATION'
-);
-
-CREATE TYPE sagastate AS ENUM (
-    'STARTED',
-    'AWAITING_PENALTY_APPLIED',
-    'AWAITING_PENALTY_COUNTED',
-    'COMPLETED',
-    'PENALTY_FAILED',
-    'COMPENSATING_REVOKE',
-    'COMPENSATED',
-    'COMPENSATION_FAILED'
 );
 
 CREATE TABLE claims (
@@ -143,25 +125,6 @@ CREATE TABLE processed_messages (
     event_id     UUID PRIMARY KEY,
     processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-CREATE TABLE saga_instances (
-    saga_id        UUID PRIMARY KEY,
-    saga_type      sagatype    NOT NULL DEFAULT 'PENALTY_APPLICATION',
-    claim_id       INT         NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
-    state          sagastate   NOT NULL,
-    attempt_count  INT         NOT NULL DEFAULT 0,
-    max_attempts   INT         NOT NULL DEFAULT 3,
-    failure_reason TEXT,
-    started_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_event_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    completed_at   TIMESTAMPTZ,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_saga_claim ON saga_instances (claim_id);
-CREATE INDEX idx_saga_state_lastevent ON saga_instances (state, last_event_at)
-    WHERE state IN ('AWAITING_PENALTY_APPLIED','AWAITING_PENALTY_COUNTED','COMPENSATING_REVOKE');
 
 -- =====================================================================
 -- Test claims (landlord_id=2, tenant_id=3 — see init_auth_service.sql)

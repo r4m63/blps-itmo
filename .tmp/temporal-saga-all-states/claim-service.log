@@ -1,0 +1,658 @@
+Starting a Gradle Daemon, 1 busy and 4 stopped Daemons could not be reused, use --status for details
+> Task :claim-service:compileJava UP-TO-DATE
+> Task :claim-service:processResources UP-TO-DATE
+> Task :claim-service:classes UP-TO-DATE
+> Task :claim-service:resolveMainClassName UP-TO-DATE
+
+> Task :claim-service:bootRun
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.2)
+
+2026-05-20T19:02:36.750+03:00  INFO 5708 --- [claim-service] [           main] b.itmo.claim.ClaimServiceApplication     : Starting ClaimServiceApplication using Java 17.0.18 with PID 5708 (/Users/ramil/Projects/blps-itmo/services/claim-service/build/classes/java/main started by ramil in /Users/ramil/Projects/blps-itmo/services/claim-service)
+2026-05-20T19:02:36.751+03:00  INFO 5708 --- [claim-service] [           main] b.itmo.claim.ClaimServiceApplication     : No active profile set, falling back to 1 default profile: "default"
+2026-05-20T19:02:36.973+03:00  INFO 5708 --- [claim-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-20T19:02:36.996+03:00  INFO 5708 --- [claim-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 20 ms. Found 6 JPA repository interfaces.
+2026-05-20T19:02:37.173+03:00  INFO 5708 --- [claim-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+2026-05-20T19:02:37.177+03:00  INFO 5708 --- [claim-service] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-05-20T19:02:37.177+03:00  INFO 5708 --- [claim-service] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-05-20T19:02:37.199+03:00  INFO 5708 --- [claim-service] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-05-20T19:02:37.200+03:00  INFO 5708 --- [claim-service] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 434 ms
+2026-05-20T19:02:37.252+03:00  INFO 5708 --- [claim-service] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-05-20T19:02:37.274+03:00  INFO 5708 --- [claim-service] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.4.1.Final
+2026-05-20T19:02:37.283+03:00  INFO 5708 --- [claim-service] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-05-20T19:02:37.349+03:00  INFO 5708 --- [claim-service] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-20T19:02:37.357+03:00  INFO 5708 --- [claim-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-05-20T19:02:37.419+03:00  INFO 5708 --- [claim-service] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@489f62a3
+2026-05-20T19:02:37.420+03:00  INFO 5708 --- [claim-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-05-20T19:02:37.434+03:00  WARN 5708 --- [claim-service] [           main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-05-20T19:02:37.730+03:00  INFO 5708 --- [claim-service] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-20T19:02:37.731+03:00  INFO 5708 --- [claim-service] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-20T19:02:37.961+03:00  INFO 5708 --- [claim-service] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-05-20T19:02:38.169+03:00  INFO 5708 --- [claim-service] [           main] i.t.s.WorkflowServiceStubsImpl           : Created WorkflowServiceStubs for channel: ManagedChannelOrphanWrapper{delegate=ManagedChannelImpl{logId=1, target=localhost:7233}}
+2026-05-20T19:02:38.271+03:00  WARN 5708 --- [claim-service] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-05-20T19:02:38.380+03:00  INFO 5708 --- [claim-service] [           main] org.quartz.impl.StdSchedulerFactory      : Using default implementation for ThreadExecutor
+2026-05-20T19:02:38.384+03:00  INFO 5708 --- [claim-service] [           main] org.quartz.core.SchedulerSignalerImpl    : Initialized Scheduler Signaller of type: class org.quartz.core.SchedulerSignalerImpl
+2026-05-20T19:02:38.384+03:00  INFO 5708 --- [claim-service] [           main] org.quartz.core.QuartzScheduler          : Quartz Scheduler v.2.3.2 created.
+2026-05-20T19:02:38.384+03:00  INFO 5708 --- [claim-service] [           main] org.quartz.simpl.RAMJobStore             : RAMJobStore initialized.
+2026-05-20T19:02:38.384+03:00  INFO 5708 --- [claim-service] [           main] org.quartz.core.QuartzScheduler          : Scheduler meta-data: Quartz Scheduler (v2.3.2) 'quartzScheduler' with instanceId 'NON_CLUSTERED'
+  Scheduler class: 'org.quartz.core.QuartzScheduler' - running locally.
+  NOT STARTED.
+  Currently in standby mode.
+  Number of jobs executed: 0
+  Using thread pool 'org.quartz.simpl.SimpleThreadPool' - with 10 threads.
+  Using job-store 'org.quartz.simpl.RAMJobStore' - which does not support persistence. and is not clustered.
+
+2026-05-20T19:02:38.384+03:00  INFO 5708 --- [claim-service] [           main] org.quartz.impl.StdSchedulerFactory      : Quartz scheduler 'quartzScheduler' initialized from an externally provided properties instance.
+2026-05-20T19:02:38.384+03:00  INFO 5708 --- [claim-service] [           main] org.quartz.impl.StdSchedulerFactory      : Quartz scheduler version: 2.3.2
+2026-05-20T19:02:38.384+03:00  INFO 5708 --- [claim-service] [           main] org.quartz.core.QuartzScheduler          : JobFactory set to: org.springframework.scheduling.quartz.SpringBeanJobFactory@4ed8ae9f
+2026-05-20T19:02:38.409+03:00  INFO 5708 --- [claim-service] [           main] o.a.k.clients.admin.AdminClientConfig    : AdminClientConfig values: 
+	auto.include.jmx.reporter = true
+	bootstrap.servers = [localhost:9092]
+	client.dns.lookup = use_all_dns_ips
+	client.id = 
+	connections.max.idle.ms = 300000
+	default.api.timeout.ms = 60000
+	metadata.max.age.ms = 300000
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retries = 2147483647
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+
+2026-05-20T19:02:38.439+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.6.1
+2026-05-20T19:02:38.439+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 5e3c2b738d253ff5
+2026-05-20T19:02:38.439+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1779292958439
+2026-05-20T19:02:38.533+03:00  INFO 5708 --- [claim-service] [| adminclient-1] o.a.kafka.common.utils.AppInfoParser     : App info kafka.admin.client for adminclient-1 unregistered
+2026-05-20T19:02:38.534+03:00  INFO 5708 --- [claim-service] [| adminclient-1] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-05-20T19:02:38.534+03:00  INFO 5708 --- [claim-service] [| adminclient-1] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-05-20T19:02:38.534+03:00  INFO 5708 --- [claim-service] [| adminclient-1] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-05-20T19:02:38.539+03:00  INFO 5708 --- [claim-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path ''
+2026-05-20T19:02:38.549+03:00  INFO 5708 --- [claim-service] [           main] o.a.k.clients.consumer.ConsumerConfig    : ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = latest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-claim-jira-1
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = claim-jira
+	group.instance.id = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_uncommitted
+	key.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+
+2026-05-20T19:02:38.564+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.6.1
+2026-05-20T19:02:38.564+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 5e3c2b738d253ff5
+2026-05-20T19:02:38.564+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1779292958564
+2026-05-20T19:02:38.565+03:00  INFO 5708 --- [claim-service] [           main] fkaConsumerFactory$ExtendedKafkaConsumer : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Subscribed to topic(s): claim.events
+2026-05-20T19:02:38.567+03:00  INFO 5708 --- [claim-service] [           main] o.a.k.clients.consumer.ConsumerConfig    : ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = latest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-claim-service-2
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = claim-service
+	group.instance.id = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_uncommitted
+	key.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+
+2026-05-20T19:02:38.568+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.6.1
+2026-05-20T19:02:38.568+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 5e3c2b738d253ff5
+2026-05-20T19:02:38.568+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1779292958568
+2026-05-20T19:02:38.568+03:00  INFO 5708 --- [claim-service] [           main] fkaConsumerFactory$ExtendedKafkaConsumer : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Subscribed to topic(s): penalty.events
+2026-05-20T19:02:38.569+03:00  INFO 5708 --- [claim-service] [           main] o.a.k.clients.consumer.ConsumerConfig    : ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = latest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-claim-service-3
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = claim-service
+	group.instance.id = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_uncommitted
+	key.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+
+2026-05-20T19:02:38.570+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.6.1
+2026-05-20T19:02:38.570+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 5e3c2b738d253ff5
+2026-05-20T19:02:38.570+03:00  INFO 5708 --- [claim-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1779292958570
+2026-05-20T19:02:38.570+03:00  INFO 5708 --- [claim-service] [           main] fkaConsumerFactory$ExtendedKafkaConsumer : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Subscribed to topic(s): identity.events
+2026-05-20T19:02:38.573+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] org.apache.kafka.clients.Metadata        : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Cluster ID: MkU3OEVBNTcwNTJENDM2Qg
+2026-05-20T19:02:38.573+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] org.apache.kafka.clients.Metadata        : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Cluster ID: MkU3OEVBNTcwNTJENDM2Qg
+2026-05-20T19:02:38.573+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Discovered group coordinator localhost:9092 (id: 2147483646 rack: null)
+2026-05-20T19:02:38.573+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Discovered group coordinator localhost:9092 (id: 2147483646 rack: null)
+2026-05-20T19:02:38.574+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] (Re-)joining group
+2026-05-20T19:02:38.574+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] (Re-)joining group
+2026-05-20T19:02:38.574+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] org.apache.kafka.clients.Metadata        : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Cluster ID: MkU3OEVBNTcwNTJENDM2Qg
+2026-05-20T19:02:38.574+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Discovered group coordinator localhost:9092 (id: 2147483646 rack: null)
+2026-05-20T19:02:38.574+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] (Re-)joining group
+2026-05-20T19:02:38.580+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Request joining group due to: need to re-join with the given member-id: consumer-claim-service-2-0b559c25-801d-457d-ad32-cfd64d08b039
+2026-05-20T19:02:38.580+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Request joining group due to: need to re-join with the given member-id: consumer-claim-jira-1-c1d978a2-bf5c-4a83-be43-10b096053a07
+2026-05-20T19:02:38.580+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Request joining group due to: rebalance failed due to 'The group member needs to have a valid member id before actually entering a consumer group.' (MemberIdRequiredException)
+2026-05-20T19:02:38.580+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Request joining group due to: rebalance failed due to 'The group member needs to have a valid member id before actually entering a consumer group.' (MemberIdRequiredException)
+2026-05-20T19:02:38.580+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Request joining group due to: need to re-join with the given member-id: consumer-claim-service-3-a1aaf135-7b40-4dd3-8572-77447e73c706
+2026-05-20T19:02:38.580+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] (Re-)joining group
+2026-05-20T19:02:38.580+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] (Re-)joining group
+2026-05-20T19:02:38.580+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Request joining group due to: rebalance failed due to 'The group member needs to have a valid member id before actually entering a consumer group.' (MemberIdRequiredException)
+2026-05-20T19:02:38.580+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] (Re-)joining group
+2026-05-20T19:02:38.652+03:00  INFO 5708 --- [claim-service] [           main] io.temporal.internal.worker.Poller       : start: Poller{name=Workflow Poller taskQueue="claim-saga-task-queue", namespace="default", identity=5708@MacBook-Pro---Ramil.local}
+2026-05-20T19:02:38.656+03:00  INFO 5708 --- [claim-service] [           main] io.temporal.internal.worker.Poller       : start: Poller{name=Activity Poller taskQueue="claim-saga-task-queue", namespace="default", identity=5708@MacBook-Pro---Ramil.local}
+2026-05-20T19:02:38.657+03:00  INFO 5708 --- [claim-service] [nio-8081-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-05-20T19:02:38.657+03:00  INFO 5708 --- [claim-service] [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-05-20T19:02:38.657+03:00  INFO 5708 --- [claim-service] [           main] o.s.s.quartz.SchedulerFactoryBean        : Starting Quartz Scheduler now
+2026-05-20T19:02:38.657+03:00  INFO 5708 --- [claim-service] [           main] org.quartz.core.QuartzScheduler          : Scheduler quartzScheduler_$_NON_CLUSTERED started.
+2026-05-20T19:02:38.658+03:00  INFO 5708 --- [claim-service] [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-05-20T19:02:38.662+03:00  INFO 5708 --- [claim-service] [           main] b.itmo.claim.ClaimServiceApplication     : Started ClaimServiceApplication in 2.034 seconds (process running for 2.155)
+2026-05-20T19:02:38.723+03:00  INFO 5708 --- [claim-service] [   scheduling-1] o.a.k.clients.producer.ProducerConfig    : ProducerConfig values: 
+	acks = -1
+	auto.include.jmx.reporter = true
+	batch.size = 16384
+	bootstrap.servers = [localhost:9092]
+	buffer.memory = 33554432
+	client.dns.lookup = use_all_dns_ips
+	client.id = producer-1
+	compression.type = none
+	connections.max.idle.ms = 540000
+	delivery.timeout.ms = 120000
+	enable.idempotence = true
+	interceptor.classes = []
+	key.serializer = class org.apache.kafka.common.serialization.StringSerializer
+	linger.ms = 0
+	max.block.ms = 60000
+	max.in.flight.requests.per.connection = 5
+	max.request.size = 1048576
+	metadata.max.age.ms = 300000
+	metadata.max.idle.ms = 300000
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partitioner.adaptive.partitioning.enable = true
+	partitioner.availability.timeout.ms = 0
+	partitioner.class = null
+	partitioner.ignore.keys = false
+	receive.buffer.bytes = 32768
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retries = 2147483647
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	transaction.timeout.ms = 60000
+	transactional.id = null
+	value.serializer = class org.apache.kafka.common.serialization.StringSerializer
+
+2026-05-20T19:02:38.726+03:00  INFO 5708 --- [claim-service] [   scheduling-1] o.a.k.clients.producer.KafkaProducer     : [Producer clientId=producer-1] Instantiated an idempotent producer.
+2026-05-20T19:02:38.730+03:00  INFO 5708 --- [claim-service] [   scheduling-1] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.6.1
+2026-05-20T19:02:38.730+03:00  INFO 5708 --- [claim-service] [   scheduling-1] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 5e3c2b738d253ff5
+2026-05-20T19:02:38.730+03:00  INFO 5708 --- [claim-service] [   scheduling-1] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1779292958730
+2026-05-20T19:02:38.735+03:00  INFO 5708 --- [claim-service] [ad | producer-1] org.apache.kafka.clients.Metadata        : [Producer clientId=producer-1] Cluster ID: MkU3OEVBNTcwNTJENDM2Qg
+2026-05-20T19:02:38.735+03:00  INFO 5708 --- [claim-service] [ad | producer-1] o.a.k.c.p.internals.TransactionManager   : [Producer clientId=producer-1] ProducerId set to 3010 with epoch 0
+2026-05-20T19:02:41.586+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Successfully joined group with generation Generation{generationId=17, memberId='consumer-claim-jira-1-c1d978a2-bf5c-4a83-be43-10b096053a07', protocol='range'}
+2026-05-20T19:02:41.586+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Successfully joined group with generation Generation{generationId=33, memberId='consumer-claim-service-3-a1aaf135-7b40-4dd3-8572-77447e73c706', protocol='range'}
+2026-05-20T19:02:41.586+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Successfully joined group with generation Generation{generationId=33, memberId='consumer-claim-service-2-0b559c25-801d-457d-ad32-cfd64d08b039', protocol='range'}
+2026-05-20T19:02:41.588+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Finished assignment for group at generation 17: {consumer-claim-jira-1-c1d978a2-bf5c-4a83-be43-10b096053a07=Assignment(partitions=[claim.events-0, claim.events-1, claim.events-2])}
+2026-05-20T19:02:41.589+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Finished assignment for group at generation 33: {consumer-claim-service-3-a1aaf135-7b40-4dd3-8572-77447e73c706=Assignment(partitions=[identity.events-0, identity.events-1, identity.events-2]), consumer-claim-service-2-0b559c25-801d-457d-ad32-cfd64d08b039=Assignment(partitions=[penalty.events-0, penalty.events-1, penalty.events-2])}
+2026-05-20T19:02:41.591+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Successfully synced group in generation Generation{generationId=17, memberId='consumer-claim-jira-1-c1d978a2-bf5c-4a83-be43-10b096053a07', protocol='range'}
+2026-05-20T19:02:41.591+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Notifying assignor about the new Assignment(partitions=[claim.events-0, claim.events-1, claim.events-2])
+2026-05-20T19:02:41.591+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Successfully synced group in generation Generation{generationId=33, memberId='consumer-claim-service-3-a1aaf135-7b40-4dd3-8572-77447e73c706', protocol='range'}
+2026-05-20T19:02:41.591+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Successfully synced group in generation Generation{generationId=33, memberId='consumer-claim-service-2-0b559c25-801d-457d-ad32-cfd64d08b039', protocol='range'}
+2026-05-20T19:02:41.591+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Notifying assignor about the new Assignment(partitions=[identity.events-0, identity.events-1, identity.events-2])
+2026-05-20T19:02:41.591+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Notifying assignor about the new Assignment(partitions=[penalty.events-0, penalty.events-1, penalty.events-2])
+2026-05-20T19:02:41.592+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Adding newly assigned partitions: identity.events-0, identity.events-1, identity.events-2
+2026-05-20T19:02:41.592+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Adding newly assigned partitions: claim.events-0, claim.events-1, claim.events-2
+2026-05-20T19:02:41.592+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Adding newly assigned partitions: penalty.events-0, penalty.events-1, penalty.events-2
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Setting offset for partition penalty.events-2 to the committed offset FetchPosition{offset=7, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=6}}
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Setting offset for partition identity.events-0 to the committed offset FetchPosition{offset=0, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=6}}
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Setting offset for partition penalty.events-0 to the committed offset FetchPosition{offset=19, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=6}}
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Setting offset for partition penalty.events-1 to the committed offset FetchPosition{offset=20, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=6}}
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Setting offset for partition identity.events-1 to the committed offset FetchPosition{offset=1, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=6}}
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Setting offset for partition identity.events-2 to the committed offset FetchPosition{offset=16, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=6}}
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Setting offset for partition claim.events-2 to the committed offset FetchPosition{offset=7, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=6}}
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Setting offset for partition claim.events-1 to the committed offset FetchPosition{offset=16, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=6}}
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Setting offset for partition claim.events-0 to the committed offset FetchPosition{offset=18, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:9092 (id: 1 rack: null)], epoch=6}}
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : claim-service: partitions assigned: [penalty.events-0, penalty.events-1, penalty.events-2]
+2026-05-20T19:02:41.597+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : claim-service: partitions assigned: [identity.events-0, identity.events-1, identity.events-2]
+2026-05-20T19:02:41.598+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : claim-jira: partitions assigned: [claim.events-0, claim.events-1, claim.events-2]
+2026-05-20T19:02:42.926+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] b.itmo.claim.jca.jira.JiraIssueService   : Jira issue SCRUM-24 created for claim 45
+2026-05-20T19:02:44.223+03:00  INFO 5708 --- [claim-service] [ionShutdownHook] io.temporal.worker.WorkerFactory         : shutdown: WorkerFactory{identity=5708@MacBook-Pro---Ramil.local}
+2026-05-20T19:02:44.224+03:00  INFO 5708 --- [claim-service] [ionShutdownHook] io.temporal.internal.worker.Poller       : shutdown: Poller{name=Workflow Poller taskQueue="claim-saga-task-queue", namespace="default", identity=5708@MacBook-Pro---Ramil.local}
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ce="default": 4] io.temporal.internal.worker.Poller       : poll loop is terminated: WorkflowPollTask
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ce="default": 3] io.temporal.internal.worker.Poller       : poll loop is terminated: WorkflowPollTask
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ce="default": 1] io.temporal.internal.worker.Poller       : poll loop is terminated: WorkflowPollTask
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ce="default": 2] io.temporal.internal.worker.Poller       : poll loop is terminated: WorkflowPollTask
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ionShutdownHook] io.temporal.internal.worker.Poller       : shutdown: Poller{name=Activity Poller taskQueue="claim-saga-task-queue", namespace="default", identity=5708@MacBook-Pro---Ramil.local}
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ce="default": 5] io.temporal.internal.worker.Poller       : poll loop is terminated: WorkflowPollTask
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ce="default": 1] io.temporal.internal.worker.Poller       : poll loop is terminated: ActivityPollTask
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ce="default": 4] io.temporal.internal.worker.Poller       : poll loop is terminated: ActivityPollTask
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ce="default": 2] io.temporal.internal.worker.Poller       : poll loop is terminated: ActivityPollTask
+2026-05-20T19:02:44.225+03:00  INFO 5708 --- [claim-service] [ce="default": 3] io.temporal.internal.worker.Poller       : poll loop is terminated: ActivityPollTask
+2026-05-20T19:02:44.226+03:00  INFO 5708 --- [claim-service] [ce="default": 5] io.temporal.internal.worker.Poller       : poll loop is terminated: ActivityPollTask
+2026-05-20T19:02:44.226+03:00  INFO 5708 --- [claim-service] [ionShutdownHook] org.quartz.core.QuartzScheduler          : Scheduler quartzScheduler_$_NON_CLUSTERED paused.
+2026-05-20T19:02:44.226+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Revoke previously assigned partitions penalty.events-0, penalty.events-1, penalty.events-2
+2026-05-20T19:02:44.226+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Revoke previously assigned partitions identity.events-0, identity.events-1, identity.events-2
+2026-05-20T19:02:44.226+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : claim-service: partitions revoked: [penalty.events-0, penalty.events-1, penalty.events-2]
+2026-05-20T19:02:44.226+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Revoke previously assigned partitions claim.events-0, claim.events-1, claim.events-2
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : claim-service: partitions revoked: [identity.events-0, identity.events-1, identity.events-2]
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Member consumer-claim-service-2-0b559c25-801d-457d-ad32-cfd64d08b039 sending LeaveGroup request to coordinator localhost:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : claim-jira: partitions revoked: [claim.events-0, claim.events-1, claim.events-2]
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Member consumer-claim-service-3-a1aaf135-7b40-4dd3-8572-77447e73c706 sending LeaveGroup request to coordinator localhost:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Member consumer-claim-jira-1-c1d978a2-bf5c-4a83-be43-10b096053a07 sending LeaveGroup request to coordinator localhost:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Request joining group due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] fkaConsumerFactory$ExtendedKafkaConsumer : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Unsubscribed all topics or patterns and assigned partitions
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Request joining group due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Request joining group due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] fkaConsumerFactory$ExtendedKafkaConsumer : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Unsubscribed all topics or patterns and assigned partitions
+2026-05-20T19:02:44.227+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] fkaConsumerFactory$ExtendedKafkaConsumer : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Unsubscribed all topics or patterns and assigned partitions
+2026-05-20T19:02:44.228+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.228+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.228+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-3, groupId=claim-service] Request joining group due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.228+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.228+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-service-2, groupId=claim-service] Request joining group due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.228+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-claim-jira-1, groupId=claim-jira] Request joining group due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.446+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-05-20T19:02:44.446+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-05-20T19:02:44.446+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-05-20T19:02:44.447+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.a.kafka.common.utils.AppInfoParser     : App info kafka.consumer for consumer-claim-jira-1 unregistered
+2026-05-20T19:02:44.447+03:00  INFO 5708 --- [claim-service] [ntainer#2-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : claim-jira: Consumer stopped
+2026-05-20T19:02:44.626+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-05-20T19:02:44.626+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-05-20T19:02:44.626+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-05-20T19:02:44.626+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-05-20T19:02:44.626+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-05-20T19:02:44.626+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-05-20T19:02:44.630+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.a.kafka.common.utils.AppInfoParser     : App info kafka.consumer for consumer-claim-service-3 unregistered
+2026-05-20T19:02:44.630+03:00  INFO 5708 --- [claim-service] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : claim-service: Consumer stopped
+2026-05-20T19:02:44.631+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.a.kafka.common.utils.AppInfoParser     : App info kafka.consumer for consumer-claim-service-2 unregistered
+2026-05-20T19:02:44.631+03:00  INFO 5708 --- [claim-service] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : claim-service: Consumer stopped
+
+> Task :claim-service:bootRun FAILED
+Exception in thread "DisconnectableInputStream source reader" org.gradle.api.UncheckedIOException: java.io.IOException: Input/output error
+	at org.gradle.internal.UncheckedException.throwAsUncheckedException(UncheckedException.java:62)
+	at org.gradle.internal.UncheckedException.throwAsUncheckedException(UncheckedException.java:41)
+	at org.gradle.util.internal.DisconnectableInputStream$1.run(DisconnectableInputStream.java:127)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.io.IOException: Input/output error
+	at java.base/java.io.FileInputStream.readBytes(Native Method)
+	at java.base/java.io.FileInputStream.read(FileInputStream.java:287)
+	at java.base/java.io.BufferedInputStream.read1(BufferedInputStream.java:345)
+	at java.base/java.io.BufferedInputStream.implRead(BufferedInputStream.java:420)
+	at java.base/java.io.BufferedInputStream.read(BufferedInputStream.java:399)
+	at org.gradle.util.internal.DisconnectableInputStream$1.run(DisconnectableInputStream.java:98)
+	... 1 more
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':claim-service:bootRun'.
+> Process 'command '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home/bin/java'' finished with non-zero exit value 137
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 12s
+4 actionable tasks: 1 executed, 3 up-to-date

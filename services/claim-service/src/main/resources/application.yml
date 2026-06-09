@@ -23,6 +23,20 @@ spring:
   quartz:
     job-store-type: memory
 
+camunda:
+  bpm:
+    database:
+      schema-update: true
+    history-level: full
+    admin-user:
+      id: admin
+      password: admin
+      first-name: Admin
+    webapp:
+      index-redirect-enabled: true
+    filter:
+      create: All tasks
+
 minio:
   url: http://localhost:9000
   access-key: minioadmin
@@ -30,17 +44,19 @@ minio:
   bucket: claim-attachments
 
 jira:
-  url: https://jira.example.com
-  user: demo
-  token: demo
-  project-key: BLPS
+  enabled: true
+  url:
+  user:
+  token:
+  project-key: SCRUM
 
-saga:
-  timeout-watcher-delay-ms: 5000
-  timeout-seconds:
-    awaiting-penalty-applied: 60
-    awaiting-penalty-counted: 60
-    compensating-retry: 30
+claim-process:
+  timers:
+    started-hold:
+    tenant-response-timeout:
+    awaiting-penalty-applied:
+    awaiting-penalty-counted:
+    compensating-retry:
 
 server:
   port: 8081

@@ -9,8 +9,8 @@
 ###
 ### Compensation arc (saga → COMPENSATING_REVOKE → COMPENSATED) is exercised
 ### indirectly: bring penalty-service or auth-service down between requests 35.6
-### and 35.7 and wait > saga.timeout-seconds.awaiting-* (default 60s). The
-### SagaTimeoutWatcher will emit PENALTY_REVOKE_COMMAND and the saga will
+### and 35.7 and wait > temporal.timeout-seconds.awaiting-* (default 60s). The
+### Temporal workflow timer will emit PENALTY_REVOKE_COMMAND and the saga will
 ### transition to COMPENSATED automatically once the service comes back.
 
 @baseUrl = http://localhost:8080

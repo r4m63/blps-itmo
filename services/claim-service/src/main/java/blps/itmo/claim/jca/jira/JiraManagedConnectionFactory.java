@@ -37,7 +37,13 @@ public class JiraManagedConnectionFactory implements ManagedConnectionFactory, R
 
     @Override
     public Object createConnectionFactory() throws ResourceException {
-        throw new ResourceAdapterInternalException("ConnectionManager required");
+        // Standalone mode (Spring's LocalConnectionFactoryBean) — supply a default
+        // ConnectionManager that just delegates to createManagedConnection.
+        ConnectionManager cm = (mcf, cri) -> {
+            ManagedConnection mc = mcf.createManagedConnection(null, cri);
+            return mc.getConnection(null, cri);
+        };
+        return new JiraConnectionFactoryImpl(cm, this);
     }
 
     @Override
@@ -66,7 +72,6 @@ public class JiraManagedConnectionFactory implements ManagedConnectionFactory, R
         return reference;
     }
 
-    @Override
     public void setReference(Reference reference) {
         this.reference = reference;
     }

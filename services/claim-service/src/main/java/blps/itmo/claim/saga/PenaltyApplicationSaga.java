@@ -1,203 +1,185 @@
 package blps.itmo.claim.saga;
 
-import blps.itmo.claim.domain.Claim;
-import blps.itmo.claim.domain.ClaimStatus;
-import blps.itmo.claim.domain.ClaimStatusHistory;
-import blps.itmo.claim.kafka.EventType;
-import blps.itmo.claim.kafka.outboxevent.OutboxService;
-import blps.itmo.claim.kafka.config.TopicNames;
 import blps.itmo.claim.kafka.payload.PenaltyApplicationFailedPayload;
 import blps.itmo.claim.kafka.payload.PenaltyAppliedPayload;
 import blps.itmo.claim.kafka.payload.PenaltyCountedPayload;
-import blps.itmo.claim.kafka.payload.PenaltyRevokeCommandPayload;
 import blps.itmo.claim.kafka.payload.PenaltyRevokeFailedPayload;
 import blps.itmo.claim.kafka.payload.PenaltyRevokedPayload;
-import blps.itmo.claim.repository.ClaimRepository;
-import blps.itmo.claim.repository.ClaimStatusHistoryRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.camunda.bpm.engine.HistoryService;
+import org.camunda.bpm.engine.RuntimeService;
+import org.camunda.bpm.engine.history.HistoricProcessInstance;
+import org.camunda.bpm.engine.history.HistoricVariableInstance;
+import org.camunda.bpm.engine.runtime.ProcessInstance;
+import org.camunda.bpm.engine.runtime.VariableInstance;
+import org.camunda.bpm.engine.runtime.MessageCorrelationBuilder;
+import org.camunda.bpm.engine.MismatchingMessageCorrelationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class PenaltyApplicationSaga {
 
-    private final SagaInstanceRepository sagaRepository;
-    private final ClaimRepository claimRepository;
-    private final ClaimStatusHistoryRepository historyRepository;
-    private final OutboxService outboxService;
+    private final RuntimeService runtimeService;
+    private final HistoryService historyService;
 
-    // 1. СТАРТ саги
-    @Transactional
-    public SagaInstance start(Integer claimId) {
-        SagaInstance saga = new SagaInstance();
-        saga.setSagaId(UUID.randomUUID());
-        saga.setSagaType(SagaType.PENALTY_APPLICATION);
-        saga.setClaimId(claimId);
-        saga.setState(SagaState.AWAITING_PENALTY_APPLIED);
-        saga.setStartedAt(Instant.now());
-        saga.setLastEventAt(Instant.now());
-        return sagaRepository.save(saga);
-    }
-
-    // 2. Прогрессивные переходы (forward)
-    @Transactional
     public void onPenaltyApplied(UUID sagaId, PenaltyAppliedPayload payload) {
-        SagaInstance saga = sagaRepository.findById(sagaId).orElse(null);
-        if (saga == null) {
-            log.warn("PENALTY_APPLIED for unknown saga {}; falling back to legacy claim transition", sagaId);
-            return;
-        }
-        if (saga.getState() != SagaState.AWAITING_PENALTY_APPLIED) {
-            log.info("PENALTY_APPLIED in unexpected state {} for saga {} — ignored", saga.getState(), sagaId);
-            return;
-        }
-        saga.setState(SagaState.AWAITING_PENALTY_COUNTED);
-        saga.setLastEventAt(Instant.now());
-        sagaRepository.save(saga);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("operationId", payload.operationId());
+        variables.put("tenantId", payload.tenantId());
+        correlate(sagaId, "PENALTY_APPLIED", variables);
     }
 
-    @Transactional
     public void onPenaltyApplicationFailed(UUID sagaId, PenaltyApplicationFailedPayload payload) {
-        SagaInstance saga = sagaRepository.findById(sagaId).orElse(null);
-        if (saga == null) {
-            log.warn("PENALTY_APPLICATION_FAILED for unknown saga {}", sagaId);
-            return;
-        }
-        if (saga.getState() != SagaState.AWAITING_PENALTY_APPLIED) {
-            log.info("PENALTY_APPLICATION_FAILED in unexpected state {} for saga {}", saga.getState(), sagaId);
-            return;
-        }
-        saga.setState(SagaState.PENALTY_FAILED);
-        saga.setFailureReason(payload.reason());
-        Instant now = Instant.now();
-        saga.setLastEventAt(now);
-        saga.setCompletedAt(now);
-        sagaRepository.save(saga);
-
-        Claim claim = claimRepository.findById(saga.getClaimId()).orElse(null);
-        if (claim != null && claim.getStatus() == ClaimStatus.PENALTY_PROCESSING) {
-            claim.setStatus(ClaimStatus.PENALTY_PROCESSING_FAILED);
-            claim.setClosedAt(null);
-            claimRepository.save(claim);
-            recordHistory(claim.getId(), ClaimStatus.PENALTY_PROCESSING, ClaimStatus.PENALTY_PROCESSING_FAILED,
-                    null, payload.reason());
-        }
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("operationId", payload.operationId());
+        variables.put("penaltyFailureReason", payload.reason());
+        variables.put("sagaFailureReason", payload.reason());
+        correlate(sagaId, "PENALTY_APPLICATION_FAILED", variables);
     }
 
-    @Transactional
     public void onPenaltyCounted(UUID sagaId, PenaltyCountedPayload payload) {
-        SagaInstance saga = sagaRepository.findById(sagaId).orElse(null);
-        if (saga == null) {
-            log.warn("PENALTY_COUNTED for unknown saga {}", sagaId);
-            return;
-        }
-        if (saga.getState() != SagaState.AWAITING_PENALTY_COUNTED) {
-            log.info("PENALTY_COUNTED in unexpected state {} for saga {}", saga.getState(), sagaId);
-            return;
-        }
-        Instant now = Instant.now();
-        saga.setState(SagaState.COMPLETED);
-        saga.setLastEventAt(now);
-        saga.setCompletedAt(now);
-        sagaRepository.save(saga);
-
-        Claim claim = claimRepository.findById(saga.getClaimId()).orElse(null);
-        if (claim != null && claim.getStatus() == ClaimStatus.PENALTY_PROCESSING) {
-            claim.setStatus(ClaimStatus.PENALTY_APPLIED);
-            claim.setClosedAt(now);
-            claimRepository.save(claim);
-            recordHistory(claim.getId(), ClaimStatus.PENALTY_PROCESSING, ClaimStatus.PENALTY_APPLIED,
-                    null, "saga completed: penalty applied & counted");
-        }
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("operationId", payload.operationId());
+        variables.put("tenantId", payload.tenantId());
+        variables.put("newPenaltyCount", payload.newPenaltyCount());
+        correlate(sagaId, "PENALTY_COUNTED", variables);
     }
 
-    // 3. Компенсация (rollback)
-    @Transactional
     public void onPenaltyRevoked(UUID sagaId, PenaltyRevokedPayload payload) {
-        SagaInstance saga = sagaRepository.findById(sagaId).orElse(null);
-        if (saga == null) {
-            log.warn("PENALTY_REVOKED for unknown saga {}", sagaId);
-            return;
-        }
-        if (saga.getState() != SagaState.COMPENSATING_REVOKE) {
-            log.info("PENALTY_REVOKED in unexpected state {} for saga {}", saga.getState(), sagaId);
-            return;
-        }
-        Instant now = Instant.now();
-        saga.setState(SagaState.COMPENSATED);
-        saga.setLastEventAt(now);
-        saga.setCompletedAt(now);
-        sagaRepository.save(saga);
-
-        Claim claim = claimRepository.findById(saga.getClaimId()).orElse(null);
-        if (claim != null && claim.getStatus() == ClaimStatus.PENALTY_PROCESSING) {
-            ClaimStatus from = claim.getStatus();
-            claim.setStatus(ClaimStatus.PENALTY_PROCESSING_FAILED);
-            claim.setClosedAt(null);
-            claimRepository.save(claim);
-            recordHistory(claim.getId(), from, ClaimStatus.PENALTY_PROCESSING_FAILED,
-                    null, "saga compensated: penalty revoked");
-        }
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("operationId", payload.operationId());
+        variables.put("tenantId", payload.tenantId());
+        variables.put("penaltyWasApplied", payload.wasApplied());
+        correlate(sagaId, "PENALTY_REVOKED", variables);
     }
 
-    @Transactional
     public void onPenaltyRevokeFailed(UUID sagaId, PenaltyRevokeFailedPayload payload) {
-        SagaInstance saga = sagaRepository.findById(sagaId).orElse(null);
-        if (saga == null) {
-            log.warn("PENALTY_REVOKE_FAILED for unknown saga {}", sagaId);
-            return;
-        }
-        if (saga.getState() != SagaState.COMPENSATING_REVOKE) {
-            return;
-        }
-        saga.setAttemptCount(saga.getAttemptCount() + 1);
-        saga.setFailureReason(payload.reason());
-        saga.setLastEventAt(Instant.now());
-        if (saga.getAttemptCount() >= saga.getMaxAttempts()) {
-            saga.setState(SagaState.COMPENSATION_FAILED);
-            saga.setCompletedAt(Instant.now());
-        }
-        sagaRepository.save(saga);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("operationId", payload.operationId());
+        variables.put("penaltyRevokeFailureReason", payload.reason());
+        variables.put("sagaFailureReason", payload.reason());
+        correlate(sagaId, "PENALTY_REVOKE_FAILED", variables);
     }
 
-    @Transactional
-    public void triggerCompensation(UUID sagaId, String reason) {
-        SagaInstance saga = sagaRepository.findById(sagaId).orElse(null);
-        if (saga == null) {
-            return;
+    public PenaltyApplicationSagaState describe(UUID sagaId) {
+        ProcessInstance running = runtimeService.createProcessInstanceQuery()
+                .variableValueEquals("sagaId", sagaId.toString())
+                .singleResult();
+        if (running != null) {
+            Map<String, Object> variables = runtimeVariables(running.getProcessInstanceId());
+            return toState(sagaId, variables, null, null);
         }
-        if (saga.getState() != SagaState.AWAITING_PENALTY_APPLIED
-                && saga.getState() != SagaState.AWAITING_PENALTY_COUNTED
-                && saga.getState() != SagaState.COMPENSATING_REVOKE) {
-            return;
-        }
-        saga.setState(SagaState.COMPENSATING_REVOKE);
-        saga.setLastEventAt(Instant.now());
-        sagaRepository.save(saga);
 
-        outboxService.enqueue(
-                "saga",
-                saga.getSagaId().toString(),
-                EventType.PENALTY_REVOKE_COMMAND,
-                TopicNames.PENALTY_EVENTS,
-                new PenaltyRevokeCommandPayload(saga.getClaimId(), null, reason),
-                saga.getSagaId()
+        HistoricProcessInstance historic = historyService.createHistoricProcessInstanceQuery()
+                .variableValueEquals("sagaId", sagaId.toString())
+                .singleResult();
+        if (historic == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Saga not found: " + sagaId);
+        }
+        Map<String, Object> variables = historicVariables(historic.getId());
+        return toState(sagaId, variables, instant(historic.getStartTime()), instant(historic.getEndTime()));
+    }
+
+    private void correlate(UUID sagaId, String messageName, Map<String, Object> variables) {
+        try {
+            MessageCorrelationBuilder builder = runtimeService.createMessageCorrelation(messageName)
+                    .processInstanceVariableEquals("sagaId", sagaId.toString())
+                    .setVariables(variables);
+            builder.correlate();
+        } catch (MismatchingMessageCorrelationException ignored) {
+            // Kafka delivery is at-least-once. If a duplicate arrives after the BPMN
+            // process already moved past this message event, it is safe to ignore here.
+        }
+    }
+
+    private Map<String, Object> runtimeVariables(String processInstanceId) {
+        List<VariableInstance> instances = runtimeService.createVariableInstanceQuery()
+                .processInstanceIdIn(processInstanceId)
+                .list();
+        Map<String, Object> variables = new HashMap<>();
+        for (VariableInstance instance : instances) {
+            variables.put(instance.getName(), instance.getValue());
+        }
+        return variables;
+    }
+
+    private Map<String, Object> historicVariables(String processInstanceId) {
+        List<HistoricVariableInstance> instances = historyService.createHistoricVariableInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .list();
+        Map<String, Object> variables = new HashMap<>();
+        for (HistoricVariableInstance instance : instances) {
+            variables.put(instance.getName(), instance.getValue());
+        }
+        return variables;
+    }
+
+    private PenaltyApplicationSagaState toState(UUID sagaId, Map<String, Object> variables,
+                                                Instant processStartedAt, Instant processEndedAt) {
+        return new PenaltyApplicationSagaState(
+                sagaId,
+                SagaType.PENALTY_APPLICATION,
+                integer(variables.get("claimId")),
+                sagaState(variables.get("sagaState")),
+                integerOrDefault(variables.get("sagaAttemptCount"), 0),
+                integerOrDefault(variables.get("sagaMaxAttempts"), 3),
+                string(variables.get("sagaFailureReason")),
+                instantOrDefault(variables.get("sagaStartedAt"), processStartedAt),
+                instantOrDefault(variables.get("sagaLastEventAt"), null),
+                instantOrDefault(variables.get("sagaCompletedAt"), processEndedAt)
         );
     }
 
-    private void recordHistory(Integer claimId, ClaimStatus from, ClaimStatus to, Integer actorId, String note) {
-        ClaimStatusHistory h = new ClaimStatusHistory();
-        h.setClaimId(claimId);
-        h.setFromStatus(from);
-        h.setToStatus(to);
-        h.setActorId(actorId);
-        h.setNote(note);
-        historyRepository.save(h);
+    private SagaState sagaState(Object value) {
+        if (value == null) {
+            return SagaState.STARTED;
+        }
+        return SagaState.valueOf(value.toString());
+    }
+
+    private Integer integer(Object value) {
+        if (value instanceof Integer i) {
+            return i;
+        }
+        if (value instanceof Number n) {
+            return n.intValue();
+        }
+        return value == null ? null : Integer.valueOf(value.toString());
+    }
+
+    private int integerOrDefault(Object value, int fallback) {
+        Integer integer = integer(value);
+        return integer == null ? fallback : integer;
+    }
+
+    private String string(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private Instant instantOrDefault(Object value, Instant fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        if (value instanceof Date date) {
+            return date.toInstant();
+        }
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        return Instant.parse(value.toString());
+    }
+
+    private Instant instant(Date date) {
+        return date == null ? null : date.toInstant();
     }
 }

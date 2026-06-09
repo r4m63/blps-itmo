@@ -1,5 +1,7 @@
 package blps.itmo.claim.jca.jira;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.resource.ResourceException;
 import jakarta.resource.cci.Connection;
 import jakarta.resource.cci.ConnectionMetaData;
@@ -14,6 +16,8 @@ import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class JiraConnectionImpl implements JiraConnection {
@@ -23,6 +27,7 @@ public class JiraConnectionImpl implements JiraConnection {
     private final String token;
     private final JiraManagedConnection managedConnection;
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public JiraConnectionImpl(String baseUrl, String user, String token, JiraManagedConnection managedConnection) {
         this.baseUrl = baseUrl;
@@ -32,23 +37,34 @@ public class JiraConnectionImpl implements JiraConnection {
     }
 
     @Override
-    public void createIssue(String projectKey, String summary, String description) {
+    public String createIssue(String projectKey, String summary, String description, List<String> labels) {
         String auth = Base64.getEncoder().encodeToString((user + ":" + token).getBytes(StandardCharsets.UTF_8));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Authorization", "Basic " + auth);
 
-        Map<String, Object> fields = Map.of(
-                "project", Map.of("key", projectKey),
-                "summary", summary,
-                "description", description,
-                "issuetype", Map.of("name", "Task")
-        );
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("project", Map.of("key", projectKey));
+        fields.put("summary", summary);
+        fields.put("description", description);
+        fields.put("issuetype", Map.of("name", "Task"));
+        if (labels != null && !labels.isEmpty()) {
+            fields.put("labels", labels);
+        }
         Map<String, Object> body = Map.of("fields", fields);
+
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(baseUrl + "/rest/api/2/issue", request, String.class);
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                baseUrl + "/rest/api/2/issue", request, String.class);
         if (!response.getStatusCode().is2xxSuccessful()) {
-            throw new IllegalStateException("Jira issue creation failed with status " + response.getStatusCode());
+            throw new IllegalStateException("Jira issue creation failed with status " + response.getStatusCode()
+                    + " body=" + response.getBody());
+        }
+        try {
+            JsonNode root = objectMapper.readTree(response.getBody());
+            return root.path("key").asText(null);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -77,8 +93,7 @@ public class JiraConnectionImpl implements JiraConnection {
         return null;
     }
 
-    @Override
     public void associateConnection(Connection connection) throws ResourceException {
-        // no-op
+        // not part of CCI Connection interface, kept as helper
     }
 }

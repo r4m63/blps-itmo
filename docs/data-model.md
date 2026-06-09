@@ -312,12 +312,13 @@ CREATE INDEX idx_penalty_claim ON penalty_operations (claim_id);
 В системе **нет**:
 
 - общей "global transaction" таблицы
-- "saga state" таблицы
+- "saga state" таблицы в claim БД: состояние penalty saga хранится в Temporal workflow history
 - shared user / role таблицы
 
 Состояние процесса размазано по:
 
 - основной статус aggregate в owning сервисе (`claims.status`, `penalty_operations.status`, `users.enabled`)
+- Temporal workflow state для penalty application saga
 - локальное состояние worker'ов (`assessment_jobs`)
 - следы интеграции в `outbox_events` + `processed_messages`
 - бизнес-трейс в `claim_timeline`

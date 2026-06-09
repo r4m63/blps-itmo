@@ -180,7 +180,7 @@ BPMN — бизнес-референс, реализация имеет осоз
 | `Activity_1p30r0x` (проверка полноты) и `Activity_0gw4i7b` (оценка ущерба) — два разных user task | Один `AssessmentWorkflowService` async worker | Это **системные** задачи, не human task. BPMN ошибочно положил их в Lane заявителя. |
 | Уведомление как `IntermediateThrowEvent_NotifyDecision` | Локальный `notifications` лог | Реальная отправка вне scope demo |
 | `BoundaryTimer_ResponseTimeout = P3D` | `@Scheduled` job каждую минуту, выбирает претеренные | Имитация workflow engine timer |
-| Workflow engine исполняет BPMN | Не исполняет; реализация в Java коде | Camunda/Temporal — overkill для лабы |
+| Workflow engine исполняет весь BPMN | Не исполняет весь BPMN; Temporal используется точечно для penalty saga | BPMN остается бизнес-референсом, а Temporal хранит состояние распределенной саги, не заменяет всю BPMN-модель |
 
 Не нужно ставить BPMN и код в противоречие. **BPMN — это бизнес-договорённость. Код — её исполняемая интерпретация.**
 

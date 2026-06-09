@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_ClaimProcess"
+                  targetNamespace="http://blps.itmo/claim/process">
+
+  <bpmn:message id="Message_PenaltyApplied" name="PENALTY_APPLIED"/>
+  <bpmn:message id="Message_PenaltyApplicationFailed" name="PENALTY_APPLICATION_FAILED"/>
+  <bpmn:message id="Message_PenaltyCounted" name="PENALTY_COUNTED"/>
+  <bpmn:message id="Message_PenaltyRevoked" name="PENALTY_REVOKED"/>
+  <bpmn:message id="Message_PenaltyRevokeFailed" name="PENALTY_REVOKE_FAILED"/>
+
+  <bpmn:process id="claimProcess" name="Claim handling process" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:startEvent id="start_claim_process" name="Claim submitted">
+      <bpmn:outgoing>flow_start_to_intake_start</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:userTask id="task_intake_start" name="Start intake" camunda:candidateGroups="ADMIN">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="adminId" label="Admin id" type="long"/>
+        </camunda:formData>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow_start_to_intake_start</bpmn:incoming>
+      <bpmn:outgoing>flow_intake_start_to_record</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="service_record_intake_started" name="Record intake started"
+                      camunda:expression="${claimProcessDelegates.recordIntakeStarted(execution)}">
+      <bpmn:incoming>flow_intake_start_to_record</bpmn:incoming>
+      <bpmn:outgoing>flow_record_to_intake_decision</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="task_intake_decision" name="Intake decision" camunda:candidateGroups="ADMIN">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="requestAdditionalInfo" label="Request additional info" type="boolean"/>
+          <camunda:formField id="note" label="Note" type="string"/>
+        </camunda:formData>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow_record_to_intake_decision</bpmn:incoming>
+      <bpmn:incoming>flow_additional_info_recorded_to_intake_decision</bpmn:incoming>
+      <bpmn:outgoing>flow_intake_decision_to_record</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="service_record_intake_decision" name="Record intake decision"
+                      camunda:expression="${claimProcessDelegates.recordIntakeDecision(execution)}">
+      <bpmn:incoming>flow_intake_decision_to_record</bpmn:incoming>
+      <bpmn:outgoing>flow_record_intake_decision_to_gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="gateway_need_additional_info" name="Need additional info?">
+      <bpmn:incoming>flow_record_intake_decision_to_gateway</bpmn:incoming>
+      <bpmn:outgoing>flow_need_additional_info_yes</bpmn:outgoing>
+      <bpmn:outgoing>flow_need_additional_info_no</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="task_additional_info" name="Provide additional info" camunda:candidateGroups="LANDLORD">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="additionalInfoBody" label="Additional information" type="string"/>
+        </camunda:formData>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow_need_additional_info_yes</bpmn:incoming>
+      <bpmn:outgoing>flow_additional_info_to_record</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="service_record_additional_info" name="Record additional info"
+                      camunda:expression="${claimProcessDelegates.recordAdditionalInfo(execution)}">
+      <bpmn:incoming>flow_additional_info_to_record</bpmn:incoming>
+      <bpmn:outgoing>flow_additional_info_recorded_to_intake_decision</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="task_assessment" name="Assessment" camunda:candidateGroups="ADMIN">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="penaltyGrounds" label="Penalty grounds" type="boolean"/>
+          <camunda:formField id="assessmentAmount" label="Assessment amount" type="long"/>
+          <camunda:formField id="assessmentNotes" label="Assessment notes" type="string"/>
+        </camunda:formData>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow_need_additional_info_no</bpmn:incoming>
+      <bpmn:outgoing>flow_assessment_to_record</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="service_record_assessment" name="Record assessment"
+                      camunda:expression="${claimProcessDelegates.recordAssessment(execution)}">
+      <bpmn:incoming>flow_assessment_to_record</bpmn:incoming>
+      <bpmn:outgoing>flow_record_assessment_to_gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="gateway_penalty_grounds" name="Penalty grounds?">
+      <bpmn:incoming>flow_record_assessment_to_gateway</bpmn:incoming>
+      <bpmn:outgoing>flow_penalty_grounds_yes</bpmn:outgoing>
+      <bpmn:outgoing>flow_penalty_grounds_no</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="task_tenant_response" name="Tenant response" camunda:candidateGroups="TENANT">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="tenantResponseBody" label="Tenant response" type="string"/>
+        </camunda:formData>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow_penalty_grounds_yes</bpmn:incoming>
+      <bpmn:outgoing>flow_tenant_response_to_record</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:boundaryEvent id="timer_tenant_response_expired" name="Tenant response timeout"
+                        attachedToRef="task_tenant_response" cancelActivity="true">
+      <bpmn:outgoing>flow_tenant_timeout_to_record</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">${tenantResponseTimeout}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="service_record_tenant_response" name="Record tenant response"
+                      camunda:expression="${claimProcessDelegates.recordTenantResponse(execution)}">
+      <bpmn:incoming>flow_tenant_response_to_record</bpmn:incoming>
+      <bpmn:outgoing>flow_tenant_record_to_support</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="service_expire_tenant_response" name="Expire tenant response"
+                      camunda:expression="${claimProcessDelegates.expireTenantResponse(execution)}">
+      <bpmn:incoming>flow_tenant_timeout_to_record</bpmn:incoming>
+      <bpmn:outgoing>flow_tenant_timeout_to_support</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="task_support_decision" name="Support decision" camunda:candidateGroups="ADMIN">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="applyPenalty" label="Apply penalty" type="boolean"/>
+          <camunda:formField id="penaltyAmount" label="Penalty amount" type="long"/>
+          <camunda:formField id="penaltyCurrency" label="Penalty currency" type="string"/>
+          <camunda:formField id="simulateFailure" label="Simulate failure" type="boolean"/>
+          <camunda:formField id="resolutionNote" label="Resolution note" type="string"/>
+        </camunda:formData>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow_tenant_record_to_support</bpmn:incoming>
+      <bpmn:incoming>flow_tenant_timeout_to_support</bpmn:incoming>
+      <bpmn:outgoing>flow_support_to_record</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="service_record_support_decision" name="Record support decision"
+                      camunda:expression="${claimProcessDelegates.recordSupportDecision(execution)}">
+      <bpmn:incoming>flow_support_to_record</bpmn:incoming>
+      <bpmn:outgoing>flow_record_support_to_gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="gateway_apply_penalty" name="Apply penalty?">
+      <bpmn:incoming>flow_record_support_to_gateway</bpmn:incoming>
+      <bpmn:outgoing>flow_apply_penalty_yes</bpmn:outgoing>
+      <bpmn:outgoing>flow_apply_penalty_no</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="service_start_penalty_saga" name="Start penalty application saga"
+                      camunda:expression="${claimProcessDelegates.startPenaltySaga(execution)}">
+      <bpmn:incoming>flow_apply_penalty_yes</bpmn:incoming>
+      <bpmn:outgoing>flow_penalty_saga_to_started_hold</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:intermediateCatchEvent id="timer_saga_started_hold" name="Saga started hold">
+      <bpmn:incoming>flow_penalty_saga_to_started_hold</bpmn:incoming>
+      <bpmn:outgoing>flow_started_hold_to_request_penalty</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">${sagaStartedHold}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:serviceTask id="service_request_penalty_application" name="Request penalty application"
+                      camunda:expression="${claimProcessDelegates.requestPenaltyApplication(execution)}">
+      <bpmn:incoming>flow_started_hold_to_request_penalty</bpmn:incoming>
+      <bpmn:outgoing>flow_penalty_saga_to_event_gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:eventBasedGateway id="gateway_wait_penalty_application" name="Wait penalty application">
+      <bpmn:incoming>flow_penalty_saga_to_event_gateway</bpmn:incoming>
+      <bpmn:outgoing>flow_wait_penalty_applied</bpmn:outgoing>
+      <bpmn:outgoing>flow_wait_penalty_failed</bpmn:outgoing>
+      <bpmn:outgoing>flow_wait_penalty_application_timeout</bpmn:outgoing>
+    </bpmn:eventBasedGateway>
+
+    <bpmn:intermediateCatchEvent id="message_penalty_applied" name="PENALTY_APPLIED">
+      <bpmn:incoming>flow_wait_penalty_applied</bpmn:incoming>
+      <bpmn:outgoing>flow_penalty_applied_to_await_counted</bpmn:outgoing>
+      <bpmn:messageEventDefinition messageRef="Message_PenaltyApplied"/>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:intermediateCatchEvent id="message_penalty_application_failed" name="PENALTY_APPLICATION_FAILED">
+      <bpmn:incoming>flow_wait_penalty_failed</bpmn:incoming>
+      <bpmn:outgoing>flow_penalty_failed_to_mark</bpmn:outgoing>
+      <bpmn:messageEventDefinition messageRef="Message_PenaltyApplicationFailed"/>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:intermediateCatchEvent id="timer_penalty_application_timeout" name="Penalty application timeout">
+      <bpmn:incoming>flow_wait_penalty_application_timeout</bpmn:incoming>
+      <bpmn:outgoing>flow_application_timeout_to_compensation</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">${awaitingPenaltyAppliedTimeout}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:serviceTask id="service_mark_penalty_failed" name="Mark penalty failed"
+                      camunda:expression="${claimProcessDelegates.markPenaltyApplicationFailed(execution)}">
+      <bpmn:incoming>flow_penalty_failed_to_mark</bpmn:incoming>
+      <bpmn:outgoing>flow_penalty_failed_to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="service_set_await_counted" name="Await penalty counted"
+                      camunda:expression="${claimProcessDelegates.awaitPenaltyCounted(execution)}">
+      <bpmn:incoming>flow_penalty_applied_to_await_counted</bpmn:incoming>
+      <bpmn:outgoing>flow_await_counted_to_event_gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:eventBasedGateway id="gateway_wait_penalty_counted" name="Wait penalty counted">
+      <bpmn:incoming>flow_await_counted_to_event_gateway</bpmn:incoming>
+      <bpmn:outgoing>flow_wait_penalty_counted</bpmn:outgoing>
+      <bpmn:outgoing>flow_wait_penalty_counted_timeout</bpmn:outgoing>
+    </bpmn:eventBasedGateway>
+
+    <bpmn:intermediateCatchEvent id="message_penalty_counted" name="PENALTY_COUNTED">
+      <bpmn:incoming>flow_wait_penalty_counted</bpmn:incoming>
+      <bpmn:outgoing>flow_penalty_counted_to_mark</bpmn:outgoing>
+      <bpmn:messageEventDefinition messageRef="Message_PenaltyCounted"/>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:intermediateCatchEvent id="timer_penalty_counted_timeout" name="Penalty counted timeout">
+      <bpmn:incoming>flow_wait_penalty_counted_timeout</bpmn:incoming>
+      <bpmn:outgoing>flow_counted_timeout_to_compensation</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">${awaitingPenaltyCountedTimeout}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:serviceTask id="service_mark_penalty_counted" name="Mark penalty counted"
+                      camunda:expression="${claimProcessDelegates.markPenaltyCounted(execution)}">
+      <bpmn:incoming>flow_penalty_counted_to_mark</bpmn:incoming>
+      <bpmn:outgoing>flow_penalty_counted_to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="service_start_compensation" name="Start compensation"
+                      camunda:expression="${claimProcessDelegates.startCompensation(execution)}">
+      <bpmn:incoming>flow_application_timeout_to_compensation</bpmn:incoming>
+      <bpmn:incoming>flow_counted_timeout_to_compensation</bpmn:incoming>
+      <bpmn:outgoing>flow_compensation_to_revoke</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="service_enqueue_penalty_revoke" name="Enqueue penalty revoke"
+                      camunda:expression="${claimProcessDelegates.enqueuePenaltyRevoke(execution)}">
+      <bpmn:incoming>flow_compensation_to_revoke</bpmn:incoming>
+      <bpmn:incoming>flow_retry_revoke</bpmn:incoming>
+      <bpmn:outgoing>flow_revoke_to_event_gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:eventBasedGateway id="gateway_wait_penalty_revoke" name="Wait penalty revoke">
+      <bpmn:incoming>flow_revoke_to_event_gateway</bpmn:incoming>
+      <bpmn:outgoing>flow_wait_penalty_revoked</bpmn:outgoing>
+      <bpmn:outgoing>flow_wait_penalty_revoke_failed</bpmn:outgoing>
+      <bpmn:outgoing>flow_wait_penalty_revoke_timeout</bpmn:outgoing>
+    </bpmn:eventBasedGateway>
+
+    <bpmn:intermediateCatchEvent id="message_penalty_revoked" name="PENALTY_REVOKED">
+      <bpmn:incoming>flow_wait_penalty_revoked</bpmn:incoming>
+      <bpmn:outgoing>flow_revoked_to_mark</bpmn:outgoing>
+      <bpmn:messageEventDefinition messageRef="Message_PenaltyRevoked"/>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:intermediateCatchEvent id="message_penalty_revoke_failed" name="PENALTY_REVOKE_FAILED">
+      <bpmn:incoming>flow_wait_penalty_revoke_failed</bpmn:incoming>
+      <bpmn:outgoing>flow_revoke_failed_to_note</bpmn:outgoing>
+      <bpmn:messageEventDefinition messageRef="Message_PenaltyRevokeFailed"/>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:intermediateCatchEvent id="timer_penalty_revoke_timeout" name="Penalty revoke timeout">
+      <bpmn:incoming>flow_wait_penalty_revoke_timeout</bpmn:incoming>
+      <bpmn:outgoing>flow_revoke_timeout_to_retry_gateway</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">${compensatingRetryTimeout}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:serviceTask id="service_note_penalty_revoke_failed" name="Note penalty revoke failed"
+                      camunda:expression="${claimProcessDelegates.notePenaltyRevokeFailed(execution)}">
+      <bpmn:incoming>flow_revoke_failed_to_note</bpmn:incoming>
+      <bpmn:outgoing>flow_revoke_failed_to_retry_gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="gateway_retry_revoke" name="Retry compensation?">
+      <bpmn:incoming>flow_revoke_failed_to_retry_gateway</bpmn:incoming>
+      <bpmn:incoming>flow_revoke_timeout_to_retry_gateway</bpmn:incoming>
+      <bpmn:outgoing>flow_retry_revoke</bpmn:outgoing>
+      <bpmn:outgoing>flow_revoke_attempts_exhausted</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="service_mark_penalty_revoked" name="Mark penalty revoked"
+                      camunda:expression="${claimProcessDelegates.markPenaltyRevoked(execution)}">
+      <bpmn:incoming>flow_revoked_to_mark</bpmn:incoming>
+      <bpmn:outgoing>flow_revoked_to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="service_mark_compensation_failed" name="Mark compensation failed"
+                      camunda:expression="${claimProcessDelegates.markCompensationFailed(execution)}">
+      <bpmn:incoming>flow_revoke_attempts_exhausted</bpmn:incoming>
+      <bpmn:outgoing>flow_compensation_failed_to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="end_no_penalty" name="Closed without penalty">
+      <bpmn:incoming>flow_penalty_grounds_no</bpmn:incoming>
+      <bpmn:incoming>flow_apply_penalty_no</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="end_penalty_failed" name="Penalty failed">
+      <bpmn:incoming>flow_penalty_failed_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="end_penalty_completed" name="Penalty completed">
+      <bpmn:incoming>flow_penalty_counted_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="end_compensated" name="Compensated">
+      <bpmn:incoming>flow_revoked_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="end_compensation_failed" name="Compensation failed">
+      <bpmn:incoming>flow_compensation_failed_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="flow_start_to_intake_start" sourceRef="start_claim_process" targetRef="task_intake_start"/>
+    <bpmn:sequenceFlow id="flow_intake_start_to_record" sourceRef="task_intake_start" targetRef="service_record_intake_started"/>
+    <bpmn:sequenceFlow id="flow_record_to_intake_decision" sourceRef="service_record_intake_started" targetRef="task_intake_decision"/>
+    <bpmn:sequenceFlow id="flow_intake_decision_to_record" sourceRef="task_intake_decision" targetRef="service_record_intake_decision"/>
+    <bpmn:sequenceFlow id="flow_record_intake_decision_to_gateway" sourceRef="service_record_intake_decision" targetRef="gateway_need_additional_info"/>
+    <bpmn:sequenceFlow id="flow_need_additional_info_yes" sourceRef="gateway_need_additional_info" targetRef="task_additional_info">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${requestAdditionalInfo == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_need_additional_info_no" sourceRef="gateway_need_additional_info" targetRef="task_assessment">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${requestAdditionalInfo == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_additional_info_to_record" sourceRef="task_additional_info" targetRef="service_record_additional_info"/>
+    <bpmn:sequenceFlow id="flow_additional_info_recorded_to_intake_decision" sourceRef="service_record_additional_info" targetRef="task_intake_decision"/>
+    <bpmn:sequenceFlow id="flow_assessment_to_record" sourceRef="task_assessment" targetRef="service_record_assessment"/>
+    <bpmn:sequenceFlow id="flow_record_assessment_to_gateway" sourceRef="service_record_assessment" targetRef="gateway_penalty_grounds"/>
+    <bpmn:sequenceFlow id="flow_penalty_grounds_yes" sourceRef="gateway_penalty_grounds" targetRef="task_tenant_response">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${penaltyGrounds == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_penalty_grounds_no" sourceRef="gateway_penalty_grounds" targetRef="end_no_penalty">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${penaltyGrounds == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_tenant_response_to_record" sourceRef="task_tenant_response" targetRef="service_record_tenant_response"/>
+    <bpmn:sequenceFlow id="flow_tenant_timeout_to_record" sourceRef="timer_tenant_response_expired" targetRef="service_expire_tenant_response"/>
+    <bpmn:sequenceFlow id="flow_tenant_record_to_support" sourceRef="service_record_tenant_response" targetRef="task_support_decision"/>
+    <bpmn:sequenceFlow id="flow_tenant_timeout_to_support" sourceRef="service_expire_tenant_response" targetRef="task_support_decision"/>
+    <bpmn:sequenceFlow id="flow_support_to_record" sourceRef="task_support_decision" targetRef="service_record_support_decision"/>
+    <bpmn:sequenceFlow id="flow_record_support_to_gateway" sourceRef="service_record_support_decision" targetRef="gateway_apply_penalty"/>
+    <bpmn:sequenceFlow id="flow_apply_penalty_yes" sourceRef="gateway_apply_penalty" targetRef="service_start_penalty_saga">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${applyPenalty == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_apply_penalty_no" sourceRef="gateway_apply_penalty" targetRef="end_no_penalty">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${applyPenalty == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_penalty_saga_to_started_hold" sourceRef="service_start_penalty_saga" targetRef="timer_saga_started_hold"/>
+    <bpmn:sequenceFlow id="flow_started_hold_to_request_penalty" sourceRef="timer_saga_started_hold" targetRef="service_request_penalty_application"/>
+    <bpmn:sequenceFlow id="flow_penalty_saga_to_event_gateway" sourceRef="service_request_penalty_application" targetRef="gateway_wait_penalty_application"/>
+    <bpmn:sequenceFlow id="flow_wait_penalty_applied" sourceRef="gateway_wait_penalty_application" targetRef="message_penalty_applied"/>
+    <bpmn:sequenceFlow id="flow_wait_penalty_failed" sourceRef="gateway_wait_penalty_application" targetRef="message_penalty_application_failed"/>
+    <bpmn:sequenceFlow id="flow_wait_penalty_application_timeout" sourceRef="gateway_wait_penalty_application" targetRef="timer_penalty_application_timeout"/>
+    <bpmn:sequenceFlow id="flow_penalty_applied_to_await_counted" sourceRef="message_penalty_applied" targetRef="service_set_await_counted"/>
+    <bpmn:sequenceFlow id="flow_penalty_failed_to_mark" sourceRef="message_penalty_application_failed" targetRef="service_mark_penalty_failed"/>
+    <bpmn:sequenceFlow id="flow_application_timeout_to_compensation" sourceRef="timer_penalty_application_timeout" targetRef="service_start_compensation"/>
+    <bpmn:sequenceFlow id="flow_penalty_failed_to_end" sourceRef="service_mark_penalty_failed" targetRef="end_penalty_failed"/>
+    <bpmn:sequenceFlow id="flow_await_counted_to_event_gateway" sourceRef="service_set_await_counted" targetRef="gateway_wait_penalty_counted"/>
+    <bpmn:sequenceFlow id="flow_wait_penalty_counted" sourceRef="gateway_wait_penalty_counted" targetRef="message_penalty_counted"/>
+    <bpmn:sequenceFlow id="flow_wait_penalty_counted_timeout" sourceRef="gateway_wait_penalty_counted" targetRef="timer_penalty_counted_timeout"/>
+    <bpmn:sequenceFlow id="flow_penalty_counted_to_mark" sourceRef="message_penalty_counted" targetRef="service_mark_penalty_counted"/>
+    <bpmn:sequenceFlow id="flow_counted_timeout_to_compensation" sourceRef="timer_penalty_counted_timeout" targetRef="service_start_compensation"/>
+    <bpmn:sequenceFlow id="flow_penalty_counted_to_end" sourceRef="service_mark_penalty_counted" targetRef="end_penalty_completed"/>
+    <bpmn:sequenceFlow id="flow_compensation_to_revoke" sourceRef="service_start_compensation" targetRef="service_enqueue_penalty_revoke"/>
+    <bpmn:sequenceFlow id="flow_revoke_to_event_gateway" sourceRef="service_enqueue_penalty_revoke" targetRef="gateway_wait_penalty_revoke"/>
+    <bpmn:sequenceFlow id="flow_wait_penalty_revoked" sourceRef="gateway_wait_penalty_revoke" targetRef="message_penalty_revoked"/>
+    <bpmn:sequenceFlow id="flow_wait_penalty_revoke_failed" sourceRef="gateway_wait_penalty_revoke" targetRef="message_penalty_revoke_failed"/>
+    <bpmn:sequenceFlow id="flow_wait_penalty_revoke_timeout" sourceRef="gateway_wait_penalty_revoke" targetRef="timer_penalty_revoke_timeout"/>
+    <bpmn:sequenceFlow id="flow_revoked_to_mark" sourceRef="message_penalty_revoked" targetRef="service_mark_penalty_revoked"/>
+    <bpmn:sequenceFlow id="flow_revoke_failed_to_note" sourceRef="message_penalty_revoke_failed" targetRef="service_note_penalty_revoke_failed"/>
+    <bpmn:sequenceFlow id="flow_revoke_timeout_to_retry_gateway" sourceRef="timer_penalty_revoke_timeout" targetRef="gateway_retry_revoke"/>
+    <bpmn:sequenceFlow id="flow_revoke_failed_to_retry_gateway" sourceRef="service_note_penalty_revoke_failed" targetRef="gateway_retry_revoke"/>
+    <bpmn:sequenceFlow id="flow_retry_revoke" sourceRef="gateway_retry_revoke" targetRef="service_enqueue_penalty_revoke">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${sagaAttemptCount &lt; sagaMaxAttempts}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_revoke_attempts_exhausted" sourceRef="gateway_retry_revoke" targetRef="service_mark_compensation_failed">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${sagaAttemptCount &gt;= sagaMaxAttempts}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_revoked_to_end" sourceRef="service_mark_penalty_revoked" targetRef="end_compensated"/>
+    <bpmn:sequenceFlow id="flow_compensation_failed_to_end" sourceRef="service_mark_compensation_failed" targetRef="end_compensation_failed"/>
+  </bpmn:process>
+</bpmn:definitions>
