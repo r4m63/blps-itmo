@@ -1,0 +1,431 @@
+### Scenario 36 — Temporal saga state coverage
+### IntelliJ HTTP Client syntax.
+###
+### Goal:
+###   Cover Temporal-backed saga states:
+###   COMPLETED, PENALTY_FAILED, AWAITING_PENALTY_APPLIED,
+###   AWAITING_PENALTY_COUNTED, COMPENSATING_REVOKE,
+###   COMPENSATED, COMPENSATION_FAILED.
+###
+### Prereq:
+###   docker compose up -d kafka kafka-ui minio postgres-auth postgres-claim postgres-penalty postgres-temporal temporal temporal-ui jira
+###   ./gradlew :auth-service:bootRun
+###   ./gradlew :claim-service:bootRun
+###   ./gradlew :penalty-service:bootRun
+###
+### Temporal UI:
+###   http://localhost:8086
+###   workflow id = penalty-application-{{saga_id}}
+###
+### Tip for manual timeout tests:
+###   Set claim-service application.yml:
+###     temporal.timeout-seconds.awaiting-penalty-applied: 10
+###     temporal.timeout-seconds.awaiting-penalty-counted: 10
+###     temporal.timeout-seconds.compensating-retry: 5
+###   Then restart claim-service.
+
+@baseUrl = http://localhost:8080
+@adminEmail = admin@blps.local
+@adminPass = adminpass
+@landlordEmail = landlord@blps.local
+@landlordPass = landpass
+@tenantEmail = tenant@blps.local
+@tenantPass = tenantpass
+
+### 36.0 Resolve tenant id
+GET {{baseUrl}}/api/auth/me
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+
+> {%
+client.global.set("tenant36_id", response.body.id);
+%}
+
+### ---------------------------------------------------------------------
+### Test A — COMPLETED
+### All services must be running.
+### Expected final saga state: COMPLETED
+### Temporal history: penaltyApplied -> penaltyCounted -> markPenaltyCounted
+### ---------------------------------------------------------------------
+
+### 36.A1 Create claim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenant36_id}},
+  "title": "Temporal COMPLETED",
+  "description": "Happy path saga should complete.",
+  "claimedAmount": 100,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim36_completed_id", response.body.id);
+%}
+
+### 36.A2 Intake start
+POST {{baseUrl}}/api/claims/{{claim36_completed_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.A3 Intake decision
+POST {{baseUrl}}/api/claims/{{claim36_completed_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "ok" }
+
+### 36.A4 Assessment
+POST {{baseUrl}}/api/claims/{{claim36_completed_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 80, "assessmentNotes": "completed path" }
+
+### 36.A5 Tenant response
+POST {{baseUrl}}/api/claims/{{claim36_completed_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 36.A6 Support decision starts Temporal workflow
+POST {{baseUrl}}/api/claims/{{claim36_completed_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 80,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "happy path"
+}
+
+> {%
+client.global.set("saga36_completed_id", response.body.currentSagaId);
+client.log("COMPLETED test workflow id = penalty-application-" + response.body.currentSagaId);
+%}
+
+### 36.A7 Re-run after 2-3 seconds until state is COMPLETED
+GET {{baseUrl}}/api/sagas/{{saga36_completed_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.A8 Claim should become PENALTY_APPLIED
+GET {{baseUrl}}/api/claims/{{claim36_completed_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### ---------------------------------------------------------------------
+### Test B — PENALTY_FAILED
+### All services must be running.
+### Expected final saga state: PENALTY_FAILED
+### Temporal history: penaltyApplicationFailed -> markPenaltyApplicationFailed
+### ---------------------------------------------------------------------
+
+### 36.B1 Create claim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenant36_id}},
+  "title": "Temporal PENALTY_FAILED",
+  "description": "simulateFailure=true should close workflow as business failure.",
+  "claimedAmount": 110,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim36_failed_id", response.body.id);
+%}
+
+### 36.B2 Intake start
+POST {{baseUrl}}/api/claims/{{claim36_failed_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.B3 Intake decision
+POST {{baseUrl}}/api/claims/{{claim36_failed_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "ok" }
+
+### 36.B4 Assessment
+POST {{baseUrl}}/api/claims/{{claim36_failed_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 90, "assessmentNotes": "failure path" }
+
+### 36.B5 Tenant response
+POST {{baseUrl}}/api/claims/{{claim36_failed_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 36.B6 Support decision with simulated penalty failure
+POST {{baseUrl}}/api/claims/{{claim36_failed_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 90,
+  "penaltyCurrency": "USD",
+  "simulateFailure": true,
+  "resolutionNote": "forced failure"
+}
+
+> {%
+client.global.set("saga36_failed_id", response.body.currentSagaId);
+client.log("PENALTY_FAILED test workflow id = penalty-application-" + response.body.currentSagaId);
+%}
+
+### 36.B7 Re-run after 2-3 seconds until state is PENALTY_FAILED
+GET {{baseUrl}}/api/sagas/{{saga36_failed_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.B8 Claim should become PENALTY_PROCESSING_FAILED
+GET {{baseUrl}}/api/claims/{{claim36_failed_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### ---------------------------------------------------------------------
+### Test C — AWAITING_PENALTY_APPLIED
+### Manual action BEFORE 36.C6:
+###   Stop penalty-service process only. Keep auth-service, claim-service,
+###   Kafka and Temporal running.
+###
+### Expected immediate saga state: AWAITING_PENALTY_APPLIED
+### If you wait past awaiting-penalty-applied timeout, it will move to compensation.
+### ---------------------------------------------------------------------
+
+### 36.C1 Create claim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenant36_id}},
+  "title": "Temporal AWAITING_PENALTY_APPLIED",
+  "description": "Stop penalty-service before support-decision.",
+  "claimedAmount": 120,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim36_wait_applied_id", response.body.id);
+%}
+
+### 36.C2 Intake start
+POST {{baseUrl}}/api/claims/{{claim36_wait_applied_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.C3 Intake decision
+POST {{baseUrl}}/api/claims/{{claim36_wait_applied_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "ok" }
+
+### 36.C4 Assessment
+POST {{baseUrl}}/api/claims/{{claim36_wait_applied_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 100, "assessmentNotes": "waiting for penalty-service" }
+
+### 36.C5 Tenant response
+POST {{baseUrl}}/api/claims/{{claim36_wait_applied_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 36.C6 STOP penalty-service, then run this support decision
+POST {{baseUrl}}/api/claims/{{claim36_wait_applied_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 100,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "waiting for penalty-service"
+}
+
+> {%
+client.global.set("saga36_wait_applied_id", response.body.currentSagaId);
+client.log("AWAITING_PENALTY_APPLIED test workflow id = penalty-application-" + response.body.currentSagaId);
+%}
+
+### 36.C7 Run immediately: state should be AWAITING_PENALTY_APPLIED
+GET {{baseUrl}}/api/sagas/{{saga36_wait_applied_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### ---------------------------------------------------------------------
+### Test D — AWAITING_PENALTY_COUNTED and COMPENSATED
+### Manual action BEFORE 36.D6:
+###   Start penalty-service.
+###   Stop auth-service process only.
+###
+### Expected immediate saga state: AWAITING_PENALTY_COUNTED
+### Expected after timeout with penalty-service running: COMPENSATED
+### ---------------------------------------------------------------------
+
+### 36.D1 Create claim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenant36_id}},
+  "title": "Temporal AWAITING_PENALTY_COUNTED then COMPENSATED",
+  "description": "Stop auth-service before support-decision.",
+  "claimedAmount": 130,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim36_compensated_id", response.body.id);
+%}
+
+### 36.D2 Intake start
+POST {{baseUrl}}/api/claims/{{claim36_compensated_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.D3 Intake decision
+POST {{baseUrl}}/api/claims/{{claim36_compensated_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "ok" }
+
+### 36.D4 Assessment
+POST {{baseUrl}}/api/claims/{{claim36_compensated_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 110, "assessmentNotes": "waiting for auth-service" }
+
+### 36.D5 Tenant response
+POST {{baseUrl}}/api/claims/{{claim36_compensated_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 36.D6 START penalty-service, STOP auth-service, then run this
+POST {{baseUrl}}/api/claims/{{claim36_compensated_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 110,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "waiting for auth-service"
+}
+
+> {%
+client.global.set("saga36_compensated_id", response.body.currentSagaId);
+client.log("COMPENSATION test workflow id = penalty-application-" + response.body.currentSagaId);
+%}
+
+### 36.D7 Run quickly: state should be AWAITING_PENALTY_COUNTED
+GET {{baseUrl}}/api/sagas/{{saga36_compensated_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.D8 Run after awaiting-penalty-counted timeout: state should become COMPENSATING_REVOKE or COMPENSATED
+GET {{baseUrl}}/api/sagas/{{saga36_compensated_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.D9 Run again after penalty-service consumes revoke: state should be COMPENSATED
+GET {{baseUrl}}/api/sagas/{{saga36_compensated_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### ---------------------------------------------------------------------
+### Test E — COMPENSATION_FAILED
+### Manual action BEFORE 36.E6:
+###   Stop penalty-service process.
+###   auth-service may be running.
+###
+### Expected:
+###   AWAITING_PENALTY_APPLIED immediately after support decision.
+###   COMPENSATING_REVOKE after awaiting-penalty-applied timeout.
+###   COMPENSATION_FAILED after maxAttempts * compensatingRetrySeconds.
+### ---------------------------------------------------------------------
+
+### 36.E1 Create claim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenant36_id}},
+  "title": "Temporal COMPENSATION_FAILED",
+  "description": "Keep penalty-service stopped through all compensation retries.",
+  "claimedAmount": 140,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim36_comp_failed_id", response.body.id);
+%}
+
+### 36.E2 Intake start
+POST {{baseUrl}}/api/claims/{{claim36_comp_failed_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.E3 Intake decision
+POST {{baseUrl}}/api/claims/{{claim36_comp_failed_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "ok" }
+
+### 36.E4 Assessment
+POST {{baseUrl}}/api/claims/{{claim36_comp_failed_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 120, "assessmentNotes": "compensation failure path" }
+
+### 36.E5 Tenant response
+POST {{baseUrl}}/api/claims/{{claim36_comp_failed_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 36.E6 STOP penalty-service, then run this
+POST {{baseUrl}}/api/claims/{{claim36_comp_failed_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 120,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "compensation should fail"
+}
+
+> {%
+client.global.set("saga36_comp_failed_id", response.body.currentSagaId);
+client.log("COMPENSATION_FAILED test workflow id = penalty-application-" + response.body.currentSagaId);
+%}
+
+### 36.E7 Run immediately: AWAITING_PENALTY_APPLIED
+GET {{baseUrl}}/api/sagas/{{saga36_comp_failed_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.E8 Run after awaiting-penalty-applied timeout: COMPENSATING_REVOKE
+GET {{baseUrl}}/api/sagas/{{saga36_comp_failed_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 36.E9 Run after maxAttempts * compensatingRetrySeconds: COMPENSATION_FAILED
+GET {{baseUrl}}/api/sagas/{{saga36_comp_failed_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}

@@ -1,0 +1,50 @@
+### Scenario 32 — Admin deactivates a user (emits USER_DEACTIVATED via Outbox+Kafka)
+### IntelliJ HTTP Client syntax.
+### Prereq: admin seeded via SQL (see sql/init_auth_service.sql).
+
+@baseUrl = http://localhost:8080
+@adminEmail = admin@blps.local
+@adminPass = adminpass
+
+### 32.1 Register a throwaway tenant (idempotent — 409 means it already exists)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{ "email": "deactivateme@blps.local", "password": "tmppass1", "role": "TENANT" }
+
+> {%
+if (response.status === 201 && response.body && response.body.id) {
+  client.global.set("deact32_id", response.body.id);
+}
+%}
+
+### 32.2 If 409 above, look the user up (admin)
+GET {{baseUrl}}/api/users
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+> {%
+if (Array.isArray(response.body)) {
+  const u = response.body.find(x => x.email === "deactivateme@blps.local");
+  if (u) client.global.set("deact32_id", u.id);
+}
+%}
+
+### 32.3 Read user (admin)
+GET {{baseUrl}}/api/users/{{deact32_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 32.4 Deactivate user (privilege USER_DEACTIVATE)
+POST {{baseUrl}}/api/users/{{deact32_id}}/deactivate
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 32.5 Confirm enabled=false
+GET {{baseUrl}}/api/users/{{deact32_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 32.6 Disabled user can no longer authenticate (expect 401)
+GET {{baseUrl}}/api/auth/me
+Authorization: Basic deactivateme@blps.local tmppass1
+
+### 32.7 Idempotency — second deactivate is a no-op (no new event)
+POST {{baseUrl}}/api/users/{{deact32_id}}/deactivate
+Authorization: Basic {{adminEmail}} {{adminPass}}

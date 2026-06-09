@@ -1,0 +1,14 @@
+BEGIN;
+
+DROP TABLE IF EXISTS claim_attachments CASCADE;
+DROP TABLE IF EXISTS claim_status_history CASCADE;
+DROP TABLE IF EXISTS claim_messages CASCADE;
+DROP TABLE IF EXISTS claims CASCADE;
+DROP TABLE IF EXISTS outbox_events CASCADE;
+DROP TABLE IF EXISTS processed_messages CASCADE;
+
+DROP TYPE IF EXISTS attachmentpurpose;
+DROP TYPE IF EXISTS commenttype;
+DROP TYPE IF EXISTS claimstatus;
+
+COMMIT;

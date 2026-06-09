@@ -1,0 +1,284 @@
+Starting a Gradle Daemon, 2 busy and 4 stopped Daemons could not be reused, use --status for details
+> Task :penalty-service:compileJava UP-TO-DATE
+> Task :penalty-service:processResources UP-TO-DATE
+> Task :penalty-service:classes UP-TO-DATE
+> Task :penalty-service:resolveMainClassName UP-TO-DATE
+
+> Task :penalty-service:bootRun
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.2)
+
+2026-05-20T19:02:41.615+03:00  INFO 5754 --- [penalty-service] [           main] b.i.penalty.PenaltyServiceApplication    : Starting PenaltyServiceApplication using Java 17.0.18 with PID 5754 (/Users/ramil/Projects/blps-itmo/services/penalty-service/build/classes/java/main started by ramil in /Users/ramil/Projects/blps-itmo/services/penalty-service)
+2026-05-20T19:02:41.616+03:00  INFO 5754 --- [penalty-service] [           main] b.i.penalty.PenaltyServiceApplication    : No active profile set, falling back to 1 default profile: "default"
+2026-05-20T19:02:41.820+03:00  INFO 5754 --- [penalty-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-20T19:02:41.841+03:00  INFO 5754 --- [penalty-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 16 ms. Found 3 JPA repository interfaces.
+2026-05-20T19:02:42.017+03:00  INFO 5754 --- [penalty-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8084 (http)
+2026-05-20T19:02:42.021+03:00  INFO 5754 --- [penalty-service] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-05-20T19:02:42.021+03:00  INFO 5754 --- [penalty-service] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-05-20T19:02:42.041+03:00  INFO 5754 --- [penalty-service] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-05-20T19:02:42.041+03:00  INFO 5754 --- [penalty-service] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 409 ms
+2026-05-20T19:02:42.095+03:00  INFO 5754 --- [penalty-service] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-05-20T19:02:42.112+03:00  INFO 5754 --- [penalty-service] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.4.1.Final
+2026-05-20T19:02:42.124+03:00  INFO 5754 --- [penalty-service] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-05-20T19:02:42.188+03:00  INFO 5754 --- [penalty-service] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-20T19:02:42.195+03:00  INFO 5754 --- [penalty-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-05-20T19:02:42.255+03:00  INFO 5754 --- [penalty-service] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@288728e
+2026-05-20T19:02:42.255+03:00  INFO 5754 --- [penalty-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-05-20T19:02:42.268+03:00  WARN 5754 --- [penalty-service] [           main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-05-20T19:02:42.531+03:00  INFO 5754 --- [penalty-service] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-20T19:02:42.532+03:00  INFO 5754 --- [penalty-service] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-20T19:02:42.644+03:00  INFO 5754 --- [penalty-service] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-05-20T19:02:42.814+03:00  WARN 5754 --- [penalty-service] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-05-20T19:02:42.916+03:00  INFO 5754 --- [penalty-service] [           main] org.quartz.impl.StdSchedulerFactory      : Using default implementation for ThreadExecutor
+2026-05-20T19:02:42.919+03:00  INFO 5754 --- [penalty-service] [           main] org.quartz.core.SchedulerSignalerImpl    : Initialized Scheduler Signaller of type: class org.quartz.core.SchedulerSignalerImpl
+2026-05-20T19:02:42.919+03:00  INFO 5754 --- [penalty-service] [           main] org.quartz.core.QuartzScheduler          : Quartz Scheduler v.2.3.2 created.
+2026-05-20T19:02:42.920+03:00  INFO 5754 --- [penalty-service] [           main] org.quartz.simpl.RAMJobStore             : RAMJobStore initialized.
+2026-05-20T19:02:42.920+03:00  INFO 5754 --- [penalty-service] [           main] org.quartz.core.QuartzScheduler          : Scheduler meta-data: Quartz Scheduler (v2.3.2) 'quartzScheduler' with instanceId 'NON_CLUSTERED'
+  Scheduler class: 'org.quartz.core.QuartzScheduler' - running locally.
+  NOT STARTED.
+  Currently in standby mode.
+  Number of jobs executed: 0
+  Using thread pool 'org.quartz.simpl.SimpleThreadPool' - with 10 threads.
+  Using job-store 'org.quartz.simpl.RAMJobStore' - which does not support persistence. and is not clustered.
+
+2026-05-20T19:02:42.920+03:00  INFO 5754 --- [penalty-service] [           main] org.quartz.impl.StdSchedulerFactory      : Quartz scheduler 'quartzScheduler' initialized from an externally provided properties instance.
+2026-05-20T19:02:42.920+03:00  INFO 5754 --- [penalty-service] [           main] org.quartz.impl.StdSchedulerFactory      : Quartz scheduler version: 2.3.2
+2026-05-20T19:02:42.920+03:00  INFO 5754 --- [penalty-service] [           main] org.quartz.core.QuartzScheduler          : JobFactory set to: org.springframework.scheduling.quartz.SpringBeanJobFactory@16a3d9a7
+2026-05-20T19:02:42.943+03:00  INFO 5754 --- [penalty-service] [           main] o.a.k.clients.admin.AdminClientConfig    : AdminClientConfig values: 
+	auto.include.jmx.reporter = true
+	bootstrap.servers = [localhost:9092]
+	client.dns.lookup = use_all_dns_ips
+	client.id = 
+	connections.max.idle.ms = 300000
+	default.api.timeout.ms = 60000
+	metadata.max.age.ms = 300000
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retries = 2147483647
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+
+2026-05-20T19:02:42.972+03:00  INFO 5754 --- [penalty-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.6.1
+2026-05-20T19:02:42.972+03:00  INFO 5754 --- [penalty-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 5e3c2b738d253ff5
+2026-05-20T19:02:42.972+03:00  INFO 5754 --- [penalty-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1779292962972
+2026-05-20T19:02:43.062+03:00  INFO 5754 --- [penalty-service] [| adminclient-1] o.a.kafka.common.utils.AppInfoParser     : App info kafka.admin.client for adminclient-1 unregistered
+2026-05-20T19:02:43.063+03:00  INFO 5754 --- [penalty-service] [| adminclient-1] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-05-20T19:02:43.063+03:00  INFO 5754 --- [penalty-service] [| adminclient-1] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-05-20T19:02:43.063+03:00  INFO 5754 --- [penalty-service] [| adminclient-1] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-05-20T19:02:43.067+03:00  INFO 5754 --- [penalty-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8084 (http) with context path ''
+2026-05-20T19:02:43.075+03:00  INFO 5754 --- [penalty-service] [           main] o.a.k.clients.consumer.ConsumerConfig    : ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = latest
+	bootstrap.servers = [localhost:9092]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-penalty-service-1
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = false
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = penalty-service
+	group.instance.id = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_uncommitted
+	key.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+
+2026-05-20T19:02:43.086+03:00  INFO 5754 --- [penalty-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.6.1
+2026-05-20T19:02:43.086+03:00  INFO 5754 --- [penalty-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 5e3c2b738d253ff5
+2026-05-20T19:02:43.086+03:00  INFO 5754 --- [penalty-service] [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1779292963086
+2026-05-20T19:02:43.087+03:00  INFO 5754 --- [penalty-service] [           main] fkaConsumerFactory$ExtendedKafkaConsumer : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Subscribed to topic(s): penalty.events
+2026-05-20T19:02:43.088+03:00  INFO 5754 --- [penalty-service] [           main] o.s.s.quartz.SchedulerFactoryBean        : Starting Quartz Scheduler now
+2026-05-20T19:02:43.088+03:00  INFO 5754 --- [penalty-service] [           main] org.quartz.core.QuartzScheduler          : Scheduler quartzScheduler_$_NON_CLUSTERED started.
+2026-05-20T19:02:43.092+03:00  INFO 5754 --- [penalty-service] [           main] b.i.penalty.PenaltyServiceApplication    : Started PenaltyServiceApplication in 1.596 seconds (process running for 1.72)
+2026-05-20T19:02:43.093+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] org.apache.kafka.clients.Metadata        : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Cluster ID: MkU3OEVBNTcwNTJENDM2Qg
+2026-05-20T19:02:43.094+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Discovered group coordinator localhost:9092 (id: 2147483646 rack: null)
+2026-05-20T19:02:43.094+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] (Re-)joining group
+2026-05-20T19:02:43.100+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Request joining group due to: need to re-join with the given member-id: consumer-penalty-service-1-a893156c-3cc6-4cbc-b223-05eb6ce8a9db
+2026-05-20T19:02:43.100+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Request joining group due to: rebalance failed due to 'The group member needs to have a valid member id before actually entering a consumer group.' (MemberIdRequiredException)
+2026-05-20T19:02:43.100+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] (Re-)joining group
+2026-05-20T19:02:43.851+03:00  INFO 5754 --- [penalty-service] [nio-8084-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-05-20T19:02:43.851+03:00  INFO 5754 --- [penalty-service] [nio-8084-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-05-20T19:02:43.852+03:00  INFO 5754 --- [penalty-service] [nio-8084-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-05-20T19:02:44.248+03:00  INFO 5754 --- [penalty-service] [ionShutdownHook] org.quartz.core.QuartzScheduler          : Scheduler quartzScheduler_$_NON_CLUSTERED paused.
+2026-05-20T19:02:44.249+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Member consumer-penalty-service-1-a893156c-3cc6-4cbc-b223-05eb6ce8a9db sending LeaveGroup request to coordinator localhost:9092 (id: 2147483646 rack: null) due to the consumer unsubscribed from all topics
+2026-05-20T19:02:44.249+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.249+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Request joining group due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.249+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] fkaConsumerFactory$ExtendedKafkaConsumer : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Unsubscribed all topics or patterns and assigned partitions
+2026-05-20T19:02:44.249+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-05-20T19:02:44.249+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-penalty-service-1, groupId=penalty-service] Request joining group due to: consumer pro-actively leaving the group
+2026-05-20T19:02:46.115+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-05-20T19:02:46.115+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-05-20T19:02:46.115+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-05-20T19:02:46.118+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.a.kafka.common.utils.AppInfoParser     : App info kafka.consumer for consumer-penalty-service-1 unregistered
+2026-05-20T19:02:46.119+03:00  INFO 5754 --- [penalty-service] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : penalty-service: Consumer stopped
+
+Exception in thread "DisconnectableInputStream source reader" org.gradle.api.UncheckedIOException: java.io.IOException: Input/output error
+	at org.gradle.internal.UncheckedException.throwAsUncheckedException(UncheckedException.java:62)
+	at org.gradle.internal.UncheckedException.throwAsUncheckedException(UncheckedException.java:41)
+	at org.gradle.util.internal.DisconnectableInputStream$1.run(DisconnectableInputStream.java:127)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.io.IOException: Input/output error
+	at java.base/java.io.FileInputStream.readBytes(Native Method)
+	at java.base/java.io.FileInputStream.read(FileInputStream.java:287)
+	at java.base/java.io.BufferedInputStream.read1(BufferedInputStream.java:345)
+	at java.base/java.io.BufferedInputStream.implRead(BufferedInputStream.java:420)
+	at java.base/java.io.BufferedInputStream.read(BufferedInputStream.java:399)
+	at org.gradle.util.internal.DisconnectableInputStream$1.run(DisconnectableInputStream.java:98)
+	... 1 more
+
+> Task :penalty-service:bootRun FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':penalty-service:bootRun'.
+> Process 'command '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home/bin/java'' finished with non-zero exit value 137
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 7s
+4 actionable tasks: 1 executed, 3 up-to-date

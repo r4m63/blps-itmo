@@ -1,0 +1,113 @@
+### Scenario 35 — Orchestrated saga happy path + admin inspection
+### IntelliJ HTTP Client syntax.
+### Prereq: run 00-smoke.http section 0 first (or have landlord/tenant/admin seeded).
+###
+### What this exercises:
+###   1. Saga starts on support-decision and gets a sagaId.
+###   2. PENALTY_APPLIED → penaltyCount++ → PENALTY_COUNTED → saga COMPLETED.
+###   3. Admin reads /api/sagas/{id} and /api/claims/{id}/saga.
+###
+### Compensation arc (saga → COMPENSATING_REVOKE → COMPENSATED) is exercised
+### indirectly: bring penalty-service or auth-service down between requests 35.6
+### and 35.7 and wait > temporal.timeout-seconds.awaiting-* (default 60s). The
+### Temporal workflow timer will emit PENALTY_REVOKE_COMMAND and the saga will
+### transition to COMPENSATED automatically once the service comes back.
+
+@baseUrl = http://localhost:8080
+@adminEmail = admin@blps.local
+@adminPass = adminpass
+@landlordEmail = landlord@blps.local
+@landlordPass = landpass
+@tenantEmail = tenant@blps.local
+@tenantPass = tenantpass
+
+### 35.1 Resolve tenant id
+GET {{baseUrl}}/api/auth/me
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+
+> {%
+client.global.set("tenant35_id", response.body.id);
+%}
+
+### 35.2 Landlord creates claim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenant35_id}},
+  "title": "Saga orchestration happy path",
+  "description": "Verifies PENALTY_APPLIED + PENALTY_COUNTED close the saga.",
+  "claimedAmount": 200,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim35_id", response.body.id);
+%}
+
+### 35.3 Intake start
+POST {{baseUrl}}/api/claims/{{claim35_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 35.4 Intake decision (no extra info)
+POST {{baseUrl}}/api/claims/{{claim35_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "" }
+
+### 35.5 Assessment with penalty grounds
+POST {{baseUrl}}/api/claims/{{claim35_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 150, "assessmentNotes": "saga e2e" }
+
+### 35.6 Tenant agrees
+POST {{baseUrl}}/api/claims/{{claim35_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 35.7 Support decision → saga starts (currentSagaId now non-null)
+POST {{baseUrl}}/api/claims/{{claim35_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 150,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "drive saga"
+}
+
+> {%
+client.global.set("saga35_id", response.body.currentSagaId);
+client.test("saga started", () => {
+  client.assert(response.body.currentSagaId !== null, "currentSagaId must be present after support-decision");
+  client.assert(response.body.status === "PENALTY_PROCESSING", "claim must enter PENALTY_PROCESSING");
+});
+%}
+
+### 35.8 Poll claim — should be PENALTY_APPLIED after PENALTY_COUNTED is consumed (~2-3s)
+GET {{baseUrl}}/api/claims/{{claim35_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 35.9 Saga by id — state should be COMPLETED
+GET {{baseUrl}}/api/sagas/{{saga35_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 35.10 Saga by claim — same row
+GET {{baseUrl}}/api/claims/{{claim35_id}}/saga
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 35.11 Tenant penalty count incremented
+GET {{baseUrl}}/api/users/{{tenant35_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 35.12 Penalty operation final state
+GET {{baseUrl}}/api/penalties/claim/{{claim35_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}

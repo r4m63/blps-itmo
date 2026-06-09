@@ -1,70 +1,195 @@
 services:
-  postgres-business:
-    image: postgres:16
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: blps-kafka
     restart: unless-stopped
-    container_name: blps-postgres-business
-    command:
-      - postgres
-      - -c
-      - max_prepared_transactions=100
     ports:
-      - "${BUSINESS_DB_PORT}:5432"
+      - "9092:9092"
+      - "29092:29092"
     environment:
-      POSTGRES_DB: ${BUSINESS_DB_NAME}
-      POSTGRES_USER: ${BUSINESS_DB_USERNAME}
-      POSTGRES_PASSWORD: ${BUSINESS_DB_PASSWORD}
-    volumes:
-      - pgdata_business:/var/lib/postgresql/data
-      - ./sql/init_1.sql:/docker-entrypoint-initdb.d/01-init_1.sql:ro
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${BUSINESS_DB_USERNAME} -d ${BUSINESS_DB_NAME}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qg
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - blps-net
 
-  postgres-auth:
-    image: postgres:16
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: blps-kafka-ui
     restart: unless-stopped
-    container_name: blps-postgres-auth
-    command:
-      - postgres
-      - -c
-      - max_prepared_transactions=100
+    depends_on:
+      - kafka
     ports:
-      - "${AUTH_DB_PORT}:5432"
+      - "8085:8080"
     environment:
-      POSTGRES_DB: ${AUTH_DB_NAME}
-      POSTGRES_USER: ${AUTH_DB_USERNAME}
-      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
-    volumes:
-      - pgdata_auth:/var/lib/postgresql/data
-      - ./sql/init_2.sql:/docker-entrypoint-initdb.d/01-init_2.sql:ro
-      - ./sql/test_users_1.sql:/docker-entrypoint-initdb.d/02-test_users_1.sql:ro
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${AUTH_DB_USERNAME} -d ${AUTH_DB_NAME}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      KAFKA_CLUSTERS_0_NAME: blps-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks:
+      - blps-net
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    container_name: blps-minio
     restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     ports:
       - "9000:9000"
       - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
-      - miniodata:/data
-    command: server /data --console-address ":9001"
+      - minio-data:/data
+    networks:
+      - blps-net
+
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: blps-postgres-auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: blps_auth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+      - ./sql/init_auth_service.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U postgres -d blps_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - blps-net
+
+  postgres-claim:
+    image: postgres:16-alpine
+    container_name: blps-postgres-claim
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: blps_claim
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-claim-data:/var/lib/postgresql/data
+      - ./sql/init_claim_service.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d blps_claim"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - blps-net
+
+  postgres-penalty:
+    image: postgres:16-alpine
+    container_name: blps-postgres-penalty
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: blps_penalty
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-penalty-data:/var/lib/postgresql/data
+      - ./sql/init_penalty_service.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d blps_penalty"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - blps-net
+
+  postgres-temporal:
+    image: postgres:16-alpine
+    container_name: blps-postgres-temporal
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: temporal
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-temporal-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - blps-net
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    container_name: blps-temporal
+    restart: unless-stopped
+    depends_on:
+      postgres-temporal:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres-temporal
+    ports:
+      - "7233:7233"
+    networks:
+      - blps-net
+
+  temporal-ui:
+    image: temporalio/ui:2.31.2
+    container_name: blps-temporal-ui
+    restart: unless-stopped
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8086:8080"
+    networks:
+      - blps-net
+
+  jira:
+    image: mockserver/mockserver:5.15.0
+    container_name: blps-jira
+    restart: unless-stopped
+    ports:
+      - "18080:1080"
+    environment:
+      MOCKSERVER_INITIALIZATION_JSON_PATH: /config/jira-init.json
+      MOCKSERVER_WATCH_INITIALIZATION_JSON: "true"
+      MOCKSERVER_LOG_LEVEL: INFO
+    volumes:
+      - ./mock/jira-init.json:/config/jira-init.json:ro
+    networks:
+      - blps-net
 
 volumes:
-  pgdata_business:
-  pgdata_auth:
-  miniodata:
+  postgres-auth-data:
+  postgres-claim-data:
+  postgres-penalty-data:
+  postgres-temporal-data:
+  minio-data:
+
+networks:
+  blps-net:
+    driver: bridge

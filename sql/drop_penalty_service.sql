@@ -1,0 +1,9 @@
+BEGIN;
+
+DROP TABLE IF EXISTS penalty_operations CASCADE;
+DROP TABLE IF EXISTS outbox_events CASCADE;
+DROP TABLE IF EXISTS processed_messages CASCADE;
+
+DROP TYPE IF EXISTS penaltystatus;
+
+COMMIT;

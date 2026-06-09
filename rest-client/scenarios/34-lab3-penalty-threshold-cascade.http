@@ -1,0 +1,196 @@
+### Scenario 34 — Multi-claim cascade + claim/penalty list queries, messages, history
+### IntelliJ HTTP Client syntax.
+### Builds 3 independent claims for the same tenant to exercise PENALTY_APPLIED counters
+### and aggregate list endpoints (no auto-deactivation logic in current code — verify by hand).
+### Prereq: run 00-smoke.http section 0 first.
+
+@baseUrl = http://localhost:8080
+@adminEmail = admin@blps.local
+@adminPass = adminpass
+@landlordEmail = landlord@blps.local
+@landlordPass = landpass
+@tenantEmail = tenant@blps.local
+@tenantPass = tenantpass
+
+### 34.1 Resolve tenant id
+GET {{baseUrl}}/api/auth/me
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+
+> {%
+client.global.set("tenant34_id", response.body.id);
+%}
+
+### 34.2 Claim A — create
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{ "tenantId": {{tenant34_id}}, "title": "Cascade A", "description": "First in cascade.", "claimedAmount": 60, "currency": "USD" }
+
+> {%
+client.global.set("claimA34_id", response.body.id);
+%}
+
+### 34.3 Claim A — drive to PENALTY_APPLIED
+POST {{baseUrl}}/api/claims/{{claimA34_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+###
+POST {{baseUrl}}/api/claims/{{claimA34_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "" }
+
+###
+POST {{baseUrl}}/api/claims/{{claimA34_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 50, "assessmentNotes": "A" }
+
+###
+POST {{baseUrl}}/api/claims/{{claimA34_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+###
+POST {{baseUrl}}/api/claims/{{claimA34_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "applyPenalty": true, "penaltyAmount": 50, "penaltyCurrency": "USD", "simulateFailure": false, "resolutionNote": "A" }
+
+### 34.4 Claim B — same flow
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{ "tenantId": {{tenant34_id}}, "title": "Cascade B", "description": "Second in cascade.", "claimedAmount": 80, "currency": "USD" }
+
+> {%
+client.global.set("claimB34_id", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/api/claims/{{claimB34_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+###
+POST {{baseUrl}}/api/claims/{{claimB34_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "" }
+
+###
+POST {{baseUrl}}/api/claims/{{claimB34_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 70, "assessmentNotes": "B" }
+
+###
+POST {{baseUrl}}/api/claims/{{claimB34_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+###
+POST {{baseUrl}}/api/claims/{{claimB34_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "applyPenalty": true, "penaltyAmount": 70, "penaltyCurrency": "USD", "simulateFailure": false, "resolutionNote": "B" }
+
+### 34.5 Claim C — same flow
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{ "tenantId": {{tenant34_id}}, "title": "Cascade C", "description": "Third in cascade.", "claimedAmount": 100, "currency": "USD" }
+
+> {%
+client.global.set("claimC34_id", response.body.id);
+%}
+
+###
+POST {{baseUrl}}/api/claims/{{claimC34_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+###
+POST {{baseUrl}}/api/claims/{{claimC34_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "" }
+
+###
+POST {{baseUrl}}/api/claims/{{claimC34_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 90, "assessmentNotes": "C" }
+
+###
+POST {{baseUrl}}/api/claims/{{claimC34_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+###
+POST {{baseUrl}}/api/claims/{{claimC34_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "applyPenalty": true, "penaltyAmount": 90, "penaltyCurrency": "USD", "simulateFailure": false, "resolutionNote": "C" }
+
+### 34.6 Poll claim C until PENALTY_APPLIED (async)
+GET {{baseUrl}}/api/claims/{{claimC34_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 34.7 Tenant penaltyCount should be ≥3 after Kafka events drain
+GET {{baseUrl}}/api/users/{{tenant34_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 34.8 Penalties for this tenant
+GET {{baseUrl}}/api/penalties?tenantId={{tenant34_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 34.9 All APPLIED penalties in the system
+GET {{baseUrl}}/api/penalties?status=APPLIED
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 34.10 Add a couple of messages to claim A and list them
+POST {{baseUrl}}/api/claims/{{claimA34_id}}/messages
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{ "messageType": "LANDLORD_STATEMENT", "body": "Extra context after the fact." }
+
+###
+POST {{baseUrl}}/api/claims/{{claimA34_id}}/messages
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "messageType": "ADMIN_NOTE", "body": "Internal admin note." }
+
+###
+GET {{baseUrl}}/api/claims/{{claimA34_id}}/messages
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+
+### 34.11 History snapshot of each claim
+GET {{baseUrl}}/api/claims/{{claimA34_id}}/history
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+###
+GET {{baseUrl}}/api/claims/{{claimB34_id}}/history
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+###
+GET {{baseUrl}}/api/claims/{{claimC34_id}}/history
+Authorization: Basic {{adminEmail}} {{adminPass}}

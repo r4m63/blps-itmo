@@ -1,0 +1,112 @@
+### Scenario 31 — Penalty failure → manual retry → PENALTY_APPLIED
+### IntelliJ HTTP Client syntax.
+### Prereq: run 00-smoke.http section 0 first.
+
+@baseUrl = http://localhost:8080
+@adminEmail = admin@blps.local
+@adminPass = adminpass
+@landlordEmail = landlord@blps.local
+@landlordPass = landpass
+@tenantEmail = tenant@blps.local
+@tenantPass = tenantpass
+
+### 31.1 Resolve tenant id
+GET {{baseUrl}}/api/auth/me
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+
+> {%
+client.global.set("tenant31_id", response.body.id);
+%}
+
+### 31.2 Landlord creates claim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenant31_id}},
+  "title": "Failure-path claim",
+  "description": "Verifies PENALTY_PROCESSING_FAILED → retry recovery.",
+  "claimedAmount": 120.00,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim31_id", response.body.id);
+%}
+
+### 31.3 Admin: intake-start
+POST {{baseUrl}}/api/claims/{{claim31_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 31.4 Admin: intake-decision (no extra info)
+POST {{baseUrl}}/api/claims/{{claim31_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "All info provided." }
+
+### 31.5 Admin: assessment
+POST {{baseUrl}}/api/claims/{{claim31_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 90.00, "assessmentNotes": "Minor damage." }
+
+### 31.6 Tenant agrees
+POST {{baseUrl}}/api/claims/{{claim31_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "OK, I accept." }
+
+### 31.7 Support decision — simulate penalty failure
+POST {{baseUrl}}/api/claims/{{claim31_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 90.00,
+  "penaltyCurrency": "USD",
+  "simulateFailure": true,
+  "resolutionNote": "Force failure to test retry path."
+}
+
+### 31.8 Poll claim until PENALTY_PROCESSING_FAILED
+GET {{baseUrl}}/api/claims/{{claim31_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 31.9 Look up the penalty operation for this claim
+### Uses list-by-tenant — survives the moment when Kafka hasn't yet propagated
+### PENALTY_APPLICATION_REQUESTED to penalty-service.
+### If "no penalty yet" is logged: wait 2s and re-run THIS request before 31.10.
+GET {{baseUrl}}/api/penalties?tenantId={{tenant31_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+> {%
+const claimId = parseInt(client.global.get("claim31_id"), 10);
+const list = Array.isArray(response.body) ? response.body : [];
+const hit = list.find(p => p.claimId === claimId);
+if (hit) {
+  client.global.set("penalty31_id", hit.id);
+  client.log("penalty31_id = " + hit.id + " (status=" + hit.status + ")");
+} else {
+  client.log("no penalty for claimId=" + claimId + " yet — wait 2s and re-run 31.9");
+}
+client.test("penalty31 found", () => {
+  client.assert(hit !== undefined, "penalty for claim31 not yet propagated from Kafka — wait and re-run 31.9");
+});
+%}
+
+### 31.10 Admin manual retry
+POST {{baseUrl}}/api/penalties/{{penalty31_id}}/retry
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 31.11 Poll claim — should converge to PENALTY_APPLIED
+GET {{baseUrl}}/api/claims/{{claim31_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 31.12 Inspect penalty final state
+GET {{baseUrl}}/api/penalties/{{penalty31_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}

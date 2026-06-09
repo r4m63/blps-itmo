@@ -1,0 +1,97 @@
+### Scenario 30 — Happy path: claim → intake → assessment → tenant response → penalty applied
+### IntelliJ HTTP Client syntax (`> {% client.global.set(...) %}` captures ids).
+### Prereq: run 00-smoke.http section 0 first (or have landlord/tenant/admin seeded).
+
+@baseUrl = http://localhost:8080
+@adminEmail = admin@blps.local
+@adminPass = adminpass
+@landlordEmail = landlord@blps.local
+@landlordPass = landpass
+@tenantEmail = tenant@blps.local
+@tenantPass = tenantpass
+
+### 30.1 Resolve tenant id
+GET {{baseUrl}}/api/auth/me
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+
+> {%
+client.global.set("tenant30_id", response.body.id);
+%}
+
+### 30.2 Landlord creates claim
+POST {{baseUrl}}/api/claims
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenant30_id}},
+  "title": "Broken sofa and stained carpet",
+  "description": "Tenant left visible damage; landlord requests damage assessment.",
+  "claimedAmount": 250.00,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim30_id", response.body.id);
+%}
+
+### 30.3 Read created claim (status SUBMITTED)
+GET {{baseUrl}}/api/claims/{{claim30_id}}
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+
+### 30.4 Admin starts intake
+POST {{baseUrl}}/api/claims/{{claim30_id}}/intake-start
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 30.5 Admin asks for additional info
+POST {{baseUrl}}/api/claims/{{claim30_id}}/intake-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": true, "note": "Attach photos and serial numbers." }
+
+### 30.6 Landlord provides additional info
+POST {{baseUrl}}/api/claims/{{claim30_id}}/additional-info
+Authorization: Basic {{landlordEmail}} {{landlordPass}}
+Content-Type: application/json
+
+{ "body": "Attached photos and the sofa serial number; carpet visible in room overview." }
+
+### 30.7 Admin records assessment
+POST {{baseUrl}}/api/claims/{{claim30_id}}/assessment
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 175.00, "assessmentNotes": "Damage confirmed; reduced to fair value." }
+
+### 30.8 Tenant disagrees
+POST {{baseUrl}}/api/claims/{{claim30_id}}/tenant-response
+Authorization: Basic {{tenantEmail}} {{tenantPass}}
+Content-Type: application/json
+
+{ "body": "I disagree with the assessed amount." }
+
+### 30.9 Support approves penalty
+POST {{baseUrl}}/api/claims/{{claim30_id}}/support-decision
+Authorization: Basic {{adminEmail}} {{adminPass}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 175.00,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "Proceed with penalty application."
+}
+
+### 30.10 Poll claim (re-run until PENALTY_APPLIED — Outbox+Kafka are async)
+GET {{baseUrl}}/api/claims/{{claim30_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 30.11 Claim status history
+GET {{baseUrl}}/api/claims/{{claim30_id}}/history
+Authorization: Basic {{adminEmail}} {{adminPass}}
+
+### 30.12 Penalty for this claim (penalty-service via proxy)
+GET {{baseUrl}}/api/penalties/claim/{{claim30_id}}
+Authorization: Basic {{adminEmail}} {{adminPass}}

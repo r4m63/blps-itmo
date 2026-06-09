@@ -1,0 +1,398 @@
+### Scenario 37 - Camunda SagaState coverage through direct claim-service API
+### IntelliJ HTTP Client syntax.
+###
+### Why direct claim-service:
+###   Some checks require stopping auth-service. If requests go through the
+###   auth-service gateway on :8080, the test cannot continue after auth-service
+###   is stopped. This file uses claim-service directly on :8081 with X-User-Id.
+###
+### Recommended short timers for manual testing:
+###   ./gradlew :claim-service:bootRun --console=plain --args="\
+###   --claim-process.timers.started-hold=PT8S \
+###   --claim-process.timers.awaiting-penalty-applied=PT10S \
+###   --claim-process.timers.awaiting-penalty-counted=PT10S \
+###   --claim-process.timers.compensating-retry=PT5S"
+###
+### Other services:
+###   ./gradlew :auth-service:bootRun
+###   ./gradlew :penalty-service:bootRun
+###
+### Coverage map:
+###   Test A covers: STARTED, COMPLETED
+###   Test B covers: PENALTY_FAILED
+###   Test C covers: AWAITING_PENALTY_APPLIED, COMPENSATING_REVOKE, COMPENSATION_FAILED
+###   Test D covers: AWAITING_PENALTY_COUNTED, COMPENSATED
+###
+### Camunda UI:
+###   http://localhost:8081/camunda
+###   process variable sagaId = {{saga_id}}
+
+@claimUrl = http://localhost:8081
+@adminId = 1
+@landlordId = 2
+@tenantId = 3
+
+### ---------------------------------------------------------------------
+### Test A - STARTED -> COMPLETED
+### Services before running:
+###   auth-service: running
+###   claim-service: running with Camunda engine
+###   penalty-service: running
+###
+### Covers:
+###   STARTED   - query immediately after support-decision while started hold is active
+###   COMPLETED - query after Kafka/Camunda events drain
+### ---------------------------------------------------------------------
+
+### 37.A1 Create claim
+POST {{claimUrl}}/api/claims
+X-User-Id: {{landlordId}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenantId}},
+  "title": "Camunda 37 STARTED COMPLETED",
+  "description": "Direct claim-service test: STARTED then COMPLETED.",
+  "claimedAmount": 101,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim37_completed_id", response.body.id);
+%}
+
+### 37.A2 Intake start
+POST {{claimUrl}}/api/claims/{{claim37_completed_id}}/intake-start
+X-User-Id: {{adminId}}
+
+### 37.A3 Intake decision
+POST {{claimUrl}}/api/claims/{{claim37_completed_id}}/intake-decision
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "ok" }
+
+### 37.A4 Assessment
+POST {{claimUrl}}/api/claims/{{claim37_completed_id}}/assessment
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 81, "assessmentNotes": "started and completed path" }
+
+### 37.A5 Tenant response
+POST {{claimUrl}}/api/claims/{{claim37_completed_id}}/tenant-response
+X-User-Id: {{tenantId}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 37.A6 Support decision starts Camunda penalty saga branch
+POST {{claimUrl}}/api/claims/{{claim37_completed_id}}/support-decision
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 81,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "started then completed"
+}
+
+> {%
+client.global.set("saga37_completed_id", response.body.currentSagaId);
+client.log("Test A process instance saga id = penalty-application-" + response.body.currentSagaId);
+%}
+
+### 37.A7 Run immediately, before claim-process.timers.started-hold expires: STARTED
+GET {{claimUrl}}/api/sagas/{{saga37_completed_id}}
+
+> {%
+client.test("Test A covers STARTED", () => {
+  client.assert(response.body.state === "STARTED", "Expected STARTED, got " + response.body.state);
+});
+%}
+
+### 37.A8 Run after started-hold + Kafka drain: COMPLETED
+GET {{claimUrl}}/api/sagas/{{saga37_completed_id}}
+
+> {%
+client.test("Test A covers COMPLETED", () => {
+  client.assert(response.body.state === "COMPLETED", "Expected COMPLETED, got " + response.body.state);
+});
+%}
+
+### ---------------------------------------------------------------------
+### Test B - PENALTY_FAILED
+### Services before running:
+###   auth-service: running
+###   claim-service: running
+###   penalty-service: running
+###
+### Covers:
+###   PENALTY_FAILED - penalty-service receives simulateFailure=true and emits
+###                    PENALTY_APPLICATION_FAILED.
+### ---------------------------------------------------------------------
+
+### 37.B1 Create claim
+POST {{claimUrl}}/api/claims
+X-User-Id: {{landlordId}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenantId}},
+  "title": "Camunda 37 PENALTY_FAILED",
+  "description": "Direct claim-service test: simulated penalty failure.",
+  "claimedAmount": 102,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim37_failed_id", response.body.id);
+%}
+
+### 37.B2 Intake start
+POST {{claimUrl}}/api/claims/{{claim37_failed_id}}/intake-start
+X-User-Id: {{adminId}}
+
+### 37.B3 Intake decision
+POST {{claimUrl}}/api/claims/{{claim37_failed_id}}/intake-decision
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "ok" }
+
+### 37.B4 Assessment
+POST {{claimUrl}}/api/claims/{{claim37_failed_id}}/assessment
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 82, "assessmentNotes": "penalty failed path" }
+
+### 37.B5 Tenant response
+POST {{claimUrl}}/api/claims/{{claim37_failed_id}}/tenant-response
+X-User-Id: {{tenantId}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 37.B6 Support decision with simulateFailure=true
+POST {{claimUrl}}/api/claims/{{claim37_failed_id}}/support-decision
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 82,
+  "penaltyCurrency": "USD",
+  "simulateFailure": true,
+  "resolutionNote": "forced penalty failure"
+}
+
+> {%
+client.global.set("saga37_failed_id", response.body.currentSagaId);
+client.log("Test B process instance saga id = penalty-application-" + response.body.currentSagaId);
+%}
+
+### 37.B7 Run after 2-5 seconds: PENALTY_FAILED
+GET {{claimUrl}}/api/sagas/{{saga37_failed_id}}
+
+> {%
+client.test("Test B covers PENALTY_FAILED", () => {
+  client.assert(response.body.state === "PENALTY_FAILED", "Expected PENALTY_FAILED, got " + response.body.state);
+});
+%}
+
+### ---------------------------------------------------------------------
+### Test C - AWAITING_PENALTY_APPLIED -> COMPENSATING_REVOKE -> COMPENSATION_FAILED
+### Manual action before 37.C6:
+###   Stop penalty-service and keep it stopped until 37.C9.
+###   claim-service must remain running.
+###
+### Covers:
+###   AWAITING_PENALTY_APPLIED - request is in claim outbox, but penalty-service
+###                             is down and does not emit PENALTY_APPLIED.
+###   COMPENSATING_REVOKE      - Camunda timer expires and starts revoke attempts.
+###   COMPENSATION_FAILED      - no PENALTY_REVOKED/PENALTY_REVOKE_FAILED signal
+###                             arrives before max compensation attempts are exhausted.
+### ---------------------------------------------------------------------
+
+### 37.C1 Create claim
+POST {{claimUrl}}/api/claims
+X-User-Id: {{landlordId}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenantId}},
+  "title": "Camunda 37 COMPENSATION_FAILED",
+  "description": "Direct claim-service test: penalty-service stopped.",
+  "claimedAmount": 103,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim37_comp_failed_id", response.body.id);
+%}
+
+### 37.C2 Intake start
+POST {{claimUrl}}/api/claims/{{claim37_comp_failed_id}}/intake-start
+X-User-Id: {{adminId}}
+
+### 37.C3 Intake decision
+POST {{claimUrl}}/api/claims/{{claim37_comp_failed_id}}/intake-decision
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "ok" }
+
+### 37.C4 Assessment
+POST {{claimUrl}}/api/claims/{{claim37_comp_failed_id}}/assessment
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 83, "assessmentNotes": "compensation failed path" }
+
+### 37.C5 Tenant response
+POST {{claimUrl}}/api/claims/{{claim37_comp_failed_id}}/tenant-response
+X-User-Id: {{tenantId}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 37.C6 STOP penalty-service, then run support decision
+POST {{claimUrl}}/api/claims/{{claim37_comp_failed_id}}/support-decision
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 83,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "penalty-service stopped"
+}
+
+> {%
+client.global.set("saga37_comp_failed_id", response.body.currentSagaId);
+client.log("Test C process instance saga id = penalty-application-" + response.body.currentSagaId);
+%}
+
+### 37.C7 Run after started-hold expires, before awaiting-penalty-applied timeout: AWAITING_PENALTY_APPLIED
+GET {{claimUrl}}/api/sagas/{{saga37_comp_failed_id}}
+
+> {%
+client.test("Test C covers AWAITING_PENALTY_APPLIED", () => {
+  client.assert(response.body.state === "AWAITING_PENALTY_APPLIED", "Expected AWAITING_PENALTY_APPLIED, got " + response.body.state);
+});
+%}
+
+### 37.C8 Run after awaiting-penalty-applied timeout: COMPENSATING_REVOKE
+GET {{claimUrl}}/api/sagas/{{saga37_comp_failed_id}}
+
+> {%
+client.test("Test C covers COMPENSATING_REVOKE", () => {
+  client.assert(response.body.state === "COMPENSATING_REVOKE", "Expected COMPENSATING_REVOKE, got " + response.body.state);
+});
+%}
+
+### 37.C9 Run after all compensation retries expire: COMPENSATION_FAILED
+GET {{claimUrl}}/api/sagas/{{saga37_comp_failed_id}}
+
+> {%
+client.test("Test C covers COMPENSATION_FAILED", () => {
+  client.assert(response.body.state === "COMPENSATION_FAILED", "Expected COMPENSATION_FAILED, got " + response.body.state);
+});
+%}
+
+### ---------------------------------------------------------------------
+### Test D - AWAITING_PENALTY_COUNTED -> COMPENSATED
+### Manual action before 37.D6:
+###   Start penalty-service.
+###   Stop auth-service.
+###   Keep claim-service running.
+###
+### Covers:
+###   AWAITING_PENALTY_COUNTED - penalty-service applies penalty and emits
+###                             PENALTY_APPLIED, but auth-service is down and
+###                             PENALTY_COUNTED does not arrive.
+###   COMPENSATED             - Camunda timer starts compensation, penalty-service
+###                             consumes revoke command and emits PENALTY_REVOKED.
+### ---------------------------------------------------------------------
+
+### 37.D1 Create claim
+POST {{claimUrl}}/api/claims
+X-User-Id: {{landlordId}}
+Content-Type: application/json
+
+{
+  "tenantId": {{tenantId}},
+  "title": "Camunda 37 COMPENSATED",
+  "description": "Direct claim-service test: auth-service stopped.",
+  "claimedAmount": 104,
+  "currency": "USD"
+}
+
+> {%
+client.global.set("claim37_compensated_id", response.body.id);
+%}
+
+### 37.D2 Intake start
+POST {{claimUrl}}/api/claims/{{claim37_compensated_id}}/intake-start
+X-User-Id: {{adminId}}
+
+### 37.D3 Intake decision
+POST {{claimUrl}}/api/claims/{{claim37_compensated_id}}/intake-decision
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{ "requestAdditionalInfo": false, "note": "ok" }
+
+### 37.D4 Assessment
+POST {{claimUrl}}/api/claims/{{claim37_compensated_id}}/assessment
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{ "penaltyGrounds": true, "assessmentAmount": 84, "assessmentNotes": "compensated path" }
+
+### 37.D5 Tenant response
+POST {{claimUrl}}/api/claims/{{claim37_compensated_id}}/tenant-response
+X-User-Id: {{tenantId}}
+Content-Type: application/json
+
+{ "body": "ack" }
+
+### 37.D6 START penalty-service, STOP auth-service, then run support decision
+POST {{claimUrl}}/api/claims/{{claim37_compensated_id}}/support-decision
+X-User-Id: {{adminId}}
+Content-Type: application/json
+
+{
+  "applyPenalty": true,
+  "penaltyAmount": 84,
+  "penaltyCurrency": "USD",
+  "simulateFailure": false,
+  "resolutionNote": "auth-service stopped"
+}
+
+> {%
+client.global.set("saga37_compensated_id", response.body.currentSagaId);
+client.log("Test D process instance saga id = penalty-application-" + response.body.currentSagaId);
+%}
+
+### 37.D7 Run after penalty-service applies penalty: AWAITING_PENALTY_COUNTED
+GET {{claimUrl}}/api/sagas/{{saga37_compensated_id}}
+
+> {%
+client.test("Test D covers AWAITING_PENALTY_COUNTED", () => {
+  client.assert(response.body.state === "AWAITING_PENALTY_COUNTED", "Expected AWAITING_PENALTY_COUNTED, got " + response.body.state);
+});
+%}
+
+### 37.D8 Run after awaiting-penalty-counted timeout and revoke processing: COMPENSATED
+GET {{claimUrl}}/api/sagas/{{saga37_compensated_id}}
+
+> {%
+client.test("Test D covers COMPENSATED", () => {
+  client.assert(response.body.state === "COMPENSATED", "Expected COMPENSATED, got " + response.body.state);
+});
+%}

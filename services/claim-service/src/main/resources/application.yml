@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: claim-service
+  datasource:
+    url: jdbc:postgresql://localhost:5434/blps_claim
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: claim-service
+  quartz:
+    job-store-type: memory
+
+camunda:
+  bpm:
+    database:
+      schema-update: true
+    history-level: full
+    admin-user:
+      id: admin
+      password: admin
+      first-name: Admin
+    webapp:
+      index-redirect-enabled: true
+    filter:
+      create: All tasks
+
+minio:
+  url: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket: claim-attachments
+
+jira:
+  enabled: true
+  url:
+  user:
+  token:
+  project-key: SCRUM
+
+claim-process:
+  timers:
+    started-hold:
+    tenant-response-timeout:
+    awaiting-penalty-applied:
+    awaiting-penalty-counted:
+    compensating-retry:
+
+server:
+  port: 8081
